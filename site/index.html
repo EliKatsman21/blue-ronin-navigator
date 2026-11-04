@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Blue Ronin Navigator</title>
+<meta name="description" content="נביגטור רכיבה לצפון: מסלולי עיקולים, תדריך שבת עם מזג אוויר חי, מצב רכיבה ומפות אופליין.">
+<meta name="theme-color" content="#0A111E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Blue Ronin">
+<link rel="preconnect" href="https://tiles.openfreemap.org">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+/* Concept: a dawn-ride instrument. Full-bleed 3D map, a ride sheet that docks right on desktop and slides up on phones.
+   Night-asphalt blue ground, Yamaha-blue route, sunrise amber for anything time/sun related. */
+:root{
+  --bg:#0A111E; --surface:#111A2B; --raised:#17233A; --ink:#E6ECF4; --muted:#8C9DB3; --line:#23324B;
+  --accent:#5C8DFF; --accent-ink:#06101F; --sun:#FFA24A; --view:#4CC48C; --warn:#FF6A63; --report:#C58BFF;
+  --go:#4CC48C; --ok:#9BD15A; --caution:#FFB547; --no:#FF6A63;
+  --c0:#7E8CA3; --c1:#5C8DFF; --c2:#FFB547; --c3:#FF5A7A;
+  --display:"Karantina","Assistant",system-ui,sans-serif; --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --sheet-w:420px; color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#EEF1F4; --surface:#F9FAFB; --raised:#FFFFFF; --ink:#132030; --muted:#56687A; --line:#CDD5DD;
+  --accent:#1E4FD6; --accent-ink:#FFFFFF; --sun:#C2620C; --view:#1F7F55; --warn:#C8322F; --report:#8B45C7;
+  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#EEF1F4; --surface:#F9FAFB; --raised:#FFFFFF; --ink:#132030; --muted:#56687A; --line:#CDD5DD;
+  --accent:#1E4FD6; --accent-ink:#FFFFFF; --sun:#C2620C; --view:#1F7F55; --warn:#C8322F; --report:#8B45C7;
+  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+#map{position:fixed;inset:0}
+.maplibregl-ctrl-attrib{font-size:10px}
+.maplibregl-popup-content{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;font-family:var(--body);direction:rtl;padding:10px 12px}
+.maplibregl-popup-tip{border-top-color:var(--surface)!important;border-bottom-color:var(--surface)!important}
+
+/* top bar */
+.bar{position:fixed;top:0;right:0;left:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--bg) 88%,transparent),transparent);pointer-events:none}
+.bar>*{pointer-events:auto}
+.brand{font-family:var(--display);font-weight:700;font-size:30px;line-height:.9;letter-spacing:.5px;white-space:nowrap}
+.brand span{color:var(--accent)}
+.now{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--surface) 90%,transparent);border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 6px;backdrop-filter:blur(8px);font-size:14px;cursor:pointer}
+.now b{font-family:var(--mono);font-weight:500}
+.now svg{width:22px;height:22px}
+@media (max-width:520px){#nowText{display:none}.brand{font-size:26px}}
+
+/* floating controls */
+.fabs{position:fixed;z-index:4;left:max(12px,env(safe-area-inset-left,0px));top:calc(64px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px}
+.fab{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(8px);display:grid;place-items:center;cursor:pointer;color:var(--ink);position:relative}
+.fab svg{width:21px;height:21px}
+.fab[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fab.home{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fab .tip{position:absolute;right:52px;white-space:nowrap;background:var(--ink);color:var(--bg);font-size:12px;padding:3px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .15s}
+@media (hover:hover){.fab:hover .tip{opacity:1}}
+.layers{position:fixed;z-index:6;left:calc(max(12px,env(safe-area-inset-left,0px)) + 54px);top:calc(64px + env(safe-area-inset-top,0px));background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;min-width:190px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.layers label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px}
+.layers .sw{width:12px;height:12px;border-radius:3px}
+.layers h5{margin:4px 0 0;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+
+/* sheet */
+.sheet{position:fixed;z-index:7;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+@media (min-width:900px){
+  .sheet{top:calc(60px + env(safe-area-inset-top,0px));bottom:12px;right:max(12px,env(safe-area-inset-right,0px));width:var(--sheet-w);border-radius:16px}
+  .grab{display:none}
+}
+@media (max-width:899px){
+  .sheet{left:0;right:0;bottom:0;border-radius:18px 18px 0 0;height:min(48vh,480px);transition:height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .sheet.peek{height:calc(118px + env(safe-area-inset-bottom,0px))}
+  .sheet.full{height:calc(100% - 70px - env(safe-area-inset-top,0px))}
+  .fabs{top:auto;bottom:calc(min(48vh,480px) + 12px)}
+  body.sheet-peek .fabs{bottom:calc(130px + env(safe-area-inset-bottom,0px))}
+  body.sheet-full .fabs{display:none}
+}
+.grab{border:0;background:none;padding:8px 0 2px;cursor:pointer;display:grid;place-items:center}
+.grab span{width:44px;height:5px;border-radius:3px;background:var(--line)}
+.tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tab{border:0;background:none;padding:8px 10px 10px;font-weight:700;font-size:15px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.panes{overflow-y:auto;flex:1;min-height:0;padding:14px 16px 24px}
+.pane{display:flex;flex-direction:column;gap:14px}
+h2{font-family:var(--display);font-size:36px;line-height:.95;margin:0;font-weight:700;letter-spacing:.3px;text-wrap:balance}
+h3{margin:0;font-size:16px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--raised);border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:5px 9px;font-size:13px;border-radius:8px}
+.btn svg{width:16px;height:16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--muted)}
+.chip.road{font-family:var(--mono)}
+.chip.sun{border-color:var(--sun);color:var(--sun)}
+
+/* briefing */
+.brief-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.sunrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sunrow>div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.sunrow .k{font-size:12px;color:var(--muted)}
+.sunrow .v{font-family:var(--mono);font-size:18px}
+.sunrow .v.sun{color:var(--sun)}
+.ccards{display:grid;gap:8px}
+.ccard{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;text-align:right}
+.ccard.best{border-color:var(--go);box-shadow:inset 0 0 0 1px var(--go)}
+.gauge{width:64px;height:64px}
+.gauge text{font-family:var(--mono);font-size:19px;fill:var(--ink)}
+.verdict{font-weight:700}
+.v-go{color:var(--go)}.v-ok{color:var(--ok)}.v-warn{color:var(--caution)}.v-no{color:var(--no)}
+.why{font-size:12.5px;color:var(--muted)}
+.best-tag{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--go);border-radius:999px;padding:1px 8px}
+.hours{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(52px,1fr);gap:4px;overflow-x:auto;padding-bottom:4px}
+.hour{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:6px 4px;text-align:center;display:grid;gap:2px;justify-items:center}
+.hour .h{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hour .t{font-family:var(--mono);font-size:15px}
+.hour .p{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.hour .w{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.hour svg{width:22px;height:22px}
+.alerts{display:grid;gap:6px}
+.alert{display:flex;gap:8px;align-items:flex-start;font-size:14px;background:var(--raised);border:1px solid var(--line);border-inline-start:3px solid var(--caution);border-radius:8px;padding:8px 10px}
+.alert.sun{border-inline-start-color:var(--sun)}
+.alert.cam{border-inline-start-color:var(--warn)}
+.alert.info{border-inline-start-color:var(--accent)}
+.gear{margin:0;padding-inline-start:18px}
+.fresh{font-size:12px;color:var(--muted)}
+
+/* route */
+.chapsel{display:flex;gap:6px;flex-wrap:wrap}
+.chapsel button{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer}
+.chapsel button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.stat{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:7px 8px}
+.stat .k{font-size:11.5px;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-size:16px}
+.curvebar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-inline-end:4px}
+.profile{width:100%;height:120px;display:block;direction:ltr}
+.gauge{direction:ltr}
+.profile .area{fill:color-mix(in srgb,var(--accent) 22%,transparent)}
+.profile .ln{fill:none;stroke:var(--accent);stroke-width:1.6}
+.profile text{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.profile .grid{stroke:var(--line);stroke-width:1}
+.stops{list-style:none;margin:0;padding:0}
+.stop{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.stop:first-child{border-top:0}
+.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:13px;background:var(--accent);color:var(--accent-ink)}
+.num.view{background:var(--view)}.num.cafe{background:var(--sun)}
+.stop p{margin:2px 0 6px;color:var(--muted);font-size:14px}
+.stop h3 button{all:unset;cursor:pointer}
+.score{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.score b{color:var(--accent);font-weight:500;letter-spacing:1px}
+
+/* lists */
+.item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item b{display:block}
+.toggle{display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.progress{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+
+/* markers */
+.mk{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);font-size:12.5px;border:2.5px solid var(--bg);box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer}
+.mk.view{background:var(--view)}.mk.cafe{background:var(--sun)}.mk.start{outline:2px solid var(--accent);outline-offset:3px}
+.mk.dim{opacity:.45;transform:scale(.8)}
+.mkc{width:22px;height:22px;border-radius:50%;background:var(--sun);border:2px solid var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.mkc svg{width:12px;height:12px;color:var(--accent-ink)}
+.mkw{display:flex;align-items:center;gap:3px;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:999px;padding:1px 7px 1px 3px;font-family:var(--mono);font-size:12px;transform:translateY(-26px);pointer-events:none}
+.mkw svg{width:18px;height:18px}
+.me{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}
+
+/* ride HUD */
+.hud{position:fixed;z-index:9;left:0;right:0;bottom:0;padding:14px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 70%,transparent);display:grid;gap:10px}
+.hud .top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.speed{font-family:var(--display);font-size:96px;line-height:.8;font-weight:700}
+.speed small{font-family:var(--body);font-size:16px;color:var(--muted);font-weight:600;margin-inline-start:4px}
+.next{text-align:left}
+.next .k{font-size:12px;color:var(--muted)}
+.next .v{font-size:20px;font-weight:700}
+.next .d{font-family:var(--mono);font-size:22px;color:var(--accent)}
+.hudmsg{font-weight:700;border-radius:10px;padding:10px 12px;background:var(--raised);border:1px solid var(--line);font-size:16px}
+.hudmsg.cam{background:var(--warn);color:#fff;border-color:var(--warn)}
+.hudmsg.curve{border-inline-start:4px solid var(--c3)}
+body.riding .sheet,body.riding .fabs .hide-ride{display:none}
+
+/* intro */
+.intro{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(120% 80% at 50% 100%,color-mix(in srgb,var(--sun) 35%,var(--bg)) 0%,var(--bg) 60%);transition:opacity .8s ease,visibility .8s}
+.intro.out{opacity:0;visibility:hidden}
+.intro .in{text-align:center;padding:24px}
+.intro h1{font-family:var(--display);font-size:clamp(64px,14vw,140px);line-height:.8;margin:0;letter-spacing:1px}
+.intro h1 span{color:var(--accent)}
+.intro p{color:var(--muted);margin:10px 0 0;font-size:16px}
+.intro .road{width:min(320px,70vw);height:60px;margin:18px auto 0;display:block}
+.intro .road path{stroke-dasharray:420;stroke-dashoffset:420;animation:draw 1.6s ease forwards .2s}
+@keyframes draw{to{stroke-dashoffset:0}}
+.toast{position:fixed;z-index:30;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;max-width:90vw}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.intro .road path{stroke-dashoffset:0}}
+</style>
+</head>
+<body>
+<div class="intro" id="intro" aria-hidden="true">
+  <div class="in">
+    <h1>BLUE <span>RONIN</span></h1>
+    <svg class="road" viewBox="0 0 320 60"><path d="M4 50 C 60 50, 70 10, 120 12 S 170 52, 220 46 S 280 8, 316 10" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/></svg>
+    <p>טוען את הצפון: כבישים, מזג אוויר, שבת.</p>
+  </div>
+</div>
+
+<div id="map" aria-label="מפת הצפון"></div>
+
+<header class="bar">
+  <div class="brand">BLUE RONIN <span>· צפון</span></div>
+  <button type="button" class="now" id="nowChip" aria-label="מזג אוויר עכשיו"><span id="nowIcon"></span><b id="nowTemp">--°</b><span id="nowText" class="small muted">טוען</span></button>
+</header>
+
+<div class="fabs" id="fabs">
+  <button type="button" class="fab home" id="fHome" aria-label="בית: כל הצפון מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="tip">בית</span></button>
+  <button type="button" class="fab hide-ride" id="fLayers" aria-label="שכבות" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="tip">שכבות</span></button>
+  <button type="button" class="fab" id="f3d" aria-label="תלת־ממד" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m2 19 6-10 4 6 3-4 7 8z"/></svg><span class="tip">תלת־ממד</span></button>
+  <button type="button" class="fab hide-ride" id="fFly" aria-label="מעוף על המסלול"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg><span class="tip">מעוף על הפרק</span></button>
+  <button type="button" class="fab" id="fLocate" aria-label="המיקום שלי"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="tip">המיקום שלי</span></button>
+  <button type="button" class="fab" id="fRide" aria-label="מצב רכיבה" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 16a8 8 0 0 1 16 0"/><path d="m12 16 4-5"/></svg><span class="tip">מצב רכיבה</span></button>
+</div>
+
+<div class="layers" id="layersPop" hidden>
+  <h5>מסלול</h5>
+  <label><input type="checkbox" data-l="curves" checked><span class="sw" style="background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3))"></span>צפיפות עיקולים</label>
+  <label><input type="checkbox" data-l="glare" checked><span class="sw" style="background:var(--sun)"></span>סנוור שמש בבוקר</label>
+  <label><input type="checkbox" data-l="stops" checked><span class="sw" style="background:var(--accent)"></span>עצירות ומצפורים</label>
+  <h5>חי</h5>
+  <label><input type="checkbox" data-l="wx" checked><span class="sw" style="background:var(--muted)"></span>מזג אוויר לשבת</label>
+  <label><input type="checkbox" data-l="radar"><span class="sw" style="background:#3fa9f5"></span>מכ״ם גשם</label>
+  <h5>OpenStreetMap · מתעדכן שבועית</h5>
+  <label><input type="checkbox" data-l="cams" checked><span class="sw" style="background:var(--warn)"></span>מצלמות ואכיפה</label>
+  <label><input type="checkbox" data-l="cafes" checked><span class="sw" style="background:var(--sun)"></span>קפה פתוח בשבת</label>
+  <label><input type="checkbox" data-l="osmview"><span class="sw" style="background:var(--view)"></span>כל המצפורים</label>
+  <label><input type="checkbox" data-l="fuel"><span class="sw" style="background:var(--muted)"></span>תחנות דלק</label>
+  <h5>מפה</h5>
+  <label><input type="checkbox" data-l="hillshade" checked><span class="sw" style="background:var(--line)"></span>הצללת תבליט</label>
+</div>
+
+<section class="sheet" id="sheet" aria-label="ספר הרכיבה">
+  <button type="button" class="grab" id="grab" aria-label="הגדלה או הקטנה של הלוח"><span></span></button>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-t="brief" aria-selected="true">תדריך שבת</button>
+    <button class="tab" role="tab" data-t="route" aria-selected="false">מסלול</button>
+    <button class="tab" role="tab" data-t="stops" aria-selected="false">עצירות ודלק</button>
+    <button class="tab" role="tab" data-t="tools" aria-selected="false">כלים</button>
+  </div>
+  <div class="panes" id="panes">
+    <div class="pane" id="p-brief"></div>
+    <div class="pane" id="p-route" hidden></div>
+    <div class="pane" id="p-stops" hidden></div>
+    <div class="pane" id="p-tools" hidden></div>
+  </div>
+</section>
+
+<div class="hud" id="hud" hidden>
+  <div id="hudMsg" class="hudmsg" hidden></div>
+  <div class="top">
+    <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
+    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div></div>
+  </div>
+  <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+<script src="data.js"></script>
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "Blue Ronin Navigator",
+  "short_name": "Blue Ronin",
+  "description": "נביגטור רכיבה לצפון: מסלולי עיקולים, תדריך שבת עם מזג אוויר חי, מצב רכיבה ומפות אופליין.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0A111E",
+  "theme_color": "#0A111E",
+  "categories": ["navigation", "travel", "sports"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

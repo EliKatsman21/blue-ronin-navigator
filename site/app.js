@@ -49,7 +49,7 @@
   /* ---------- state ---------- */
   const st = {
     chap: LS.get("chap", "c1"),
-    layers: Object.assign({ curves: true, glare: true, stops: true, wx: true, radar: false, cams: true, cafes: true, osmview: false, fuel: true, hillshade: true }, LS.get("layers", {})),
+    layers: Object.assign({ curves: true, glare: true, stops: true, wx: true, radar: false, cams: true, cafes: true, osmview: true, fuel: true, hillshade: true }, LS.get("layers", {})),
     shabbat: LS.get("shabbat", true),
     theme: LS.get("theme", "system"),
     routes: {}, curves: {}, cstats: {}, glare: {}, elev: {},
@@ -97,6 +97,32 @@
   const DEM = { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 13, attribution: "תבליט: Mapzen / AWS Terrain Tiles" };
   const FC = f => ({ type: "FeatureCollection", features: f || [] });
 
+  /* Map icons drawn on canvas: a category color disc, a white glyph, and for fuel a small Shabbat-status dot. */
+  const GLYPH = {
+    fuel: ["M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20", "M3.5 20h12", "M7.5 7h4v3.5h-4z", "M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"],
+    view: ["M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z", "M16.5 7.2a1.8 1.8 0 1 0 .01 0"],
+    cam: ["M3 8.5h11v7H3z", "M14 10.5l6-3v9l-6-3", "M6 12h.01"]
+  };
+  function iconImage(color, glyph, dot) {
+    const px = 2, S = 30 * px, c = document.createElement("canvas"); c.width = S; c.height = S; const g = c.getContext("2d");
+    g.save(); g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 4 * px; g.shadowOffsetY = 1.5 * px;
+    g.beginPath(); g.arc(S / 2, S / 2, 12 * px, 0, Math.PI * 2); g.fillStyle = color; g.fill(); g.restore();
+    g.lineWidth = 2.2 * px; g.strokeStyle = "#fff"; g.beginPath(); g.arc(S / 2, S / 2, 12 * px, 0, Math.PI * 2); g.stroke();
+    g.save(); g.translate(S / 2 - 8.4 * px, S / 2 - 8.4 * px); g.scale(0.7 * px, 0.7 * px);
+    g.strokeStyle = "#fff"; g.lineWidth = 2.3; g.lineCap = "round"; g.lineJoin = "round";
+    GLYPH[glyph].forEach(d => g.stroke(new Path2D(d))); g.restore();
+    if (dot) { g.beginPath(); g.arc(S - 6.5 * px, 6.5 * px, 5 * px, 0, Math.PI * 2); g.fillStyle = dot; g.fill(); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
+    return g.getImageData(0, 0, S, S);
+  }
+  function addIcons() {
+    const set = (id, img) => { if (map.hasImage(id)) map.removeImage(id); map.addImage(id, img, { pixelRatio: 2 }); };
+    const fuel = css("--fuel");
+    set("i-fuel-open", iconImage(fuel, "fuel", css("--go")));
+    set("i-fuel-closed", iconImage(fuel, "fuel", css("--no")));
+    set("i-fuel-unknown", iconImage(fuel, "fuel", "#9AA5B4"));
+    set("i-view", iconImage(css("--view"), "view"));
+    set("i-cam", iconImage(css("--warn"), "cam"));
+  }
   function setupStyle() {
     hebrewize();
     const under = firstOf(/^(tunnel|road|highway|bridge|transportation|aeroway|building)/) || firstSymbol();
@@ -113,9 +139,11 @@
     map.addLayer({ id: "br-curves", type: "line", source: "br-curves", paint: { "line-color": ["match", ["get", "cls"], 0, c("--c0"), 1, c("--c1"), 2, c("--c2"), c("--c3")], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 6] }, layout: { "line-cap": "round", "line-join": "round" } }, sym);
     map.addLayer({ id: "br-glare", type: "line", source: "br-glare", paint: { "line-color": c("--sun"), "line-width": ["interpolate", ["linear"], ["zoom"], 7, 3, 13, 5], "line-offset": ["interpolate", ["linear"], ["zoom"], 7, 6, 13, 12], "line-dasharray": [1, 1] }, layout: { "line-cap": "butt" } });
     map.addLayer({ id: "br-enf-pt", type: "circle", source: "br-enf", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": c("--warn"), "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-    map.addLayer({ id: "br-fuel", type: "circle", source: "br-osm", filter: ["==", ["get", "k"], "fuel"], minzoom: 7.5, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3, 13, 7], "circle-color": ["match", ["get", "s"], "open", c("--go"), "closed", c("--no"), c("--muted")], "circle-stroke-color": c("--bg"), "circle-stroke-width": 1.5 } });
-    map.addLayer({ id: "br-view", type: "circle", source: "br-osm", filter: ["==", ["get", "k"], "view"], minzoom: 8, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 13, 6], "circle-color": c("--view"), "circle-stroke-color": c("--bg"), "circle-stroke-width": 1.5 } });
-    map.addLayer({ id: "br-cam", type: "circle", source: "br-osm", filter: ["==", ["get", "k"], "cam"], paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "circle-color": c("--warn"), "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    addIcons();
+    const sz = (a, b) => ["interpolate", ["linear"], ["zoom"], 7, a, 13, b];
+    map.addLayer({ id: "br-view", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "view"], minzoom: 8.5, layout: { "icon-image": "i-view", "icon-size": sz(0.5, 0.9), "icon-allow-overlap": false, "icon-padding": 1, "symbol-sort-key": 3 } });
+    map.addLayer({ id: "br-fuel", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "fuel"], minzoom: 7.5, layout: { "icon-image": ["concat", "i-fuel-", ["coalesce", ["get", "s"], "unknown"]], "icon-size": sz(0.55, 0.95), "icon-allow-overlap": true, "symbol-sort-key": 2 } });
+    map.addLayer({ id: "br-cam", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "cam"], layout: { "icon-image": "i-cam", "icon-size": sz(0.55, 0.9), "icon-allow-overlap": true, "symbol-sort-key": 1 } });
     if (st.layers.radar) addRadarLayer();
     if (st.terrain) map.setTerrain({ source: "dem", exaggeration: 1.5 });
     pushSources(); applyLayerVis();
@@ -273,30 +301,52 @@
   }
 
   /* ---------- OSM live layers (weekly refresh) ---------- */
-  async function loadOSM(force) {
-    const age = st.osm ? Date.now() - st.osm.ts : 1e12; const wd = new Date().getDay();
-    const stale = age > 6 * 864e5 || ([4, 5, 6].includes(wd) && age > 2 * 864e5);
-    if (!force && !stale) { pushSources(); return; }
+  /* OSM layers: served pre-cached by our own server (/api/osm, refreshed daily) so they load in a blink.
+     Overpass is only a fallback, and then all mirrors race in parallel. */
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+  function normOverpass(j) {
+    const t = n => n.tags || {}; const yes = v => v === "yes" ? true : v === "no" ? false : null;
+    const pick = n => { const la = n.lat ?? (n.center && n.center.lat), lo = n.lon ?? (n.center && n.center.lon); const g = t(n); return { id: n.type[0] + n.id, lat: +la.toFixed(5), lon: +lo.toFixed(5), name: g["name:he"] || g.name || "", brand: g["brand:he"] || g.brand || g.operator || "", maxspeed: g.maxspeed || "", oh: g.opening_hours || "", o95: yes(g["fuel:octane_95"]), o98: yes(g["fuel:octane_98"]), diesel: yes(g["fuel:diesel"]) }; };
+    const els = j.elements.filter(n => n.lat != null || n.center);
+    return { ts: Date.now(), cams: els.filter(n => t(n).highway === "speed_camera").map(pick), fuel: els.filter(n => t(n).amenity === "fuel").map(pick), views: els.filter(n => t(n).tourism === "viewpoint").map(pick) };
+  }
+  async function fromServer() { const r = await withTimeout(fetch("/api/osm"), 9000); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.fuel) throw new Error("bad"); return j; }
+  async function fromOverpass() {
     const bb = `${NORTH_BOUNDS[0][1]},${NORTH_BOUNDS[0][0]},${NORTH_BOUNDS[1][1]},${NORTH_BOUNDS[1][0]}`;
     const q = `[out:json][timeout:40];(node["highway"="speed_camera"](${bb});nwr["amenity"="fuel"](${bb});node["tourism"="viewpoint"](${bb}););out center tags;`;
-    for (const ep of ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]) {
-      try {
-        const r = await fetch(ep + "?data=" + encodeURIComponent(q)); if (!r.ok) throw new Error(r.status);
-        const j = await r.json(); const t = n => n.tags || {};
-        const yes = v => v === "yes" ? true : v === "no" ? false : null;
-        const pick = n => { const la = n.lat ?? (n.center && n.center.lat), lo = n.lon ?? (n.center && n.center.lon); const g = t(n); return { id: n.type[0] + n.id, lat: +la.toFixed(5), lon: +lo.toFixed(5), name: g["name:he"] || g.name || "", brand: g["brand:he"] || g.brand || g.operator || "", maxspeed: g.maxspeed || "", oh: g.opening_hours || "", o95: yes(g["fuel:octane_95"]), o98: yes(g["fuel:octane_98"]), diesel: yes(g["fuel:diesel"]), shop: !!(g.shop || g["shop"]) }; };
-        st.osm = { ts: Date.now(), cams: j.elements.filter(n => t(n).highway === "speed_camera").map(pick), fuel: j.elements.filter(n => t(n).amenity === "fuel" && (n.lat || n.center)).map(pick), views: j.elements.filter(n => t(n).tourism === "viewpoint").map(pick) };
-        LS.set("osm2", st.osm); pushSources(); renderAll(); if (force) toast(`עודכן מ־OpenStreetMap: ${st.osm.cams.length} מצלמות, ${st.osm.fuel.length} תחנות דלק, ${st.osm.views.length} מצפורים`); return;
-      } catch (e) { }
-    }
-    if (force) toast("שרת OpenStreetMap עמוס. ננסה שוב בפתיחה הבאה.");
+    const ctl = new AbortController();
+    try { return await withTimeout(Promise.any(["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"].map(async ep => { const r = await fetch(ep + "?data=" + encodeURIComponent(q), { signal: ctl.signal }); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.elements || !j.elements.length) throw new Error("empty"); return normOverpass(j); })), 25000); }
+    finally { ctl.abort(); }
   }
+  let osmBusy = false;
+  async function loadOSM(force) {
+    const age = st.osm ? Date.now() - st.osm.ts : 1e12;
+    if (!force && age < 20 * 3600e3) { pushSources(); return; }
+    if (osmBusy) return; osmBusy = true;
+    try {
+      let d = null; try { d = await fromServer(); } catch (e) { }
+      if (!d && (!st.osm || force)) { try { d = await fromOverpass(); } catch (e) { } }
+      if (d) {
+        d.fuel.forEach(f => { f.name = f.name || ""; f.brand = f.brand || ""; f.oh = f.oh || ""; if (f.o95 === undefined) f.o95 = null; if (f.o98 === undefined) f.o98 = null; if (f.diesel === undefined) f.diesel = null; });
+        d.views.forEach(v => v.name = v.name || "");
+        st.osm = d; nearCache.clear(); LS.set("osm2", st.osm); pushSources(); renderAll();
+        if (force) toast(`עודכן: ${st.osm.fuel.length} תחנות דלק, ${st.osm.views.length} מצפורים, ${st.osm.cams.length} מצלמות`);
+      } else if (force || !st.osm) { toast("המידע על תחנות ומצפורים לא נטען כרגע. ננסה שוב בעוד רגע."); if (!st.osm) setTimeout(() => loadOSM(), 20000); }
+    } finally { osmBusy = false; }
+  }
+  /* Cached per route+radius: the distance scan is the heaviest thing the stops tab does. */
+  const nearCache = new Map();
   function nearRoute(list, cid, maxKm) {
-    const r = st.routes[cid]; if (!r || !list) return [];
+    const r = st.routes[cid]; if (!r || !list || !list.length) return [];
+    const key = `${cid}|${maxKm}|${list === (st.osm && st.osm.fuel) ? "f" : list === (st.osm && st.osm.views) ? "v" : list === (st.osm && st.osm.cams) ? "c" : list.length}|${st.osm ? st.osm.ts : 0}|${r.coords.length}`;
+    if (nearCache.has(key)) { const ids = nearCache.get(key); return ids.map(([i, d, km]) => Object.assign({ d, km }, list[i])); }
     const simp = L.simplifyByDist(r.coords, 0.15); const cum = L.cumulative(simp);
-    return list.map(n => { let bd = 1e9, bk = 0; simp.forEach((p, i) => { const d = L.hav(p, [n.lon, n.lat]); if (d < bd) { bd = d; bk = cum[i]; } }); return Object.assign({ d: bd, km: bk }, n); }).filter(n => n.d <= maxKm).sort((a, b) => a.km - b.km);
+    const pad = maxKm / 100; let w = 180, so = 90, e = -180, n = -90; simp.forEach(p => { w = Math.min(w, p[0]); e = Math.max(e, p[0]); so = Math.min(so, p[1]); n = Math.max(n, p[1]); });
+    const hits = [];
+    list.forEach((x, i) => { if (x.lon < w - pad || x.lon > e + pad || x.lat < so - pad || x.lat > n + pad) return; let bd = 1e9, bk = 0; for (let k = 0; k < simp.length; k++) { const d = L.hav(simp[k], [x.lon, x.lat]); if (d < bd) { bd = d; bk = cum[k]; } } if (bd <= maxKm) hits.push([i, bd, bk]); });
+    hits.sort((a, b) => a[2] - b[2]); nearCache.set(key, hits);
+    return hits.map(([i, d, km]) => Object.assign({ d, km }, list[i]));
   }
-
   /* ---------- radar (RainViewer) ---------- */
   async function addRadarLayer() {
     try {
@@ -449,7 +499,7 @@
     const list = all.filter(f => (!ff.sat || f.sat !== "closed") && (!ff.oct || f.o98 !== false));
     let h = `<div><div class="row" style="justify-content:space-between"><h3>דלק לאורך ${esc(chap().title)}</h3></div>
       <div class="row small" style="margin:6px 0"><label class="toggle"><input type="checkbox" id="ffSat" ${ff.sat ? "checked" : ""}> בלי הסגורות בשבת</label><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק אם יש 98</label></div>
-      <div class="legend" style="margin-bottom:4px"><span><i style="background:var(--go)"></i>פתוח בשבת</span><span><i style="background:var(--no)"></i>סגור</span><span><i style="background:var(--muted)"></i>לא ידוע</span></div>`;
+      <div class="legend" style="margin-bottom:4px;align-items:center"><span class="small">במפה: משאבה בתכלת, והנקודה בפינה היא מצב השבת</span><span><i style="background:var(--go);width:9px;height:9px;border-radius:50%"></i>פתוח</span><span><i style="background:var(--no);width:9px;height:9px;border-radius:50%"></i>סגור</span><span><i style="background:#9AA5B4;width:9px;height:9px;border-radius:50%"></i>לא ידוע</span></div>`;
     if (!st.osm) h += `<p class="small muted">טוען תחנות מ־OpenStreetMap…</p>`;
     else if (!list.length) h += `<p class="small muted">אין תחנות שמתאימות לסינון ליד הפרק.</p>`;
     h += list.map(f => `<div class="item" style="display:block"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div style="min-width:0"><b>${esc(f.label)}</b><span class="small muted mono">ק״מ ${Math.round(f.km)}${f.d > 0.08 ? ` · ${Math.round(f.d * 1000)} מ׳ מהכביש` : ""}</span></div><div class="row" style="flex-wrap:nowrap"><a class="btn sm" target="_blank" rel="noopener" href="${wazeLL(f.lat, f.lon)}">Waze</a><button type="button" class="btn sm" data-fx="${f.id}">פרטים</button></div></div><div class="chips" style="margin-top:4px">${satPill(f)}${octChips(f)}<span class="small muted">${esc(srcLine(f))}</span></div></div>`).join("");
@@ -666,8 +716,30 @@
   }
 
   /* ---------- sheet / tabs ---------- */
-  function setSheet(mode) { const s = $("sheet"); s.classList.remove("peek", "full"); document.body.classList.remove("sheet-peek", "sheet-full"); if (mode !== "half") { s.classList.add(mode); document.body.classList.add("sheet-" + mode); } st.sheet = mode; }
-  $("grab").onclick = () => setSheet(st.sheet === "peek" ? "half" : st.sheet === "half" ? "full" : "peek");
+  /* Bottom sheet (phone): three explicit sizes in a segmented control, plus drag on the header. */
+  const HINT = { peek: "פתיחת הלוח ←", half: "גררו או בחרו גודל", full: "חזרה למפה ←" };
+  function setSheet(mode) {
+    const s = $("sheet"); s.classList.remove("peek", "full"); s.style.height = ""; document.body.classList.remove("sheet-peek", "sheet-full");
+    if (mode !== "half") { s.classList.add(mode); document.body.classList.add("sheet-" + mode); }
+    st.sheet = mode; document.querySelectorAll(".sz").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.size === mode)));
+    const h = $("sheetHint"); if (h) h.textContent = HINT[mode];
+    if (mode !== "peek") closeLayers();
+  }
+  document.querySelectorAll(".sz").forEach(b => b.onclick = e => { e.stopPropagation(); setSheet(b.dataset.size); });
+  (() => {
+    const head = $("sheetHead"), sheet = $("sheet"); if (!head) return; let drag = null;
+    head.addEventListener("pointerdown", e => { if (e.target.closest("button") || innerWidth >= 900) return; drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, t: performance.now(), moved: false }; head.setPointerCapture(e.pointerId); sheet.classList.add("dragging"); });
+    head.addEventListener("pointermove", e => { if (!drag) return; const dy = e.clientY - drag.y; if (Math.abs(dy) > 4) drag.moved = true; const max = innerHeight - 64; sheet.style.height = Math.max(90, Math.min(max, drag.h - dy)) + "px"; });
+    const end = e => {
+      if (!drag) return; sheet.classList.remove("dragging"); const dy = e.clientY - drag.y, v = dy / Math.max(1, performance.now() - drag.t), h = sheet.getBoundingClientRect().height; const was = drag; drag = null;
+      if (!was.moved) { setSheet(st.sheet === "peek" ? "half" : st.sheet === "half" ? "full" : "half"); return; }
+      if (v < -0.6) return setSheet(st.sheet === "peek" ? "half" : "full");
+      if (v > 0.6) return setSheet(st.sheet === "full" ? "half" : "peek");
+      const H = innerHeight; const opts = [["peek", 124], ["half", Math.min(H * 0.46, 460)], ["full", H - 64]];
+      setSheet(opts.reduce((a, b) => Math.abs(b[1] - h) < Math.abs(a[1] - h) ? b : a)[0]);
+    };
+    head.addEventListener("pointerup", end); head.addEventListener("pointercancel", end);
+  })();
   function setTab(t) {
     st.tab = t; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.t === t)));
     ["brief", "route", "stops", "tools"].forEach(k => $("p-" + k).hidden = k !== t); $("panes").scrollTop = 0;
@@ -681,7 +753,10 @@
 
   /* ---------- layers popover ---------- */
   function syncLayerBoxes() { document.querySelectorAll("#layersPop input").forEach(i => i.checked = !!st.layers[i.dataset.l]); }
-  $("fLayers").onclick = () => { const p = $("layersPop"); p.hidden = !p.hidden; $("fLayers").setAttribute("aria-pressed", String(!p.hidden)); };
+  function closeLayers() { const p = $("layersPop"); if (p && !p.hidden) { p.hidden = true; $("fLayers").setAttribute("aria-pressed", "false"); } }
+  $("fLayers").onclick = () => { const p = $("layersPop"); const open = p.hidden; if (open && innerWidth < 900 && st.sheet !== "peek") setSheet("peek"); p.hidden = !open; $("fLayers").setAttribute("aria-pressed", String(open)); };
+  $("layersClose").onclick = closeLayers;
+  map.on("click", () => { if (innerWidth < 900) closeLayers(); });
   document.querySelectorAll("#layersPop input").forEach(i => i.onchange = () => {
     st.layers[i.dataset.l] = i.checked; LS.set("layers", Object.assign({}, st.layers, { radar: false }));
     if (i.dataset.l === "radar") { if (i.checked) addRadarLayer(); else if (map.getLayer("br-radar")) { map.removeLayer("br-radar"); map.removeSource("br-radar"); } }

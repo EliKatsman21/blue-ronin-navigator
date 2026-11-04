@@ -22,18 +22,18 @@
   --bg:#0A111E; --surface:#111A2B; --raised:#17233A; --ink:#E6ECF4; --muted:#8C9DB3; --line:#23324B;
   --accent:#5C8DFF; --accent-ink:#06101F; --sun:#FFA24A; --view:#4CC48C; --warn:#FF6A63; --report:#C58BFF;
   --go:#4CC48C; --ok:#9BD15A; --caution:#FFB547; --no:#FF6A63;
-  --c0:#7E8CA3; --c1:#5C8DFF; --c2:#FFB547; --c3:#FF5A7A;
+  --c0:#7E8CA3; --c1:#5C8DFF; --c2:#FFB547; --c3:#FF5A7A; --fuel:#22C3E6;
   --display:"Karantina","Assistant",system-ui,sans-serif; --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   --sheet-w:420px; color-scheme:dark;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
   --bg:#EEF1F4; --surface:#F9FAFB; --raised:#FFFFFF; --ink:#132030; --muted:#56687A; --line:#CDD5DD;
   --accent:#1E4FD6; --accent-ink:#FFFFFF; --sun:#C2620C; --view:#1F7F55; --warn:#C8322F; --report:#8B45C7;
-  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; color-scheme:light}}
+  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; --fuel:#0891B2; color-scheme:light}}
 :root[data-theme="light"]{
   --bg:#EEF1F4; --surface:#F9FAFB; --raised:#FFFFFF; --ink:#132030; --muted:#56687A; --line:#CDD5DD;
   --accent:#1E4FD6; --accent-ink:#FFFFFF; --sun:#C2620C; --view:#1F7F55; --warn:#C8322F; --report:#8B45C7;
-  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; color-scheme:light}
+  --go:#1F8F5A; --ok:#5D8F1F; --caution:#C47D0B; --no:#C8322F; --c0:#7C8796; --c1:#1E4FD6; --c2:#D98A0B; --c3:#D3204A; --fuel:#0891B2; color-scheme:light}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;overflow:hidden}
@@ -58,13 +58,21 @@ button,select,input{font:inherit;color:inherit}
 
 /* floating controls */
 .fabs{position:fixed;z-index:4;left:max(12px,env(safe-area-inset-left,0px));top:calc(64px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px}
-.fab{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(8px);display:grid;place-items:center;cursor:pointer;color:var(--ink);position:relative}
-.fab svg{width:21px;height:21px}
+.fab{width:56px;border-radius:14px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 6px;cursor:pointer;color:var(--ink);position:relative;box-shadow:0 2px 10px rgba(0,0,0,.18);-webkit-tap-highlight-color:transparent}
+.fab svg{width:20px;height:20px}
+.fab .lbl{font-size:10.5px;font-weight:700;line-height:1.05;letter-spacing:.01em;white-space:nowrap;color:inherit;opacity:.92}
+.fab:active{transform:scale(.96)}
+@media (max-height:740px) and (max-width:899px){.fabs{gap:6px}.fab{width:52px;padding:6px 0 5px;gap:2px}.fab svg{width:18px;height:18px}.fab .lbl{font-size:10px}}
 .fab[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .fab.home{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.fab .tip{position:absolute;right:52px;white-space:nowrap;background:var(--ink);color:var(--bg);font-size:12px;padding:3px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .15s}
-@media (hover:hover){.fab:hover .tip{opacity:1}}
-.layers{position:fixed;z-index:6;left:calc(max(12px,env(safe-area-inset-left,0px)) + 54px);top:calc(64px + env(safe-area-inset-top,0px));background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;min-width:190px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+.layers{position:fixed;z-index:8;left:calc(max(12px,env(safe-area-inset-left,0px)) + 66px);top:calc(64px + env(safe-area-inset-top,0px));background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 14px 12px;display:grid;gap:7px;min-width:210px;box-shadow:0 14px 40px rgba(0,0,0,.4);overflow-y:auto;max-height:calc(100% - 90px - env(safe-area-inset-top,0px))}
+@media (max-width:899px){.layers{left:calc(max(12px,env(safe-area-inset-left,0px)) + 66px);right:max(12px,env(safe-area-inset-right,0px));min-width:0;max-height:calc(100% - 64px - 140px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}}
+.layers .lhead{display:flex;justify-content:space-between;align-items:center;position:sticky;top:-6px;background:var(--surface);padding:8px 0 4px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.layers .lhead b{font-size:15px}
+.layers .x{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:3px 10px;font-weight:700;font-size:13px;cursor:pointer}
+.layers .ic{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;flex:none;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.layers .ic svg{width:11px;height:11px}
 .layers label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px}
 .layers .sw{width:12px;height:12px;border-radius:3px}
 .layers h5{margin:4px 0 0;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
@@ -76,15 +84,23 @@ button,select,input{font:inherit;color:inherit}
   .grab{display:none}
 }
 @media (max-width:899px){
-  .sheet{left:0;right:0;bottom:0;border-radius:18px 18px 0 0;height:min(48vh,480px);transition:height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
-  .sheet.peek{height:calc(118px + env(safe-area-inset-bottom,0px))}
-  .sheet.full{height:calc(100% - 70px - env(safe-area-inset-top,0px))}
-  .fabs{top:auto;bottom:calc(min(48vh,480px) + 12px)}
-  body.sheet-peek .fabs{bottom:calc(130px + env(safe-area-inset-bottom,0px))}
+  .sheet{left:0;right:0;bottom:0;border-radius:20px 20px 0 0;height:min(46vh,460px);transition:height .28s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -10px 30px rgba(0,0,0,.28)}
+  .sheet.peek{height:calc(124px + env(safe-area-inset-bottom,0px))}
+  .sheet.full{height:calc(100% - 64px - env(safe-area-inset-top,0px))}
+  .sheet.dragging{transition:none}
+  .fabs{top:auto;bottom:calc(min(46vh,460px) + 12px);transition:bottom .28s cubic-bezier(.2,.8,.2,1)}
+  body.sheet-peek .fabs{bottom:calc(136px + env(safe-area-inset-bottom,0px))}
   body.sheet-full .fabs{display:none}
+  .sheet.peek .panes{visibility:hidden}
 }
-.grab{border:0;background:none;padding:8px 0 2px;cursor:pointer;display:grid;place-items:center}
-.grab span{width:44px;height:5px;border-radius:3px;background:var(--line)}
+.sheethead{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px 2px;touch-action:none;cursor:grab}
+.sheethead .grip{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:40px;height:5px;border-radius:3px;background:var(--line)}
+.sheethead .hint{font-size:12px;color:var(--muted);font-weight:600;padding-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sizebar{display:flex;gap:2px;background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:2px;flex:none}
+.sz{display:flex;align-items:center;gap:5px;border:0;background:none;border-radius:9px;padding:5px 9px;font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sz svg{width:14px;height:18px}
+.sz[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+@media (min-width:900px){.sheethead{display:none}}
 .tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .tab{border:0;background:none;padding:8px 10px 10px;font-weight:700;font-size:15px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
@@ -204,15 +220,29 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 .intro h1 span{color:var(--accent)}
 .intro p{color:var(--muted);margin:10px 0 0;font-size:16px}
 .intro .road{width:min(320px,70vw);height:60px;margin:18px auto 0;display:block}
+.tacho{width:min(170px,44vw);display:block;margin:0 auto 10px;overflow:visible;direction:ltr}
+.tacho .arc{fill:none;stroke:color-mix(in srgb,var(--ink) 28%,transparent);stroke-width:2.5;stroke-linecap:round}
+.tacho .arc.red{stroke:var(--warn)}
+.tacho .tk{stroke:color-mix(in srgb,var(--ink) 70%,transparent);stroke-width:2;stroke-linecap:round}
+.tacho .tk.red,.tacho .tn.red{stroke:var(--warn);fill:var(--warn)}
+.tacho .tn{font-family:var(--mono);font-size:10px;fill:var(--muted);text-anchor:middle}
+.tacho .unit{font-family:var(--mono);font-size:7.5px;fill:var(--muted);text-anchor:middle;letter-spacing:.08em}
+.tacho .hub{fill:var(--sun);stroke:var(--bg);stroke-width:2}
+.tacho .needle line{stroke:var(--sun);stroke-width:3;stroke-linecap:round}
+.tacho .needle{transform-box:view-box;transform-origin:100px 96px;transform:rotate(-120deg);animation:sweep 1.5s cubic-bezier(.3,.1,.2,1) .25s forwards}
+.tacho .neutral{font-family:var(--display);font-size:26px;font-weight:700;fill:var(--go);text-anchor:middle;opacity:0;animation:nlight .35s ease 1.65s forwards;filter:drop-shadow(0 0 6px var(--go))}
+@keyframes sweep{0%{transform:rotate(-120deg)}45%{transform:rotate(120deg)}58%{transform:rotate(116deg)}100%{transform:rotate(-120deg)}}
+@keyframes nlight{to{opacity:1}}
 .intro .road path{stroke-dasharray:420;stroke-dashoffset:420;animation:draw 1.6s ease forwards .2s}
 @keyframes draw{to{stroke-dashoffset:0}}
 .toast{position:fixed;z-index:30;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;max-width:90vw}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.intro .road path{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.intro .road path{stroke-dashoffset:0}.tacho .neutral{opacity:1}}
 </style>
 </head>
 <body>
 <div class="intro" id="intro" aria-hidden="true">
   <div class="in">
+    <svg class="tacho" viewBox="0 0 200 128" aria-hidden="true"><path class="arc" d="M31.6 135.5 A79 79 0 1 1 177.8 82.3"/><path class="arc red" d="M177.8 82.3 A79 79 0 0 1 168.4 135.5"/><line class="tk" x1="35.9" y1="133.0" x2="45.4" y2="127.5"/><text class="tn" x="55.0" y="125.5">0</text><line class="tk" x1="27.1" y1="108.8" x2="34.0" y2="107.6"/><line class="tk" x1="27.1" y1="83.2" x2="38.0" y2="85.1"/><text class="tn" x="48.8" y="90.5">2</text><line class="tk" x1="35.9" y1="59.0" x2="42.0" y2="62.5"/><line class="tk" x1="52.4" y1="39.3" x2="59.5" y2="47.7"/><text class="tn" x="66.6" y="59.7">4</text><line class="tk" x1="74.7" y1="26.5" x2="77.1" y2="33.0"/><line class="tk" x1="100.0" y1="22.0" x2="100.0" y2="33.0"/><text class="tn" x="100.0" y="47.5">6</text><line class="tk" x1="125.3" y1="26.5" x2="122.9" y2="33.0"/><line class="tk" x1="147.6" y1="39.3" x2="140.5" y2="47.7"/><text class="tn" x="133.4" y="59.7">8</text><line class="tk" x1="164.1" y1="59.0" x2="158.0" y2="62.5"/><line class="tk red" x1="172.9" y1="83.2" x2="162.0" y2="85.1"/><text class="tn red" x="151.2" y="90.5">10</text><line class="tk red" x1="172.9" y1="108.8" x2="166.0" y2="107.6"/><line class="tk red" x1="164.1" y1="133.0" x2="154.6" y2="127.5"/><text class="tn red" x="145.0" y="125.5">12</text><g class="needle"><line x1="100" y1="96" x2="100" y2="30"/></g><circle class="hub" cx="100" cy="96" r="6"/><text class="unit" x="100" y="118">×1000 r/min</text><text class="neutral" x="100" y="70">N</text></svg>
     <h1>BLUE <span>RONIN</span></h1>
     <svg class="road" viewBox="0 0 320 60"><path d="M4 50 C 60 50, 70 10, 120 12 S 170 52, 220 46 S 280 8, 316 10" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/></svg>
     <p>טוען את הצפון: כבישים, מזג אוויר, שבת.</p>
@@ -227,15 +257,16 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 </header>
 
 <div class="fabs" id="fabs">
-  <button type="button" class="fab home" id="fHome" aria-label="בית: כל הצפון מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="tip">בית</span></button>
-  <button type="button" class="fab hide-ride" id="fLayers" aria-label="שכבות" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="tip">שכבות</span></button>
-  <button type="button" class="fab" id="f3d" aria-label="תלת־ממד" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m2 19 6-10 4 6 3-4 7 8z"/></svg><span class="tip">תלת־ממד</span></button>
-  <button type="button" class="fab hide-ride" id="fFly" aria-label="מעוף על המסלול"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg><span class="tip">מעוף על הפרק</span></button>
-  <button type="button" class="fab" id="fLocate" aria-label="המיקום שלי"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="tip">המיקום שלי</span></button>
-  <button type="button" class="fab" id="fRide" aria-label="מצב רכיבה" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 16a8 8 0 0 1 16 0"/><path d="m12 16 4-5"/></svg><span class="tip">מצב רכיבה</span></button>
+  <button type="button" class="fab home" id="fHome" aria-label="בית: כל הצפון מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="lbl">בית</span></button>
+  <button type="button" class="fab hide-ride" id="fLayers" aria-label="שכבות" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="lbl">שכבות</span></button>
+  <button type="button" class="fab" id="f3d" aria-label="תלת־ממד" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m2 19 6-10 4 6 3-4 7 8z"/></svg><span class="lbl">תלת־ממד</span></button>
+  <button type="button" class="fab hide-ride" id="fFly" aria-label="מעוף על המסלול"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg><span class="lbl">מעוף</span></button>
+  <button type="button" class="fab" id="fLocate" aria-label="המיקום שלי"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lbl">מיקום</span></button>
+  <button type="button" class="fab" id="fRide" aria-label="מצב רכיבה" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 16a8 8 0 0 1 16 0"/><path d="m12 16 4-5"/></svg><span class="lbl">רכיבה</span></button>
 </div>
 
 <div class="layers" id="layersPop" hidden>
+  <div class="lhead"><b>שכבות במפה</b><button type="button" class="x" id="layersClose">סגירה</button></div>
   <h5>מסלול</h5>
   <label><input type="checkbox" data-l="curves" checked><span class="sw" style="background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3))"></span>צפיפות עיקולים</label>
   <label><input type="checkbox" data-l="glare" checked><span class="sw" style="background:var(--sun)"></span>סנוור שמש בבוקר</label>
@@ -244,16 +275,24 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
   <label><input type="checkbox" data-l="wx" checked><span class="sw" style="background:var(--muted)"></span>מזג אוויר לשבת</label>
   <label><input type="checkbox" data-l="radar"><span class="sw" style="background:#3fa9f5"></span>מכ״ם גשם</label>
   <h5>OpenStreetMap · מתעדכן שבועית</h5>
-  <label><input type="checkbox" data-l="cams" checked><span class="sw" style="background:var(--warn)"></span>מצלמות ואכיפה</label>
-  <label><input type="checkbox" data-l="cafes" checked><span class="sw" style="background:var(--sun)"></span>קפה פתוח בשבת</label>
-  <label><input type="checkbox" data-l="osmview"><span class="sw" style="background:var(--view)"></span>כל המצפורים</label>
-  <label><input type="checkbox" data-l="fuel"><span class="sw" style="background:var(--muted)"></span>תחנות דלק</label>
+  <label><input type="checkbox" data-l="cams" checked><span class="ic" style="background:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5h11v7H3z"/><path d="M14 10.5l6-3v9l-6-3"/></svg></span>מצלמות ואכיפה</label>
+  <label><input type="checkbox" data-l="cafes" checked><span class="ic" style="background:var(--sun)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h12v5a5 5 0 0 1-10 0z"/><path d="M16 10h2a2.5 2.5 0 0 1 0 5h-2"/></svg></span>קפה פתוח בשבת</label>
+  <label><input type="checkbox" data-l="osmview"><span class="ic" style="background:var(--view)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z"/></svg></span>מצפורים</label>
+  <label><input type="checkbox" data-l="fuel"><span class="ic" style="background:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg></span>תחנות דלק</label>
   <h5>מפה</h5>
   <label><input type="checkbox" data-l="hillshade" checked><span class="sw" style="background:var(--line)"></span>הצללת תבליט</label>
 </div>
 
 <section class="sheet" id="sheet" aria-label="ספר הרכיבה">
-  <button type="button" class="grab" id="grab" aria-label="הגדלה או הקטנה של הלוח"><span></span></button>
+  <div class="sheethead" id="sheetHead">
+    <span class="grip" aria-hidden="true"></span>
+    <span class="hint" id="sheetHint">גררו או בחרו גודל</span>
+    <div class="sizebar" role="group" aria-label="גודל הלוח">
+      <button type="button" class="sz" data-size="peek" aria-pressed="false" aria-label="מפה מלאה, לוח מוקטן"><svg viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="12" height="16" rx="2.5"/><rect x="2.6" y="13.2" width="8.8" height="2.2" rx=".8" fill="currentColor" stroke="none"/></svg>מפה</button>
+      <button type="button" class="sz" data-size="half" aria-pressed="true" aria-label="חצי מסך"><svg viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="12" height="16" rx="2.5"/><rect x="2.6" y="9" width="8.8" height="6.4" rx=".8" fill="currentColor" stroke="none"/></svg>חצי</button>
+      <button type="button" class="sz" data-size="full" aria-pressed="false" aria-label="מסך מלא"><svg viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="12" height="16" rx="2.5"/><rect x="2.6" y="2.6" width="8.8" height="12.8" rx=".8" fill="currentColor" stroke="none"/></svg>מלא</button>
+    </div>
+  </div>
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-t="brief" aria-selected="true">תדריך שבת</button>
     <button class="tab" role="tab" data-t="route" aria-selected="false">מסלול</button>

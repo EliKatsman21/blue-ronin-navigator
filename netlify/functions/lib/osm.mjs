@@ -2,8 +2,9 @@
    and cached in Netlify Blobs so riders never wait on a busy Overpass server. */
 import { getStore } from "@netlify/blobs";
 
-export const BBOX = "32.40,34.86,33.34,35.90"; // s,w,n,e
-const QUERY = `[out:json][timeout:50];(node["highway"="speed_camera"](${BBOX});nwr["amenity"="fuel"](${BBOX});node["tourism"="viewpoint"](${BBOX}););out center tags;`;
+/* North (Carmel to Rosh HaNikra and the Golan) and the Jerusalem hills / Judean lowlands (chapter 5). s,w,n,e */
+export const BBOXES = ["32.40,34.86,33.34,35.90", "31.52,34.76,31.84,35.20"];
+const QUERY = "[out:json][timeout:60];(" + BBOXES.map(b => `node["highway"="speed_camera"](${b});nwr["amenity"="fuel"](${b});node["tourism"="viewpoint"](${b});`).join("") + ");out center tags;";
 const MIRRORS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 export const store = () => getStore({ name: "brn-osm", consistency: "strong" });
 
@@ -47,7 +48,7 @@ export async function fetchOverpass(timeoutMs = 45000) {
 
 export async function refresh() {
   const data = await fetchOverpass();
-  await store().setJSON("north", data);
+  await store().setJSON("v2", data);
   return data;
 }
-export const getCached = () => store().get("north", { type: "json" });
+export const getCached = () => store().get("v2", { type: "json" });

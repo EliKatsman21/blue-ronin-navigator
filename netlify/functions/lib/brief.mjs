@@ -10,7 +10,7 @@ const hhmm = d => new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2
 
 function points() {
   const pts = [];
-  CHAPTERS.forEach(c => { const s = c.stops; [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].forEach(p => pts.push({ lat: p.lat, lon: p.lon, name: p.name.split(" · ")[0], chap: c.id })); });
+  CHAPTERS.filter(c => !c.combo).forEach(c => { const s = c.stops; [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].forEach(p => pts.push({ lat: p.lat, lon: p.lon, name: p.name.split(" · ")[0], chap: c.id })); });
   pts.push({ lat: 32.651, lon: 35.105, name: "יוקנעם", chap: "now" });
   return pts;
 }
@@ -26,7 +26,8 @@ export async function computeBrief(mode = "friday") {
   const arr = await r.json(); const wx = Array.isArray(arr) ? arr : [arr];
 
   const chapters = CHAPTERS.map(c => {
-    const rows = []; pts.forEach((p, i) => { if (p.chap !== c.id) return; const w = L.windowStats(wx[i].hourly, `${sat.iso}T06:00`, `${sat.iso}T12:00`, `${sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
+    const ids = c.combo || [c.id];
+    const rows = []; pts.forEach((p, i) => { if (!ids.includes(p.chap)) return; const w = L.windowStats(wx[i].hourly, `${sat.iso}T06:00`, `${sat.iso}T12:00`, `${sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
     if (!rows.length) return null;
     const agg = { tMin: Math.min(...rows.map(x => x.w.tMin)), tMax: Math.max(...rows.map(x => x.w.tMax)), maxP: Math.max(...rows.map(x => x.w.maxP)), sumMm: Math.max(...rows.map(x => x.w.sumMm)), maxGust: Math.max(...rows.map(x => x.w.maxGust)), minVis: Math.min(...rows.map(x => x.w.minVis)), wet: rows.some(x => x.w.wet), storm: rows.some(x => x.w.storm), fog: rows.some(x => x.w.fog) };
     const fog = [];
@@ -34,7 +35,7 @@ export async function computeBrief(mode = "friday") {
     return { id: c.id, title: c.title, agg, ri: L.rideIndex(agg), fog };
   }).filter(Boolean);
 
-  const best = chapters.slice().sort((a, b) => b.ri.i - a.ri.i)[0];
+  const best = chapters.filter(c => !CHAPTERS.find(x => x.id === c.id).combo).sort((a, b) => b.ri.i - a.ri.i)[0];
   const t = SunCalc.getTimes(sat.noonUTC, 32.651, 35.105);
   const sunrise = hhmm(t.sunrise), depart = hhmm(new Date(t.sunrise.getTime() + 15 * 6e4));
   const now = wx[wx.length - 1].current || {};

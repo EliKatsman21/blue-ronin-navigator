@@ -49,6 +49,37 @@
     }
   ];
 
+  /* Chapter 4: the three northern chapters stitched into one long day (or a weekend). */
+  const RING = ["c1", "c2", "c3"];
+  CHAPTERS.push({
+    id: "c4", title: "הטבעת הצפונית המלאה", short: "הטבעת המלאה", combo: RING, region: "north", tech: 0.75,
+    sub: "שלושת הפרקים ברצף אחד: כרמל, גלבוע, כנרת, גולן, גליל עליון ועד ראש הנקרה. למי שמרחיק לכת.",
+    note: "יום ארוך מאוד. מומלץ לפצל ללילה בגולן, ולתכנן תדלוק לפי תוכנית הדלק.",
+    stops: RING.flatMap((cid, ci) => CHAPTERS.find(c => c.id === cid).stops.map((s, si) => Object.assign({}, s, { kind: s.kind === "start" && (ci || si) ? "road" : s.kind })))
+  });
+
+  /* Chapter 5: Jerusalem hills and the Judean lowlands. Loop from Eshtaol. */
+  CHAPTERS.push({
+    id: "c5", title: "נס הרים ובית גוברין", short: "נס הרים·גוברין", region: "center", tech: 0.85,
+    sub: "הסיבובים של בית גוברין בכביש 35, עלייה ב־3866 לנס הרים, ירידת הסרפנטינות של 386 לנחל שורק, וחזרה בערוץ כסלון בכביש 395.",
+    note: "כבישים צרים בלי שוליים, ובסופ״ש הרבה רוכבי אופניים ומטיילים. תחילת 395 מאשתאול צרה מאוד.",
+    stops: [
+      S("esh", "צומת אשתאול · נקודת מפגש", 31.7826, 34.9958, "start", "יציאה דרומה בכביש 38. תדלוק בבית שמש לפני הדרך.", { roads: ["38", "395"] }),
+      S("bgv", "בית גוברין · גן לאומי", 31.6047, 34.8958, "view", "עצירה ליד מערות בית גוברין ותל מרשה. מכאן מתחילים הסיבובים של 35.", { roads: ["35"], score: [3, 4] }),
+      S("lach", "הסיבובים של בית גוברין · צומת לכיש", 31.5975, 34.8465, "road", "קטע העיקולים של כביש 35. מסתובבים בצומת לכיש ורוכבים אותו שוב, בכיוון ההפוך.", { roads: ["35"], score: [4, 3] }),
+      S("mah", "צומת מחסיה · עלייה ב־3866", 31.7383, 34.9772, "road", "מכביש 38 מזרחה ובעלייה לנס הרים. עיקולים צפופים והרבה תנועת רוכבים.", { roads: ["38", "3866"], score: [4, 4] }),
+      S("nes", "נס הרים", 31.7548, 35.0560, "road", "ראש העלייה. מכאן פונים לכביש 386.", { roads: ["3866", "386"], score: [4, 4] }),
+      S("sorek", "סרפנטינות 386 מעל נחל שורק", 31.7585, 35.0888, "view", "ירידה מפותלת עם נוף לעמק שורק, ואחריה טיפוס תלול עד צומת כרם.", { roads: ["386"], score: [5, 5] }),
+      S("sataf", "הסטף · כיכר הר איתן", 31.7745, 35.1232, "view", "מעיינות הסטף ובית קפה. מכאן חוזרים מערבה בכביש 395.", { roads: ["395"], score: [3, 5] }),
+      S("kis", "ערוץ כסלון · כביש 395", 31.7790, 35.0300, "road", "הקטע הצר והיפה ביותר: חצוב בצלע ההר מעל נחל רזיאל. לאט, ראות קצרה.", { roads: ["395"], score: [5, 5] }),
+      S("esh2", "צומת אשתאול · סוף הלולאה", 31.7822, 34.9962, "road", "חזרה לנקודת היציאה.", { roads: ["395", "38"] })
+    ]
+  });
+  [["c1", 0.35], ["c2", 0.7], ["c3", 0.6]].forEach(([id, t]) => { const c = CHAPTERS.find(x => x.id === id); c.tech = t; c.region = "north"; });
+  CHAPTERS.find(c => c.id === "c2").note = "עליית חמת גדר בכביש 98 טכנית מאוד: עיקולים עיוורים ותלולים, בלי שוליים.";
+  CHAPTERS.find(c => c.id === "c3").note = "כביש 899 מהיר עם כמה עיקולי סיכה, וצמוד לגבול. בודקים הנחיות לפני יציאה.";
+  CHAPTERS.find(c => c.id === "c1").note = "ירידת בית אורן ותחילת דרך הגלבוע צרות, עם אספלט משתנה.";
+
   const CAFES = [
     { id: "alka", name: "אלקע בר", place: "מצפה רונן, עין זיוון", lat: 33.098, lon: 35.783, shabbat: true, src: "טיולי · פתוח בשבת" },
     { id: "moiz", name: "מוייז", place: "רמות, מעל הכנרת", lat: 32.852, lon: 35.665, shabbat: true, src: "טיולי · פתוח בשבת" },
@@ -72,7 +103,9 @@
   ];
 
   const NORTH_BOUNDS = [[34.86, 32.40], [35.90, 33.34]];
+  const CENTER_BOUNDS = [[34.76, 31.52], [35.20, 31.84]];
+  const REGIONS = { north: NORTH_BOUNDS, center: CENTER_BOUNDS };
   const LIVE_BOARD = "https://claude.ai/artifact/Wv9hF1aRr4UWx5v12fe5GG";
 
-  g.BRD = { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, LIVE_BOARD };
+  g.BRD = { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD };
 })(typeof module !== "undefined" ? module.exports : window);

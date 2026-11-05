@@ -115,6 +115,8 @@ h3{margin:0;font-size:16px}
 .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--raised);border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;color:var(--ink)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.sm{padding:5px 9px;font-size:13px;border-radius:8px}
+.btn.vote[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.vote svg{width:13px;height:13px}
 .btn svg{width:16px;height:16px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--muted)}
@@ -156,6 +158,26 @@ h3{margin:0;font-size:16px}
 .chapsel{display:flex;gap:6px;flex-wrap:wrap}
 .chapsel button{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer}
 .chapsel button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chapsel button{display:inline-flex;align-items:center;gap:8px}
+.leds{display:inline-flex;gap:3px;align-items:center;direction:ltr;flex:none}
+.leds i{width:12px;height:12px;border-radius:50%;background:color-mix(in srgb,var(--muted) 22%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--muted) 35%,transparent)}
+.leds.mini{gap:2px}.leds.mini i{width:6px;height:6px}
+.leds i.on.l1,.leds i.on.l2{background:#3BD16F;box-shadow:0 0 6px #3BD16F}
+.leds i.on.l3{background:#FFC93C;box-shadow:0 0 6px #FFC93C}
+.leds i.on.l4{background:#FF8A2B;box-shadow:0 0 6px #FF8A2B}
+.leds i.on.l5{background:#FF3B4E;box-shadow:0 0 7px #FF3B4E}
+.chapsel button[aria-pressed="true"] .leds i:not(.on){background:color-mix(in srgb,var(--accent-ink) 25%,transparent);box-shadow:none}
+.dmini{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:12px;font-weight:700;color:var(--muted)}
+.card.diff{gap:8px}
+.dhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dlvl{font-family:var(--display);font-size:30px;line-height:1;font-weight:700}
+.dlvl b{font-family:var(--mono);font-size:26px;font-weight:500}
+.dlvl span{font-family:var(--mono);font-size:14px;color:var(--muted)}
+.diff.lv5 .dlvl{color:#FF3B4E}.diff.lv4 .dlvl{color:#FF8A2B}.diff.lv3 .dlvl{color:var(--caution)}
+.dparts{display:grid;gap:5px}
+.dparts div{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.dparts i{height:6px;border-radius:3px;background:var(--line);overflow:hidden;display:block}
+.dparts b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#3BD16F,#FFC93C 55%,#FF3B4E);background-size:220px 100%}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .stat{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:7px 8px}
 .stat .k{font-size:11.5px;color:var(--muted)}
@@ -220,6 +242,9 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 .intro h1 span{color:var(--accent)}
 .intro p{color:var(--muted);margin:10px 0 0;font-size:16px}
 .intro .road{width:min(320px,70vw);height:60px;margin:18px auto 0;display:block}
+.ign{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(13% + env(safe-area-inset-bottom,0px));white-space:nowrap;display:inline-flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--ink);border-radius:999px;padding:9px 18px 9px 14px;font-weight:700;font-size:15px;cursor:pointer;animation:ignpulse 1.6s ease-in-out infinite}
+.ign svg{width:18px;height:18px;color:var(--warn)}
+@keyframes ignpulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--warn) 14%,transparent)}}
 .tacho{width:min(170px,44vw);display:block;margin:0 auto 10px;overflow:visible;direction:ltr}
 .tacho .arc{fill:none;stroke:color-mix(in srgb,var(--ink) 28%,transparent);stroke-width:2.5;stroke-linecap:round}
 .tacho .arc.red{stroke:var(--warn)}
@@ -246,8 +271,44 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
     <h1>BLUE <span>RONIN</span></h1>
     <svg class="road" viewBox="0 0 320 60"><path d="M4 50 C 60 50, 70 10, 120 12 S 170 52, 220 46 S 280 8, 316 10" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/></svg>
     <p>טוען את הצפון: כבישים, מזג אוויר, שבת.</p>
+    <button type="button" class="ign" id="ignBtn" hidden aria-label="הנעה עם צליל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.5a8 8 0 1 0 11.4 0"/></svg>הקישו להנעה</button>
   </div>
 </div>
+<script>
+/* Ignition sound, locked to the tachometer needle. Runs before the map library loads.
+   Autoplay is allowed for installed apps on Android; elsewhere one tap on the intro starts it. */
+(() => {
+  const KEY = "brn:introSound";
+  let on = true; try { on = JSON.parse(localStorage.getItem(KEY) ?? "true"); } catch (e) { }
+  window.BR_introHold = 2350;
+  if (!on || matchMedia("(prefers-reduced-motion: reduce)").matches || !window.AudioContext && !window.webkitAudioContext) return;
+  try { const last = +sessionStorage.getItem("brn:introAt") || 0; if (Date.now() - last < 15000) return; sessionStorage.setItem("brn:introAt", Date.now()); } catch (e) { }
+  const intro = document.getElementById("intro"), btn = document.getElementById("ignBtn");
+  const anims = () => intro.getAnimations({ subtree: true }).filter(a => /sweep|nlight/.test(a.animationName || ""));
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const gain = ctx.createGain(); gain.gain.value = 0.85; gain.connect(ctx.destination);
+  let buf = null, played = false;
+  const ready = fetch("sounds/ignition.mp3").then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej))).then(b => (buf = b)).catch(() => null);
+  const play = (offset) => { if (!buf || played) return; played = true; const s = ctx.createBufferSource(); s.buffer = buf; s.connect(gain); s.start(0, Math.max(0, offset)); window.BR_introHold = Math.max(window.BR_introHold, performance.now() + (buf.duration - offset) * 1000 - 500); };
+  const elapsed = () => { const a = anims()[0]; return a && a.currentTime != null ? a.currentTime / 1000 : performance.now() / 1000; };
+  ready.then(() => {
+    if (!buf) return;
+    if (ctx.state === "running") { const off = elapsed(); if (off < 1.0) play(off); return; }
+    ctx.resume().then(() => { if (ctx.state === "running") { const off = elapsed(); if (off < 1.0) play(off); } }).catch(() => { });
+    setTimeout(() => { if (!played && !intro.classList.contains("out")) { btn.hidden = false; window.BR_introHold = Math.max(window.BR_introHold, performance.now() + 1600); } }, 250);
+  });
+  const ignite = async e => {
+    if (played) return; e && e.preventDefault();
+    try { await ctx.resume(); } catch (err) { }
+    await ready; if (!buf) return;
+    btn.hidden = true;
+    anims().forEach(a => { a.cancel(); a.play(); });
+    play(0);
+  };
+  btn.addEventListener("click", ignite);
+  intro.addEventListener("pointerdown", e => { if (e.target !== btn && !btn.contains(e.target)) ignite(e); });
+})();
+</script>
 
 <div id="map" aria-label="מפת הצפון"></div>
 

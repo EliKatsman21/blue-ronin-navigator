@@ -200,5 +200,35 @@
     return { plan, gap: null };
   }
 
-  g.BRL = { saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* Route difficulty, 0-100 and five levels, from what the road actually does:
+     curve density, climbing per km, steepest sampled grade, length, and a per-chapter road factor
+     (narrow, no shoulders, traffic) set in the ride book. Elevation is optional. */
+  const DIFF_LEVELS = [
+    { n: 1, t: "שיוט", d: "מתאים גם לרוכבים בתחילת הדרך" },
+    { n: 2, t: "זורם", d: "עיקולים נוחים, קצב רגוע" },
+    { n: 3, t: "מאתגר", d: "דורש ניסיון בעיקולים ובירידות" },
+    { n: 4, t: "טכני", d: "עיקולים צפופים ושיפועים. לרוכבים מנוסים" },
+    { n: 5, t: "מומחים", d: "צר, תלול ובלי שוליים. ריכוז מלא" }
+  ];
+  function difficulty({ km, cstats, el, elKm, tech = 0.5 }) {
+    const total = cstats && cstats.total ? cstats.total : 0;
+    const curves = total ? Math.min(1, ((cstats.km[2] + 1.7 * cstats.km[3]) / total) / 0.55) : 0.3;
+    let climb = null, grade = null;
+    if (el && el.length > 2 && elKm) {
+      climb = 0; grade = 0; const step = (elKm * 1000) / (el.length - 1);
+      for (let i = 1; i < el.length; i++) { const d = el[i] - el[i - 1]; if (d > 0) climb += d; grade = Math.max(grade, Math.abs(d) / step * 100); }
+    }
+    const climbF = climb === null ? 0.4 : Math.min(1, (climb / Math.max(1, km)) / 26);
+    const gradeF = grade === null ? 0.4 : Math.min(1, Math.max(0, (grade - 3) / 7));
+    const distF = Math.min(1, km / 380);
+    const parts = [
+      { k: "עיקולים", v: curves, w: 0.36 }, { k: "טיפוס", v: climbF, w: 0.18 },
+      { k: "שיפועים", v: gradeF, w: 0.12 }, { k: "אורך", v: distF, w: 0.14 }, { k: "אופי הכביש", v: tech, w: 0.2 }
+    ];
+    const score = Math.round(parts.reduce((a, p) => a + p.v * p.w, 0) * 100);
+    const lvl = score < 32 ? 1 : score < 46 ? 2 : score < 60 ? 3 : score < 75 ? 4 : 5;
+    return { score, level: DIFF_LEVELS[lvl - 1], parts, climb: climb === null ? null : Math.round(climb), grade: grade === null ? null : Math.round(grade * 10) / 10, provisional: climb === null };
+  }
+
+  g.BRL = { difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

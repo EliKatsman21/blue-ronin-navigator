@@ -230,5 +230,72 @@
     return { score, level: DIFF_LEVELS[lvl - 1], parts, climb: climb === null ? null : Math.round(climb), grade: grade === null ? null : Math.round(grade * 10) / 10, provisional: climb === null };
   }
 
-  g.BRL = { difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* ---------- territories: where a route is inside a polygon ring ([lon,lat]...) ---------- */
+  function inRing(p, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  /* Spans of the route inside the ring, with the crossing points refined to ~20 m. */
+  function ringSpans(coords, ring) {
+    if (!ring || !coords || coords.length < 2) return [];
+    let w = 180, s = 90, e = -180, n = -90; ring.forEach(([x, y]) => { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y); });
+    const test = p => p[0] >= w && p[0] <= e && p[1] >= s && p[1] <= n && inRing(p, ring);
+    const spans = []; let km = 0, prev = coords[0], prevIn = test(prev), cur = prevIn ? { fromKm: 0, enter: prev, startsInside: true } : null;
+    for (let i = 1; i < coords.length; i++) {
+      const p = coords[i], d = hav(prev, p), inside = test(p);
+      if (inside !== prevIn) {
+        let a = 0, b = 1; for (let k = 0; k < 12; k++) { const m = (a + b) / 2; const q = [prev[0] + (p[0] - prev[0]) * m, prev[1] + (p[1] - prev[1]) * m]; if (test(q) === prevIn) a = m; else b = m; }
+        const x = [prev[0] + (p[0] - prev[0]) * b, prev[1] + (p[1] - prev[1]) * b], xk = km + d * b;
+        if (inside) cur = { fromKm: xk, enter: x }; else if (cur) { cur.toKm = xk; cur.exit = x; spans.push(cur); cur = null; }
+      }
+      km += d; prev = p; prevIn = inside;
+    }
+    if (cur) { cur.toKm = km; cur.endsInside = true; spans.push(cur); }
+    return spans;
+  }
+
+  /* ---------- turn-by-turn, in Hebrew ---------- */
+  const DIRS = { left: "שמאלה", right: "ימינה", "slight left": "קלות שמאלה", "slight right": "קלות ימינה", "sharp left": "חדות שמאלה", "sharp right": "חדות ימינה", straight: "ישר", uturn: "פרסה" };
+  const ORD = ["", "הראשונה", "השנייה", "השלישית", "הרביעית", "החמישית", "השישית", "השביעית"];
+  const roadOf = m => { const ref = (m.ref || "").split(";")[0].trim(); if (/^\d+$/.test(ref)) return "כביש " + ref; return ref || m.name || ""; };
+  function instruction(m) {
+    const road = roadOf(m), to = road ? ` אל ${road}` : "", dir = DIRS[m.modifier] || "";
+    switch (m.type) {
+      case "depart": return road ? `צאו לדרך ב${road}` : "צאו לדרך";
+      case "arrive": return m.last ? "הגעתם ליעד" : "הגעתם לעצירה";
+      case "roundabout": case "rotary": return `בכיכר צאו ביציאה ${ORD[m.exit] || (m.exit ? "ה־" + m.exit : "")}${to}`.replace("  ", " ");
+      case "roundabout turn": return `בכיכר פנו ${dir}${to}`;
+      case "fork": return `בפיצול שמרו ${m.modifier && m.modifier.includes("left") ? "שמאלה" : "ימינה"}${to}`;
+      case "merge": return road ? `השתלבו ב${road}` : "השתלבו בתנועה";
+      case "on ramp": return road ? `עלו ל${road}` : `עלו לרמפה ${dir}`;
+      case "off ramp": return `צאו ${dir || "מהכביש"}${road ? ` לכיוון ${road}` : ""}`;
+      case "end of road": return `בסוף הדרך פנו ${dir}${to}`;
+      case "continue": case "new name": return m.modifier && m.modifier !== "straight" ? `המשיכו ${dir}${to}` : `המשיכו ישר${to}`;
+      case "turn": default: return m.modifier === "uturn" ? "בצעו פרסה" : m.modifier === "straight" ? `המשיכו ישר${to}` : `פנו ${dir}${to}`;
+    }
+  }
+  /* Which maneuvers deserve a spoken prompt. */
+  const speakable = m => !(m.type === "new name" || (m.type === "continue" && (!m.modifier || m.modifier === "straight")) || m.type === "depart");
+  /* Arrow angle for the HUD icon (degrees, 0 = straight up). */
+  const ARROW = { straight: 0, "slight right": 40, right: 90, "sharp right": 135, uturn: 180, "sharp left": -135, left: -90, "slight left": -40 };
+  const arrowAngle = m => m.type === "arrive" ? null : (m.type === "roundabout" || m.type === "rotary") ? "rb" : (ARROW[m.modifier] ?? 0);
+
+  /* ---------- fly-through path: resampled every `step` km and smoothed ---------- */
+  function flyPath(coords, step = 0.015) {
+    const cum = cumulative(coords), L = cum[cum.length - 1]; const n = Math.max(2, Math.min(40000, Math.ceil(L / step) + 1)); const st = L / (n - 1);
+    const raw = new Array(n); let j = 0;
+    for (let i = 0; i < n; i++) { const km = i * st; while (j < cum.length - 2 && cum[j + 1] < km) j++; const t = (km - cum[j]) / ((cum[j + 1] - cum[j]) || 1); raw[i] = [coords[j][0] + (coords[j + 1][0] - coords[j][0]) * t, coords[j][1] + (coords[j + 1][1] - coords[j][1]) * t]; }
+    const box = (arr, w) => { const out = new Array(arr.length); let sx = 0, sy = 0, cnt = 0; const h = w >> 1;
+      for (let i = -h; i < arr.length; i++) { const add = i + h; if (add < arr.length) { sx += arr[add][0]; sy += arr[add][1]; cnt++; } const rem = i - h - 1; if (rem >= 0) { sx -= arr[rem][0]; sy -= arr[rem][1]; cnt--; } if (i >= 0) out[i] = [sx / cnt, sy / cnt]; } return out; };
+    const sm = box(box(raw, 7), 7);
+    const look = Math.max(4, Math.round(0.16 / st)); const head = new Float32Array(n);
+    for (let i = 0; i < n; i++) head[i] = bearing(sm[Math.max(0, i - 2)], sm[Math.min(n - 1, i + look)]);
+    return { pts: sm, head, step: st, km: L, n };
+  }
+
+  g.BRL = { inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

@@ -75,6 +75,22 @@
       S("esh2", "צומת אשתאול · סוף הלולאה", 31.7822, 34.9962, "road", "חזרה לנקודת היציאה.", { roads: ["395", "38"] })
     ]
   });
+  /* Chapter 6: the whole Jordan Valley stretch of Route 90, the Petza'el climb (505) and the twisty
+     Allon Road (508/578) back north. Most of it is beyond the Green Line; the app marks entry and exit. */
+  CHAPTERS.push({
+    id: "c6", title: "בקעת הירדן ועליית פצאל", short: "בקעה·פצאל", region: "valley", tech: 0.6,
+    sub: "כל כביש 90 בבקעה מבית שאן ועד צפון ים המלח, עליית פצאל בכביש 505 למעלה אפרים, וחזרה צפונה בדרך אלון עם הפיתולים עד מחולה.",
+    note: "רוב הפרק בשטחים (יהודה ושומרון): בודקים הנחיות ביטחון לפני יציאה. ביריחו ובשטחי A הכניסה לישראלים אסורה. בקיץ חם מאוד, ותחנות הדלק בדרום הבקעה מעטות.",
+    stops: [
+      S("bsh6", "בית שאן · נקודת מפגש", 32.4975, 35.4980, "start", "תדלוק לפני היציאה דרומה בכביש 90.", { roads: ["90"] }),
+      S("almog", "צומת אלמוג · צפון ים המלח", 31.7980, 35.4660, "view", "הקצה הדרומי של הפרק, מעל ים המלח. מסתובבים צפונה.", { roads: ["90", "1"], score: [1, 4] }),
+      S("ptz", "צומת פצאל", 32.0400, 35.4600, "road", "פונים מערבה לכביש 505.", { roads: ["90", "505"] }),
+      S("maef", "עליית פצאל · מעלה אפרים", 32.0760, 35.4000, "view", "הטיפוס מהבקעה אל הרכס: עיקולים רצופים ונוף על כל הבקעה. למעלה ממשיכים צפונה בדרך אלון.", { roads: ["505", "508"], score: [5, 5] }),
+      S("hamra", "צומת חמרה · דרך אלון", 32.1610, 35.4450, "road", "דרך אלון ממשיכה צפונה לאורך הרכס המזרחי.", { roads: ["508", "57"], score: [4, 4] }),
+      S("mehola", "צומת מחולה", 32.3690, 35.5270, "road", "סוף דרך אלון: יורדים לכביש 90 וחוזרים צפונה.", { roads: ["578", "90"], score: [4, 4] }),
+      S("bsh6e", "בית שאן · סוף הלולאה", 32.4970, 35.4985, "road", "חזרה לנקודת היציאה.", { roads: ["90"] })
+    ]
+  });
   [["c1", 0.35], ["c2", 0.7], ["c3", 0.6]].forEach(([id, t]) => { const c = CHAPTERS.find(x => x.id === id); c.tech = t; c.region = "north"; });
   CHAPTERS.find(c => c.id === "c2").note = "עליית חמת גדר בכביש 98 טכנית מאוד: עיקולים עיוורים ותלולים, בלי שוליים.";
   CHAPTERS.find(c => c.id === "c3").note = "כביש 899 מהיר עם כמה עיקולי סיכה, וצמוד לגבול. בודקים הנחיות לפני יציאה.";
@@ -104,8 +120,9 @@
 
   const NORTH_BOUNDS = [[34.86, 32.40], [35.90, 33.34]];
   const CENTER_BOUNDS = [[34.76, 31.52], [35.20, 31.84]];
-  const REGIONS = { north: NORTH_BOUNDS, center: CENTER_BOUNDS };
+  const VALLEY_BOUNDS = [[35.30, 31.74], [35.62, 32.55]];
+  const REGIONS = { north: NORTH_BOUNDS, center: CENTER_BOUNDS, valley: VALLEY_BOUNDS };
   const LIVE_BOARD = "https://claude.ai/artifact/Wv9hF1aRr4UWx5v12fe5GG";
 
-  g.BRD = { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD };
+  g.BRD = { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, VALLEY_BOUNDS, REGIONS, LIVE_BOARD };
 })(typeof module !== "undefined" ? module.exports : window);

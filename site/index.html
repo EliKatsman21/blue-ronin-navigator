@@ -241,7 +241,7 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 .intro h1{font-family:var(--display);font-size:clamp(64px,14vw,140px);line-height:.8;margin:0;letter-spacing:1px}
 .intro h1 span{color:var(--accent)}
 .intro p{color:var(--muted);margin:10px 0 0;font-size:16px}
-.intro .road{width:min(320px,70vw);height:60px;margin:18px auto 0;display:block}
+.intro .road{width:min(320px,70vw);height:60px;margin:18px auto 0;display:block;overflow:visible}
 .ign{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(13% + env(safe-area-inset-bottom,0px));white-space:nowrap;display:inline-flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--ink);border-radius:999px;padding:9px 18px 9px 14px;font-weight:700;font-size:15px;cursor:pointer;animation:ignpulse 1.6s ease-in-out infinite}
 .ign svg{width:18px;height:18px;color:var(--warn)}
 @keyframes ignpulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--warn) 14%,transparent)}}
@@ -261,6 +261,82 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 .intro .road path{stroke-dasharray:420;stroke-dashoffset:420;animation:draw 1.6s ease forwards .2s}
 @keyframes draw{to{stroke-dashoffset:0}}
 .toast{position:fixed;z-index:30;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;max-width:90vw}
+
+/* navigation buttons */
+.navb{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 11px 5px 9px;font-weight:700;font-size:13px;text-decoration:none;border:1px solid transparent;line-height:1.1}
+.navb svg{width:15px;height:15px;flex:none}
+.navb.w{background:#33CCFF;color:#062436}
+.navb.g{background:var(--raised);color:var(--ink);border-color:var(--line)}
+.navb.g svg{color:#EA4335}
+.navb.m{background:var(--raised);color:var(--ink);border-color:var(--line)}
+.navb.m svg{color:var(--sun)}
+/* photos */
+.ph{margin:-2px -2px 6px;min-height:0}
+.ph-skel{display:block;width:100%;height:100%;min-height:72px;border-radius:8px;background:linear-gradient(90deg,var(--line),var(--raised),var(--line));background-size:200% 100%;animation:skel 1.2s linear infinite}
+@keyframes skel{to{background-position:-200% 0}}
+.ph-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;border-radius:9px;overflow:hidden;height:118px}
+.ph-img{display:block;min-width:0}
+.ph-img img{width:100%;height:100%;object-fit:cover;display:block}
+.ph-img.main{grid-column:span 2}
+.ph-cr{font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl}
+.item .grow,.grow{flex:1;min-width:0}
+.thumb{flex:none;width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--raised);padding:0;cursor:pointer;display:grid;place-items:center}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .ph-skel{min-height:52px}
+.ph-none{color:var(--muted);display:grid;place-items:center}.ph-none svg{width:22px;height:22px}
+.item{align-items:center}
+/* territories */
+.card.terr{border-color:color-mix(in srgb,var(--caution) 55%,var(--line))}
+.terrlist{margin:0;padding:0;list-style:none;display:grid;gap:4px;border-inline-start:2px dashed var(--caution);padding-inline-start:10px}
+.terrlist li{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+/* traffic */
+.trstrip{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden}
+.trstrip i{flex:1;background:var(--line)}
+.trstrip.skel{background:linear-gradient(90deg,var(--line),var(--raised),var(--line));background-size:200% 100%;animation:skel 1.2s linear infinite}
+/* builder */
+.newroute{border:1px dashed var(--accent)!important;color:var(--accent);background:transparent!important}
+.newroute[aria-pressed="true"]{background:var(--accent)!important;color:var(--accent-ink)!important;border-style:solid!important}
+.builder{display:grid;gap:10px}
+.search{position:relative}
+.search input{width:100%;font:inherit;font-size:16px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--ink)}
+.search input:focus{outline:2px solid var(--accent);outline-offset:0}
+.sres{display:grid;gap:2px;margin-top:4px;max-height:260px;overflow-y:auto}
+.sres:empty{display:none}
+.sr{display:flex;gap:10px;align-items:center;text-align:right;border:0;background:var(--raised);border-radius:10px;padding:8px 10px;cursor:pointer;width:100%;color:var(--ink)}
+.sr b{display:block;font-size:14px}
+.sr-k{font-size:11px;font-weight:700;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:1px 7px;flex:none}
+.sr-plus{font-size:20px;color:var(--accent);flex:none}
+.wps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.wps li{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.ic-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer;flex:none;color:var(--ink)}
+.ic-btn:disabled{opacity:.35;cursor:default}
+#bbPick[aria-pressed="true"]{background:var(--report);color:#fff;border-color:var(--report)}
+/* fly-through */
+.bike{width:34px;height:61px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
+.bike svg{width:100%;height:100%;display:block}
+.flyui{position:fixed;z-index:9;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+@media (min-width:900px){.flyui{right:calc(var(--sheet-w) + 28px)}}
+.fl-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;min-width:0}
+.fl-top b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fl-row{display:flex;align-items:center;gap:10px}
+.fl-row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.fl-btn{width:42px;height:42px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
+.fl-btn svg{width:20px;height:20px}
+#flClose{background:var(--raised);color:var(--ink);border:1px solid var(--line)}
+.fl-rate{display:flex;gap:2px;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:2px;flex:none}
+.fl-rate button{border:0;background:none;border-radius:8px;padding:5px 8px;font-family:var(--mono);font-size:12.5px;color:var(--muted);cursor:pointer}
+.fl-rate button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
+@media (min-width:900px){body.flying .sheet{opacity:1;pointer-events:auto}}
+/* turn-by-turn */
+.turn{position:fixed;z-index:10;top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:12px;align-items:center;background:#0E6B47;color:#fff;border-radius:16px;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.turn-ic{width:56px;height:56px;flex:none;display:grid;place-items:center}
+.turn-ic svg{width:52px;height:52px}
+.turn-d{font-family:var(--display);font-size:40px;line-height:.9;font-weight:700}
+.turn-t{font-size:16px;font-weight:700;line-height:1.25}
+.hudmsg.terr{background:color-mix(in srgb,var(--caution) 22%,var(--raised));border-color:var(--caution)}
+.vbtn[aria-pressed="false"]{opacity:.55;text-decoration:line-through}
+.vbtn svg{width:18px;height:18px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.intro .road path{stroke-dashoffset:0}.tacho .neutral{opacity:1}}
 </style>
 </head>
@@ -269,11 +345,59 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
   <div class="in">
     <svg class="tacho" viewBox="0 0 200 128" aria-hidden="true"><path class="arc" d="M31.6 135.5 A79 79 0 1 1 177.8 82.3"/><path class="arc red" d="M177.8 82.3 A79 79 0 0 1 168.4 135.5"/><line class="tk" x1="35.9" y1="133.0" x2="45.4" y2="127.5"/><text class="tn" x="55.0" y="125.5">0</text><line class="tk" x1="27.1" y1="108.8" x2="34.0" y2="107.6"/><line class="tk" x1="27.1" y1="83.2" x2="38.0" y2="85.1"/><text class="tn" x="48.8" y="90.5">2</text><line class="tk" x1="35.9" y1="59.0" x2="42.0" y2="62.5"/><line class="tk" x1="52.4" y1="39.3" x2="59.5" y2="47.7"/><text class="tn" x="66.6" y="59.7">4</text><line class="tk" x1="74.7" y1="26.5" x2="77.1" y2="33.0"/><line class="tk" x1="100.0" y1="22.0" x2="100.0" y2="33.0"/><text class="tn" x="100.0" y="47.5">6</text><line class="tk" x1="125.3" y1="26.5" x2="122.9" y2="33.0"/><line class="tk" x1="147.6" y1="39.3" x2="140.5" y2="47.7"/><text class="tn" x="133.4" y="59.7">8</text><line class="tk" x1="164.1" y1="59.0" x2="158.0" y2="62.5"/><line class="tk red" x1="172.9" y1="83.2" x2="162.0" y2="85.1"/><text class="tn red" x="151.2" y="90.5">10</text><line class="tk red" x1="172.9" y1="108.8" x2="166.0" y2="107.6"/><line class="tk red" x1="164.1" y1="133.0" x2="154.6" y2="127.5"/><text class="tn red" x="145.0" y="125.5">12</text><g class="needle"><line x1="100" y1="96" x2="100" y2="30"/></g><circle class="hub" cx="100" cy="96" r="6"/><text class="unit" x="100" y="118">×1000 r/min</text><text class="neutral" x="100" y="70">N</text></svg>
     <h1>BLUE <span>RONIN</span></h1>
-    <svg class="road" viewBox="0 0 320 60"><path d="M4 50 C 60 50, 70 10, 120 12 S 170 52, 220 46 S 280 8, 316 10" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/></svg>
+    <svg class="road" viewBox="0 0 320 60"><path d="M4 50 C 60 50, 70 10, 120 12 S 170 52, 220 46 S 280 8, 316 10" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/><g id="rider" opacity="0"><g id="rStreaks" opacity="0"><path d="M-34 -14h16M-40 -22h20M-30 -30h12" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round"/></g>
+<g id="rWb"><circle cx="0" cy="-9" r="8.6" fill="none" stroke="var(--ink)" stroke-width="3.4"/><g id="rSpR"><path d="M0 -15.5V-2.5M-6.5 -9H6.5" stroke="var(--ink)" stroke-width="1.4"/></g></g>
+<g><circle cx="44" cy="-9" r="8.6" fill="none" stroke="var(--ink)" stroke-width="3.4"/><g id="rSpF"><path d="M44 -15.5V-2.5M37.5 -9H50.5" stroke="var(--ink)" stroke-width="1.4"/></g></g>
+<path d="M0 -9 15 -14" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+<path d="M44 -9 37 -27" stroke="var(--muted)" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M4 -14 2 -21 12 -23 20 -25 30 -27 44 -24 47 -19 40 -14 26 -12 14 -12z" fill="var(--accent)" stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round"/>
+<path d="M39 -26 45 -31" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M6 -15h-9" stroke="var(--muted)" stroke-width="3" stroke-linecap="round"/>
+<path d="M17 -25 23 -15 30 -14" fill="none" stroke="var(--ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M18 -26 27 -39" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>
+<path d="M26 -37 36 -29" stroke="var(--ink)" stroke-width="3.2" stroke-linecap="round"/>
+<circle cx="29" cy="-44" r="5.6" fill="var(--ink)"/><path d="M30.5 -46.5a4.6 4.6 0 0 1 3.6 3" stroke="var(--sun)" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+</g></svg>
     <p>טוען את הצפון: כבישים, מזג אוויר, שבת.</p>
     <button type="button" class="ign" id="ignBtn" hidden aria-label="הנעה עם צליל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.5a8 8 0 1 0 11.4 0"/></svg>הקישו להנעה</button>
   </div>
 </div>
+<script>
+/* The wheelie rider: rides the road line as it draws itself, lifts the front wheel with the revs
+   (the same keyframes as the tachometer needle and the engine sound), sets it down on the decel. */
+(() => {
+  const intro = document.getElementById("intro"), path = intro.querySelector(".road path"), g = document.getElementById("rider");
+  if (!path || !g || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const streaks = document.getElementById("rStreaks"), spR = document.getElementById("rSpR"), spF = document.getElementById("rSpF");
+  const bez = (x1, y1, x2, y2) => u => { if (u <= 0) return 0; if (u >= 1) return 1; let s = u; for (let i = 0; i < 8; i++) { const bx = 3 * x1 * s * (1 - s) ** 2 + 3 * x2 * s * s * (1 - s) + s ** 3 - u, dx = 3 * x1 * (1 - s) ** 2 + 6 * (x2 - x1) * s * (1 - s) + 3 * (1 - x2) * s * s; s = Math.min(1, Math.max(0, s - bx / (dx || 1e-6))); } return 3 * y1 * s * (1 - s) ** 2 + 3 * y2 * s * s * (1 - s) + s ** 3; };
+  const ne = bez(.3, .1, .2, 1), dr = bez(.25, .1, .25, 1);
+  const needle = t => t < .25 ? 0 : t < .925 ? ne((t - .25) / .675) : t < 1.12 ? 1 - (4 / 240) * ne((t - .925) / .195) : t < 1.75 ? (236 / 240) * (1 - ne((t - 1.12) / .63)) : 0;
+  const Lp = path.getTotalLength(); const end = path.getPointAtLength(Lp), endB = path.getPointAtLength(Lp - 2); const endAng = Math.atan2(end.y - endB.y, end.x - endB.x);
+  const at = s => { if (s <= Lp) { const a = path.getPointAtLength(Math.max(0, s)), b = path.getPointAtLength(Math.min(Lp, Math.max(0, s) + 2)); return [a.x, a.y, Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI]; } const e = s - Lp; return [end.x + Math.cos(endAng) * e, end.y + Math.sin(endAng) * e, endAng * 180 / Math.PI]; };
+  const clock = () => { const a = intro.getAnimations({ subtree: true }).find(x => x.animationName === "sweep"); return a && a.currentTime != null ? a.currentTime / 1000 : performance.now() / 1000; };
+  let wPrev = 0, last = 0;
+  const frame = () => {
+    if (intro.classList.contains("out")) return;
+    const t = clock(); const f = needle(t);
+    /* the rider holds the throttle with the needle: covers most of the road while the revs rise and fall,
+       lands near the end of the line as the needle returns, then rides out of frame */
+    const tip = 420 * dr((t - .2) / 1.6), u = Math.min(1, Math.max(0, (t - .22) / 1.53));
+    const s = t <= 1.75 ? Math.min(tip, Lp * .86 * (1 - Math.pow(1 - u, 1.7))) : Lp * .86 + (t - 1.75) * Lp * .75;
+    const [x, y, ang] = at(s);
+    let w = 33 * Math.pow(f, 1.15);
+    if (t > .925 && t < 1.12) w += 1.6 * Math.sin(2 * Math.PI * 7 * t);
+    if (t > 1.55 && t < 2.1) w -= 2.6 * Math.exp(-(t - 1.55) * 9) * Math.sin((t - 1.55) * 30);
+    wPrev = w; last = t;
+    g.setAttribute("transform", `translate(${x.toFixed(2)} ${(y - 2.4).toFixed(2)}) rotate(${(ang - wPrev).toFixed(2)}) scale(.6)`);
+    g.setAttribute("opacity", t < .2 ? 0 : t > 2.25 ? Math.max(0, 1 - (t - 2.25) / .2) : Math.min(1, (t - .2) / .08));
+    streaks.setAttribute("opacity", (Math.min(1, f * 1.4) * .85).toFixed(2));
+    const spin = (s / 9 * 180 / Math.PI / .6) % 360; spR.setAttribute("transform", `rotate(${spin.toFixed(1)} 0 -9)`); spF.setAttribute("transform", `rotate(${spin.toFixed(1)} 44 -9)`);
+    if (t < 3.2 || !last) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  window.BR_riderRestart = () => requestAnimationFrame(frame);
+})();
+</script>
 <script>
 /* Ignition sound, locked to the tachometer needle. Runs before the map library loads.
    Autoplay is allowed for installed apps on Android; elsewhere one tap on the intro starts it. */
@@ -284,7 +408,7 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
   if (!on || matchMedia("(prefers-reduced-motion: reduce)").matches || !window.AudioContext && !window.webkitAudioContext) return;
   try { const last = +sessionStorage.getItem("brn:introAt") || 0; if (Date.now() - last < 15000) return; sessionStorage.setItem("brn:introAt", Date.now()); } catch (e) { }
   const intro = document.getElementById("intro"), btn = document.getElementById("ignBtn");
-  const anims = () => intro.getAnimations({ subtree: true }).filter(a => /sweep|nlight/.test(a.animationName || ""));
+  const anims = () => intro.getAnimations({ subtree: true }).filter(a => /sweep|nlight|draw/.test(a.animationName || ""));
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const gain = ctx.createGain(); gain.gain.value = 0.85; gain.connect(ctx.destination);
   let buf = null, played = false;
@@ -303,7 +427,7 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
     await ready; if (!buf) return;
     btn.hidden = true;
     anims().forEach(a => { a.cancel(); a.play(); });
-    play(0);
+    play(0); window.BR_riderRestart && window.BR_riderRestart();
   };
   btn.addEventListener("click", ignite);
   intro.addEventListener("pointerdown", e => { if (e.target !== btn && !btn.contains(e.target)) ignite(e); });
@@ -341,6 +465,8 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
   <label><input type="checkbox" data-l="osmview"><span class="ic" style="background:var(--view)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z"/></svg></span>מצפורים</label>
   <label><input type="checkbox" data-l="fuel"><span class="ic" style="background:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg></span>תחנות דלק</label>
   <h5>מפה</h5>
+  <label><input type="checkbox" data-l="traffic" checked><span class="sw" style="background:linear-gradient(90deg,var(--go),var(--caution),var(--no))"></span>תנועה חיה</label>
+  <label><input type="checkbox" data-l="green" checked><span class="sw" style="background:repeating-linear-gradient(90deg,var(--caution) 0 4px,transparent 4px 7px)"></span>הקו הירוק ומעבר בשטחים</label>
   <label><input type="checkbox" data-l="hillshade" checked><span class="sw" style="background:var(--line)"></span>הצללת תבליט</label>
 </div>
 
@@ -368,19 +494,30 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
   </div>
 </section>
 
+<div class="turn" id="turn" hidden><div class="turn-ic" id="turnIc"></div><div class="turn-txt"><div class="turn-d" id="turnD"></div><div class="turn-t" id="turnT"></div></div></div>
+<div class="flyui" id="flyui" hidden>
+  <div class="fl-top"><b id="flTitle"></b><span id="flInfo" class="mono small"></span></div>
+  <div class="fl-row">
+    <button type="button" class="fl-btn" id="flPlay" aria-label="השהיה"></button>
+    <input id="flSeek" type="range" min="0" max="1000" value="0" aria-label="מיקום במסלול">
+    <div class="fl-rate" role="group" aria-label="מהירות"><button type="button" data-rate="1">1×</button><button type="button" data-rate="2">2×</button><button type="button" data-rate="4">4×</button></div>
+    <button type="button" class="fl-btn" id="flClose" aria-label="סיום המעוף"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+</div>
 <div class="hud" id="hud" hidden>
   <div id="hudMsg" class="hudmsg" hidden></div>
   <div class="top">
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
     <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div></div>
   </div>
-  <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
+  <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
 </div>
 
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+<script src="geo.js"></script>
 <script src="data.js"></script>
 <script src="logic.js"></script>
 <script src="app.js"></script>

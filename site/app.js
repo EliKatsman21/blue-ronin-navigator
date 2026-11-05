@@ -1094,7 +1094,7 @@
   }
   function flyStep(ts) {
     const F = st.fly; if (!F) return;
-    const DT = F.last == null ? 1 / 60 : Math.min(0.05, (ts - F.last) / 1000); F.last = ts;
+    const DT = F.last == null ? 1 / 60 : Math.min(0.25, (ts - F.last) / 1000); F.last = ts;
     const P = F.P;
     if (F.snap) flySnap(F);
     /* sub-steps keep the springs stable on slow frames */
@@ -1119,8 +1119,8 @@
       springAng(F.bh, P.head[i0], 11, dt);
       let mxNear = 0; const j1 = Math.min(P.n - 1, i0 + Math.round(0.3 / P.step)); for (let k = i0; k <= j1; k += 4) if (F.cls[k] > mxNear) mxNear = F.cls[k];
       const zt = [13.45, 13.9, 14.3, 14.6][mxNear] - 0.32 * Math.log2(Math.max(1, F.rate));
-      spring(F.zoom, F.loading ? zt - 0.25 : zt, 0.9, dt);
-      spring(F.pitch, 62, 1.4, dt);
+      spring(F.zoom, F.loading ? zt - 0.25 : zt, F.blend < 1 ? 2.2 : 0.9, dt);
+      spring(F.pitch, 62, F.blend < 1 ? 2.2 : 1.4, dt);
       if (F.blend < 1) F.blend = Math.min(1, F.blend + dt / 1.6);
     }
     F.marker.setLngLat(pos).setRotation(F.bh.x);

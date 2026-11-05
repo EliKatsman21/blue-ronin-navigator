@@ -90,7 +90,8 @@
   };
   const map = new maplibregl.Map({
     container: "map", style: OFM + styleName, center: [35.0, 31.6], zoom: 6.2,
-    maxPitch: 80, attributionControl: { compact: true }, dragRotate: true, cooperativeGestures: false
+    maxPitch: 80, attributionControl: { compact: true }, dragRotate: true, cooperativeGestures: false,
+    pixelRatio: Math.min(2, window.devicePixelRatio || 1), fadeDuration: 160, maxTileCacheSize: 360, refreshExpiredTiles: false
   });
   map.on("error", e => {
     const msg = String(e && e.error && (e.error.message || e.error.status) || "");
@@ -221,13 +222,13 @@
       e.onclick = ev => { ev.stopPropagation(); stopPopup(s, n); };
       mk.push(new maplibregl.Marker({ element: e }).setLngLat(lonlat(s)).addTo(map));
     }));
-    if (st.layers.cafes) CAFES.filter(c => !st.shabbat || c.shabbat === true).forEach(c => {
+    if (st.layers.cafes && !st.fly) CAFES.filter(c => !st.shabbat || c.shabbat === true).forEach(c => {
       const onRoute = chap().stops.some(s => s.cafe === c.id); if (onRoute && st.layers.stops) return;
       const e = document.createElement("button"); e.type = "button"; e.className = "mkc"; e.innerHTML = IC.cup; e.setAttribute("aria-label", c.name);
       e.onclick = ev => { ev.stopPropagation(); cafePopup(c); };
       mk.push(new maplibregl.Marker({ element: e }).setLngLat([c.lon, c.lat]).addTo(map));
     });
-    if (st.layers.wx && st.wx) wxPoints().forEach((p, i) => {
+    if (st.layers.wx && st.wx && !st.fly) wxPoints().forEach((p, i) => {
       const h = satHour(i, 8); if (!h) return;
       const e = document.createElement("div"); e.className = "mkw"; e.innerHTML = `${wxIcon(h.code)}${Math.round(h.t)}°`;
       mk.push(new maplibregl.Marker({ element: e, anchor: "bottom" }).setLngLat([p.lon, p.lat]).addTo(map));
@@ -266,8 +267,11 @@
   /* ---------- routing (OSRM, cached forever) ---------- */
   const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
   const routePts = c => (c.custom && c.opts && c.opts.loop && c.stops.length > 1 ? c.stops.concat([c.stops[0]]) : c.stops);
-  const routeKey = c => c.custom ? "uroute:v1:" + hashStr(JSON.stringify([routePts(c).map(s => [s.lon.toFixed(5), s.lat.toFixed(5)]), !!(c.opts && c.opts.noHighway)])) : "route:v3:" + c.id;
-  const osrmUrl = (c, extra = "") => `https://router.project-osrm.org/route/v1/driving/${routePts(c).map(s => `${s.lon.toFixed(5)},${s.lat.toFixed(5)}`).join(";")}?overview=full&geometries=geojson&continue_straight=false${c.opts && c.opts.noHighway ? "&exclude=motorway" : ""}${extra}`;
+  /* Stops may carry silent via points (s.via = [[lat, lon], ...] before the stop): they shape the line
+     but are passed to OSRM as non-waypoints, so they add no legs and no "arrived" prompts. */
+  const routeCoords = c => { const pts = [], wp = []; routePts(c).forEach(s => { (s.via || []).forEach(v => pts.push({ lat: v[0], lon: v[1] })); wp.push(pts.length); pts.push(s); }); return { pts, wp }; };
+  const routeKey = c => c.custom ? "uroute:v1:" + hashStr(JSON.stringify([routePts(c).map(s => [s.lon.toFixed(5), s.lat.toFixed(5)]), !!(c.opts && c.opts.noHighway)])) : "route:v4:" + c.id;
+  const osrmUrl = (c, extra = "") => { const { pts, wp } = routeCoords(c); return `https://router.project-osrm.org/route/v1/driving/${pts.map(s => `${s.lon.toFixed(5)},${s.lat.toFixed(5)}`).join(";")}?overview=full&geometries=geojson&continue_straight=false${wp.length < pts.length ? "&waypoints=" + wp.join(";") : ""}${c.opts && c.opts.noHighway ? "&exclude=motorway" : ""}${extra}`; };
   async function loadRoute(c) {
     const key = routeKey(c); const cached = LS.get(key, null);
     if (cached) return cached;
@@ -277,7 +281,7 @@
       const rt = j.routes[0]; const out = { coords: rt.geometry.coordinates.map(p => [+p[0].toFixed(5), +p[1].toFixed(5)]), km: rt.distance / 1000, min: rt.duration / 60, legs: rt.legs.map(l => l.distance / 1000), real: true };
       LS.set(key, out); return out;
     } catch (e) {
-      const cs = routePts(c).map(lonlat); const cum = L.cumulative(cs);
+      const cs = routeCoords(c).pts.map(lonlat); const cum = L.cumulative(cs);
       return { coords: cs, km: cum[cum.length - 1] * 1.35, min: cum[cum.length - 1] * 1.35 / 55 * 60, legs: [], real: false };
     }
   }
@@ -307,7 +311,7 @@
   const climbOf = el => { let c = 0; for (let i = 1; i < el.length; i++) if (el[i] > el[i - 1]) c += el[i] - el[i - 1]; return Math.round(c); };
   async function loadElev(id) {
     if (st.elev[id]) return st.elev[id];
-    const key = "elev:v3:" + (CHAPTERS.find(c => c.id === id) && CHAPTERS.find(c => c.id === id).custom ? routeKey(CHAPTERS.find(c => c.id === id)) : id); const c = LS.get(key, null); if (c) { c.climb = climbOf(c.el); return (st.elev[id] = c); }
+    const key = "elev:v4:" + (CHAPTERS.find(c => c.id === id) && CHAPTERS.find(c => c.id === id).custom ? routeKey(CHAPTERS.find(c => c.id === id)) : id); const c = LS.get(key, null); if (c) { c.climb = climbOf(c.el); return (st.elev[id] = c); }
     const r = st.routes[id]; if (!r) return null;
     const { pts, km } = L.sample(r.coords, Math.min(300, Math.max(100, Math.round(r.km / 1.2))));
     try {
@@ -900,7 +904,7 @@
 
   /* ---------- turn-by-turn steps from OSRM ---------- */
   async function loadSteps(c, route) {
-    const key = "steps:v1:" + routeKey(c); const cached = LS.get(key, null); if (cached) return cached;
+    const key = "steps:v2:" + routeKey(c); const cached = LS.get(key, null); if (cached) return cached;
     try {
       const j = await (await fetch(osrmUrl(c, "&steps=true"))).json(); if (j.code !== "Ok") throw 0;
       const legs = j.routes[0].legs; const out = []; let from = 0; const coords = route.coords, cum = route.cum;
@@ -1004,6 +1008,52 @@
 
   /* ---------- fly-through: a chase camera behind a motorcycle on a smoothed copy of the route ---------- */
   const BIKE_SVG = '<svg viewBox="0 0 40 72" aria-hidden="true"><defs><radialGradient id="bkGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#5C8DFF" stop-opacity=".55"/><stop offset="1" stop-color="#5C8DFF" stop-opacity="0"/></radialGradient></defs><ellipse cx="20" cy="38" rx="20" ry="32" fill="url(#bkGlow)"/><rect x="17" y="3" width="6" height="15" rx="3" fill="#0B1220"/><rect x="17" y="54" width="6" height="15" rx="3" fill="#0B1220"/><path d="M20 8c5 0 8 6 8.5 14l1 18c.3 7-3 13-9.5 13S10.2 47 10.5 40l1-18C12 14 15 8 20 8z" fill="#2457E6" stroke="#fff" stroke-width="1.6"/><path d="M8 21h24" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M15 13.5c1.5-1.6 3.2-2.3 5-2.3s3.5.7 5 2.3" fill="none" stroke="#9FC0FF" stroke-width="1.6"/><ellipse cx="20" cy="33" rx="6.2" ry="7.5" fill="#0B1220"/><circle cx="20" cy="27" r="5.4" fill="#F2F5FA" stroke="#0B1220" stroke-width="1.2"/><path d="M16.2 25.4a4 4 0 0 1 7.6 0" fill="none" stroke="#FFA24A" stroke-width="2"/></svg>';
+  /* Tile warm-up: fetches vector and DEM tiles ahead of the camera into the HTTP and service-worker
+     caches, so MapLibre finds them locally by the time the bike gets there. Nearest first, 6 at a time. */
+  const TQ = { q: [], busy: 0, seen: new Map() };
+  function warmTile(u) {
+    if (TQ.seen.has(u)) return TQ.seen.get(u);
+    if (TQ.seen.size > 6000) TQ.seen.clear();
+    const p = new Promise(res => TQ.q.push({ u, res })); TQ.seen.set(u, p); pumpTiles(); return p;
+  }
+  function pumpTiles() {
+    while (TQ.busy < 6 && TQ.q.length) {
+      const { u, res } = TQ.q.shift(); TQ.busy++;
+      fetch(u, { mode: "cors", priority: "low" }).then(r => r.ok ? r.arrayBuffer() : 0).catch(() => 0).finally(() => { TQ.busy--; res(); pumpTiles(); });
+    }
+  }
+  function dropTileQueue() { TQ.q.splice(0).forEach(x => { TQ.seen.delete(x.u); x.res(); }); }
+  function tileTemplates() {
+    const out = []; const style = map.getStyle();
+    for (const id of Object.keys(style.sources)) { const so = map.getSource(id); if (so && so.type === "vector" && so.tiles && so.tiles[0]) out.push({ t: so.tiles[0], kind: "v" }); }
+    out.push({ t: DEM.tiles[0], kind: "d" }); return out;
+  }
+  /* How far ahead (km) each zoom level is worth having: the pitched camera sees low zooms far away. */
+  const WARM = { v: { 14: 4, 13: 9, 12: 18, 11: 36 }, d: { 13: 5, 12: 12, 11: 26 } };
+  function warmAhead(F, fromKm, toKm) {
+    const P = F.P, out = [], key = (tp, z, x, y) => tp.t.replace("{z}", z).replace("{x}", x).replace("{y}", y);
+    const stepI = Math.max(1, Math.round(0.35 / P.step));
+    for (let i = Math.max(0, Math.floor(fromKm / P.step)), k = 0; i < P.n && i * P.step <= toKm; i += stepI, k++) {
+      const d = i * P.step - fromKm, pt = P.pts[i];
+      for (const tp of F.tpl) for (const z in WARM[tp.kind]) if (d <= WARM[tp.kind][z] && (z > 12 || k % 3 === 0)) L.tilesAlong([pt], +z, 1).forEach(([zz, x, y]) => out.push(warmTile(key(tp, zz, x, y))));
+    }
+    return Promise.all(out);
+  }
+  function warmWhole(F) {
+    const s = L.simplifyByDist(F.P.pts, 2), out = [];
+    for (const tp of F.tpl) [9, 10].forEach(z => L.tilesAlong(s, z, 1).forEach(([zz, x, y]) => out.push(warmTile(tp.t.replace("{z}", zz).replace("{x}", x).replace("{y}", y)))));
+    return Promise.all(out);
+  }
+
+  /* Critically damped springs: smooth, no overshoot, frame-rate independent. */
+  const spring = (S, target, w, dt) => { S.v += (w * w * (target - S.x) - 2 * w * S.v) * dt; S.x += S.v * dt; };
+  const springAng = (S, target, w, dt) => { const d = ((target - S.x + 540) % 360) - 180; S.v += (w * w * d - 2 * w * S.v) * dt; S.x = (S.x + S.v * dt + 360) % 360; };
+  function flyAt(P, km) {
+    const fi = Math.max(0, Math.min(P.n - 1.001, km / P.step)), i0 = Math.floor(fi), t = fi - i0, a = P.pts[i0], b = P.pts[i0 + 1];
+    return { i: i0, p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] };
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
   function startFly() {
     if (st.fly) return stopFly();
     const c = chap(), r = st.routes[st.chap]; if (!r) return;
@@ -1012,46 +1062,83 @@
     for (let i = 0, si = 0; i < P.n; i++) { const km = i * P.step; while (si < segs.length - 1 && segs[si].startKm + segs[si].km < km) si++; cls[i] = segs[si] ? segs[si].cls : 0; }
     const base = Math.min(2.4, Math.max(0.5, P.km / 85));
     const el = document.createElement("div"); el.className = "bike"; el.innerHTML = BIKE_SVG;
-    st.fly = { c, P, cls, E: st.elev[st.chap], km: 0, rate: LS.get("flyRate", 1), playing: true, dirty: true, last: null, bearing: P.head[0], bh: P.head[0], zoom: 13.6, v: base * 0.4, base, uiT: 0, trT: 0,
+    const cam = map.getCenter();
+    st.fly = { c, P, cls, E: st.elev[st.chap], km: 0, rate: LS.get("flyRate", 1), playing: false, loading: true, last: null, base, v: 0, uiT: 0, trT: 0, pfKm: -99, tpl: tileTemplates(),
+      brg: { x: map.getBearing(), v: 0 }, bh: { x: P.head[0], v: 0 }, zoom: { x: map.getZoom(), v: 0 }, pitch: { x: map.getPitch(), v: 0 },
+      from: [cam.lng, cam.lat], blend: 0, prevExag: st.terrain ? 1.5 : null,
       marker: new maplibregl.Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(P.pts[0]).addTo(map) };
-    if (!st.terrain) { st.terrain = true; $("f3d").setAttribute("aria-pressed", "true"); map.setTerrain({ source: "dem", exaggeration: 1.35 }); }
-    if (innerWidth < 900) setSheet("peek"); document.body.classList.add("flying"); closeLayers();
+    const F = st.fly;
+    /* A touch less relief while flying: the camera rides the ground, so less bounce on steep roads. */
+    st.terrain = true; $("f3d").setAttribute("aria-pressed", "true"); map.setTerrain({ source: "dem", exaggeration: 1.2 });
+    if (innerWidth < 900) setSheet("peek"); document.body.classList.add("flying"); closeLayers(); renderMarkers();
     $("fFly").setAttribute("aria-pressed", "true"); $("flTitle").textContent = c.title; flyUI();
     map.getCanvas().addEventListener("pointerdown", flyTouch, { passive: true });
-    st.fly.raf = requestAnimationFrame(flyStep);
+    F.raf = requestAnimationFrame(flyStep);
+    /* Pre-roll: the camera swoops down to the start while the first kilometres and the route overview
+       load, then the ride begins. Never waits more than ~3 s. */
+    (async () => {
+      const first = Promise.all([warmAhead(F, 0, 6), warmWhole(F)]);
+      await Promise.race([first, sleep(2600)]);
+      if (st.fly !== F) return;
+      await Promise.race([new Promise(res => map.once("idle", res)), sleep(900)]);
+      if (st.fly !== F) return;
+      F.loading = false; F.playing = !F.hold; F.pfKm = 0; flyUI();
+    })();
   }
-  function flyTouch() { const F = st.fly; if (F && F.playing) { F.playing = false; flyUI(); } }
+  /* a touch hands the camera to the rider: pause, and stop every spring so nothing fights the finger */
+  function flyTouch() { const F = st.fly; if (!F) return; if (F.loading) F.hold = true; if (F.playing) F.playing = false; F.brg.v = 0; F.zoom.v = 0; F.pitch.v = 0; F.blend = 1; flyUI(); }
+  function flySnap(F) {
+    const P = F.P, { p, i } = flyAt(P, F.km), la = flyAt(P, F.km + 0.6).p, bk = flyAt(P, F.km - 0.1).p;
+    F.brg = { x: L.bearing(bk, la), v: 0 }; F.bh = { x: P.head[i], v: 0 }; F.blend = 1; F.snap = false; F.force = true;
+    return p;
+  }
   function flyStep(ts) {
     const F = st.fly; if (!F) return;
-    const dt = F.last == null ? 0.016 : Math.min(0.1, (ts - F.last) / 1000); F.last = ts;
+    const DT = F.last == null ? 1 / 60 : Math.min(0.05, (ts - F.last) / 1000); F.last = ts;
     const P = F.P;
-    if (F.playing) {
-      const i = Math.min(P.n - 1, Math.round(F.km / P.step)), ahead = Math.min(P.n - 1, i + Math.round(0.45 / P.step));
-      let mx = 0; for (let k = i; k <= ahead; k += 3) if (F.cls[k] > mx) mx = F.cls[k];
-      const target = F.base * F.rate * [1.35, 1.0, 0.6, 0.42][mx];
-      F.v += (target - F.v) * (1 - Math.exp(-dt * 1.6));
-      F.km = Math.min(P.km, F.km + F.v * dt);
-      if (F.km >= P.km) { F.playing = false; flyUI(); }
+    if (F.snap) flySnap(F);
+    /* sub-steps keep the springs stable on slow frames */
+    const nSub = Math.max(1, Math.ceil(DT / (1 / 90))), dt = DT / nSub;
+    let pos, i0;
+    for (let s = 0; s < nSub; s++) {
+      if (F.playing) {
+        const i = Math.min(P.n - 1, Math.round(F.km / P.step)), ahead = Math.min(P.n - 1, i + Math.round(0.5 / P.step));
+        let mx = 0; for (let k = i; k <= ahead; k += 3) if (F.cls[k] > mx) mx = F.cls[k];
+        const left = P.km - F.km, endEase = Math.max(0.08, Math.min(1, left / 0.9));
+        const target = F.base * F.rate * [1.35, 1.0, 0.62, 0.44][mx] * endEase;
+        F.v += (target - F.v) * (1 - Math.exp(-dt * 1.4));
+        F.km = Math.min(P.km, F.km + F.v * dt);
+        if (F.km >= P.km - 0.002) { F.km = P.km; F.playing = false; F.v = 0; flyUI(); }
+      } else F.v *= Math.exp(-dt * 4);
+      const at = flyAt(P, F.km); pos = at.p; i0 = at.i;
+      /* camera heading: the chord from just behind the bike to a point ahead that grows with speed,
+         so it reads the road's direction instead of every wiggle */
+      const la = Math.max(0.28, Math.min(1.5, 0.22 + F.v * 0.7));
+      const tgt = L.bearing(flyAt(P, F.km - 0.08).p, flyAt(P, F.km + la).p);
+      springAng(F.brg, tgt, F.loading ? 1.6 : 1.9, dt);
+      springAng(F.bh, P.head[i0], 11, dt);
+      let mxNear = 0; const j1 = Math.min(P.n - 1, i0 + Math.round(0.3 / P.step)); for (let k = i0; k <= j1; k += 4) if (F.cls[k] > mxNear) mxNear = F.cls[k];
+      const zt = [13.45, 13.9, 14.3, 14.6][mxNear] - 0.32 * Math.log2(Math.max(1, F.rate));
+      spring(F.zoom, F.loading ? zt - 0.25 : zt, 0.9, dt);
+      spring(F.pitch, 62, 1.4, dt);
+      if (F.blend < 1) F.blend = Math.min(1, F.blend + dt / 1.6);
     }
-    const fi = F.km / P.step, i0 = Math.min(P.n - 2, Math.floor(fi)), t = fi - i0, a = P.pts[i0], b = P.pts[i0 + 1];
-    const pos = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], h = P.head[i0];
-    const k1 = F.dirty ? 1 : 1 - Math.exp(-dt * 2.0), k2 = F.dirty ? 1 : 1 - Math.exp(-dt * 6.0);
-    let d = ((h - F.bearing + 540) % 360) - 180; F.bearing = (F.bearing + d * k1 + 360) % 360;
-    d = ((h - F.bh + 540) % 360) - 180; F.bh = (F.bh + d * k2 + 360) % 360;
-    const zt = [13.3, 13.85, 14.35, 14.7][F.cls[i0]]; F.zoom += (zt - F.zoom) * (F.dirty ? 1 : 1 - Math.exp(-dt * 0.7));
-    F.marker.setLngLat(pos).setRotation(F.bh);
-    if (F.playing || F.dirty) {
-      const Hh = map.getCanvas().clientHeight;
-      map.jumpTo({ center: pos, bearing: F.bearing, pitch: 63, zoom: F.zoom, padding: { top: Math.round(Hh * 0.38), bottom: 0, left: 0, right: 0 } });
-      F.dirty = false;
+    F.marker.setLngLat(pos).setRotation(F.bh.x);
+    if (F.force || (!F.hold && (F.playing || F.loading || F.blend < 1 || Math.abs(F.brg.v) > 0.05 || Math.abs(F.zoom.v) > 0.002))) {
+      F.force = false;
+      const Hh = map.getCanvas().clientHeight, e = F.blend * F.blend * (3 - 2 * F.blend);
+      const center = e >= 1 ? pos : [F.from[0] + (pos[0] - F.from[0]) * e, F.from[1] + (pos[1] - F.from[1]) * e];
+      map.jumpTo({ center, bearing: F.brg.x, pitch: F.pitch.x, zoom: F.zoom.x, padding: { top: Math.round(Hh * 0.38 * e), bottom: 0, left: 0, right: 0 } });
     }
-    if (ts - F.trT > 350) { F.trT = ts; const step = Math.max(1, Math.round(i0 / 600)); const line = []; for (let k = 0; k <= i0; k += step) line.push(P.pts[k]); line.push(pos); setSrc("br-fly", FC(line.length > 1 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } }] : [])); }
+    if (F.playing && F.km - F.pfKm > 1.2) { F.pfKm = F.km; warmAhead(F, F.km, F.km + 36); }
+    if (ts - F.trT > 500) { F.trT = ts; const step = Math.max(1, Math.round(i0 / 500)); const line = []; for (let k = 0; k <= i0; k += step) line.push(P.pts[k]); line.push(pos); setSrc("br-fly", FC(line.length > 1 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } }] : [])); }
     if (ts - F.uiT > 200) { F.uiT = ts; flyInfo(i0); }
     F.raf = requestAnimationFrame(flyStep);
   }
   function flyInfo(i0) {
     const F = st.fly; if (!F) return; const P = F.P;
     let elv = ""; if (F.E && F.E.el) { const j = Math.min(F.E.el.length - 1, Math.round(F.km / F.E.km * (F.E.el.length - 1))); elv = ` · ${Math.round(F.E.el[j])} מ׳`; }
+    if (F.loading) { $("flInfo").textContent = "טוען את הדרך מראש…"; return; }
     const dk = P.km < 40 ? 1 : 0; $("flInfo").textContent = `ק״מ ${F.km.toFixed(dk)} / ${P.km.toFixed(dk)}${elv} · ${L.CURVE_LABEL[F.cls[i0]]}`;
     if (!flySeeking) $("flSeek").value = Math.round(F.km / P.km * 1000);
   }
@@ -1062,14 +1149,17 @@
     $("flPlay").setAttribute("aria-label", F.playing ? "השהיה" : "המשך");
     document.querySelectorAll("#flyui [data-rate]").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.rate === F.rate)));
   }
-  $("flPlay").onclick = () => { const F = st.fly; if (!F) return; if (F.km >= F.P.km) F.km = 0; F.playing = !F.playing; F.dirty = true; flyUI(); };
+  $("flPlay").onclick = () => { const F = st.fly; if (!F || F.loading) return; if (F.km >= F.P.km) { F.km = 0; F.snap = true; }
+    if (!F.playing) { const cm = map.getCenter(); F.from = [cm.lng, cm.lat]; F.blend = 0; F.brg.x = map.getBearing(); F.brg.v = 0; F.zoom.x = map.getZoom(); F.zoom.v = 0; F.pitch.x = map.getPitch(); F.pfKm = -99; }
+    F.hold = false; F.playing = !F.playing; flyUI(); };
   $("flClose").onclick = () => stopFly(true);
   document.querySelectorAll("#flyui [data-rate]").forEach(x => x.onclick = () => { const F = st.fly; if (!F) return; F.rate = +x.dataset.rate; LS.set("flyRate", F.rate); flyUI(); });
-  $("flSeek").addEventListener("input", e => { const F = st.fly; if (!F) return; flySeeking = true; F.km = e.target.value / 1000 * F.P.km; F.dirty = true; F.v = F.base * 0.5; });
+  $("flSeek").addEventListener("input", e => { const F = st.fly; if (!F) return; flySeeking = true; F.km = e.target.value / 1000 * F.P.km; F.snap = true; F.v = F.base * 0.5; F.pfKm = -99; warmAhead(F, F.km, F.km + 8); });
   $("flSeek").addEventListener("change", () => { flySeeking = false; });
   function stopFly(done) {
     const F = st.fly; if (!F) return;
-    cancelAnimationFrame(F.raf); F.marker.remove(); st.fly = null; setSrc("br-fly", FC());
+    cancelAnimationFrame(F.raf); F.marker.remove(); st.fly = null; setSrc("br-fly", FC()); dropTileQueue(); renderMarkers();
+    map.setTerrain({ source: "dem", exaggeration: 1.5 });
     map.getCanvas().removeEventListener("pointerdown", flyTouch); document.body.classList.remove("flying");
     $("fFly").setAttribute("aria-pressed", "false"); flyUI(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     if (done) fitChapter(1400);
@@ -1115,6 +1205,8 @@
     const R = st.ride; if (!R || R.rerouting) return; R.rerouting = true;
     const G = R.G, myKm = G.cum[G.idx]; const rest = G.stops.filter((s, i) => G.stopKm[i] > myKm + 0.2).slice(0, 12);
     if (!rest.length) { R.rerouting = false; return; }
+    /* keep only the via points still ahead of the rider, or OSRM would send them back */
+    if (rest[0].via) { const nearKm = (lat, lon) => { let bi = 0, bd = 1e9; for (let i = 0; i < G.coords.length; i++) { const d = (G.coords[i][0] - lon) ** 2 + (G.coords[i][1] - lat) ** 2; if (d < bd) { bd = d; bi = i; } } return G.cum[bi]; }; rest[0] = Object.assign({}, rest[0], { via: rest[0].via.filter(v => nearKm(v[0], v[1]) > myKm + 0.3) }); }
     const tmp = { custom: true, opts: R.c.opts, stops: [{ lat: me[1], lon: me[0], name: "כאן" }].concat(rest) };
     try {
       const j = await (await fetch(osrmUrl(tmp, "&steps=true"))).json(); if (j.code !== "Ok" || !st.ride) throw 0;

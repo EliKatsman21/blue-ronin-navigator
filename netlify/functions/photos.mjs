@@ -15,7 +15,7 @@ async function commons(lat, lon, radius) {
 }
 async function mapillary(lat, lon, token, radius) {
   const dLat = radius / 111320, dLon = radius / (111320 * Math.cos(lat * Math.PI / 180));
-  const u = `https://graph.mapillary.com/images?access_token=${token}&fields=id,thumb_1024_url,computed_geometry,captured_at,creator&bbox=${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat}&limit=40`;
+  const u = `https://graph.mapillary.com/images?access_token=${encodeURIComponent(token)}&fields=id,thumb_1024_url,computed_geometry,captured_at,creator&bbox=${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat}&limit=40`;
   const r = await fetch(u); if (!r.ok) return [];
   const data = ((await r.json()).data || []).filter(x => x.thumb_1024_url && x.computed_geometry);
   return data.map(x => { const [lo, la] = x.computed_geometry.coordinates; return { src: "mapillary", thumb: x.thumb_1024_url, link: `https://www.mapillary.com/app/?pKey=${x.id}`, author: (x.creator && x.creator.username) || "Mapillary", license: "CC BY-SA 4.0", d: hav(lat, lon, la, lo), ts: x.captured_at }; })

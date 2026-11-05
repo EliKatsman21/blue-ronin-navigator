@@ -770,7 +770,7 @@
   function trafficCard(id) {
     const c = CHAPTERS.find(x => x.id === id); const s = c.stops[0];
     const waze = `https://www.waze.com/live-map/directions?to=ll.${s.lat.toFixed(5)}%2C${s.lon.toFixed(5)}`;
-    if (!st.cfg.traffic) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>עומסים עכשיו</h3><a class="navb w" target="_blank" rel="noopener" href="${waze}">${NAVI.w}<span>מפת התנועה</span></a></div><p class="small muted" style="margin:0">שכבת התנועה החיה עוד לא חוברה לאפליקציה. בינתיים, מפת התנועה של Waze פתוחה עם היעד של הפרק.</p></div>`;
+    if (!st.cfg.traffic) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>עומסים עכשיו</h3><a class="navb w" target="_blank" rel="noopener" href="${waze}">${NAVI.w}<span>מפת התנועה</span></a></div><p class="small muted" style="margin:0">${st.cfg.trafficKey ? "ל־TomTom עדיין אין נתוני תנועה בישראל. השכבה תידלק לבד כשיהיו. עד אז, מפת התנועה של Waze פתוחה עם היעד של הפרק." : "שכבת התנועה החיה עוד לא חוברה לאפליקציה. בינתיים, מפת התנועה של Waze פתוחה עם היעד של הפרק."}</p></div>`;
     const t = st.traffic[id];
     let h = `<div class="card traffic"><div class="row" style="justify-content:space-between"><h3>עומסים עכשיו</h3><span class="small muted">${t && t.pts ? `עודכן ${fmtT(new Date(t.ts))}` : t && t.busy ? "טוען…" : ""}</span></div>`;
     h += t && t.pts ? `<div class="small" style="font-weight:700">לאורך הפרק</div>${trStrip(t)}` : t && t.err ? `<p class="small muted" style="margin:0">שירות התנועה לא ענה. נסו שוב בעוד דקה.</p>` : `<div class="trstrip skel"></div>`;
@@ -1314,7 +1314,7 @@
     st.layers[i.dataset.l] = i.checked; LS.set("layers", Object.assign({}, st.layers, { radar: false }));
     if (i.dataset.l === "radar") { if (i.checked) addRadarLayer(); else if (map.getLayer("br-radar")) { map.removeLayer("br-radar"); map.removeSource("br-radar"); } }
     if (["osmview", "fuel", "cams"].includes(i.dataset.l) && i.checked && !st.osm) loadOSM(true);
-    if (i.dataset.l === "traffic" && i.checked && !st.cfg.traffic) toast("שכבת התנועה החיה עוד לא מחוברת");
+    if (i.dataset.l === "traffic" && i.checked && !st.cfg.traffic) toast(st.cfg.trafficKey ? "ל־TomTom עדיין אין נתוני תנועה בישראל" : "שכבת התנועה החיה עוד לא מחוברת");
     applyLayerVis();
   });
   syncLayerBoxes();

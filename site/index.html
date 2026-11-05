@@ -139,6 +139,20 @@ h3{margin:0;font-size:16px}
 .v-go{color:var(--go)}.v-ok{color:var(--ok)}.v-warn{color:var(--caution)}.v-no{color:var(--no)}
 .why{font-size:12.5px;color:var(--muted)}
 .best-tag{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--go);border-radius:999px;padding:1px 8px}
+.best-tag.feat{background:var(--sun)}
+.calert{font-size:12.5px;color:var(--caution);font-weight:600;margin-top:2px}
+.annc{position:fixed;z-index:6;top:calc(56px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));left:calc(max(12px,env(safe-area-inset-left,0px)) + 66px);max-width:520px;margin-inline-start:auto;display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--accent);border-radius:12px;padding:9px 10px 9px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:14px;animation:annIn .45s cubic-bezier(.2,.8,.2,1)}
+.annc.warn{border-inline-start-color:var(--caution)} .annc.alert{border-inline-start-color:var(--no)}
+.annc .t{flex:1;min-width:0} .annc a{font-weight:700;color:var(--accent);white-space:nowrap}
+.annc button{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 2px}
+@keyframes annIn{from{opacity:0;transform:translateY(-8px)}}
+@media (min-width:900px){.annc{right:calc(var(--sheet-w) + 28px)}}
+body.riding .annc,body.flying .annc{display:none}
+.maint{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(6px);padding:24px}
+.maint .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:380px;display:grid;gap:12px;text-align:center}
+.maint .box b{font-family:var(--display);font-size:30px;line-height:1}
+.fbtext{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--ink);font:inherit;resize:vertical}
+.legal a{color:inherit}
 .hours{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(52px,1fr);gap:4px;overflow-x:auto;padding-bottom:4px}
 .hour{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:6px 4px;text-align:center;display:grid;gap:2px;justify-items:center}
 .hour .h{font-family:var(--mono);font-size:12px;color:var(--muted)}
@@ -362,77 +376,7 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
     <button type="button" class="ign" id="ignBtn" hidden aria-label="הנעה עם צליל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.5a8 8 0 1 0 11.4 0"/></svg>הקישו להנעה</button>
   </div>
 </div>
-<script>
-/* The wheelie rider: rides the road line as it draws itself, lifts the front wheel with the revs
-   (the same keyframes as the tachometer needle and the engine sound), sets it down on the decel. */
-(() => {
-  const intro = document.getElementById("intro"), path = intro.querySelector(".road path"), g = document.getElementById("rider");
-  if (!path || !g || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const streaks = document.getElementById("rStreaks"), spR = document.getElementById("rSpR"), spF = document.getElementById("rSpF");
-  const bez = (x1, y1, x2, y2) => u => { if (u <= 0) return 0; if (u >= 1) return 1; let s = u; for (let i = 0; i < 8; i++) { const bx = 3 * x1 * s * (1 - s) ** 2 + 3 * x2 * s * s * (1 - s) + s ** 3 - u, dx = 3 * x1 * (1 - s) ** 2 + 6 * (x2 - x1) * s * (1 - s) + 3 * (1 - x2) * s * s; s = Math.min(1, Math.max(0, s - bx / (dx || 1e-6))); } return 3 * y1 * s * (1 - s) ** 2 + 3 * y2 * s * s * (1 - s) + s ** 3; };
-  const ne = bez(.3, .1, .2, 1), dr = bez(.25, .1, .25, 1);
-  const needle = t => t < .25 ? 0 : t < .925 ? ne((t - .25) / .675) : t < 1.12 ? 1 - (4 / 240) * ne((t - .925) / .195) : t < 1.75 ? (236 / 240) * (1 - ne((t - 1.12) / .63)) : 0;
-  const Lp = path.getTotalLength(); const end = path.getPointAtLength(Lp), endB = path.getPointAtLength(Lp - 2); const endAng = Math.atan2(end.y - endB.y, end.x - endB.x);
-  const at = s => { if (s <= Lp) { const a = path.getPointAtLength(Math.max(0, s)), b = path.getPointAtLength(Math.min(Lp, Math.max(0, s) + 2)); return [a.x, a.y, Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI]; } const e = s - Lp; return [end.x + Math.cos(endAng) * e, end.y + Math.sin(endAng) * e, endAng * 180 / Math.PI]; };
-  const clock = () => { const a = intro.getAnimations({ subtree: true }).find(x => x.animationName === "sweep"); return a && a.currentTime != null ? a.currentTime / 1000 : performance.now() / 1000; };
-  let wPrev = 0, last = 0;
-  const frame = () => {
-    if (intro.classList.contains("out")) return;
-    const t = clock(); const f = needle(t);
-    /* the rider holds the throttle with the needle: covers most of the road while the revs rise and fall,
-       lands near the end of the line as the needle returns, then rides out of frame */
-    const tip = 420 * dr((t - .2) / 1.6), u = Math.min(1, Math.max(0, (t - .22) / 1.53));
-    const s = t <= 1.75 ? Math.min(tip, Lp * .86 * (1 - Math.pow(1 - u, 1.7))) : Lp * .86 + (t - 1.75) * Lp * .75;
-    const [x, y, ang] = at(s);
-    let w = 33 * Math.pow(f, 1.15);
-    if (t > .925 && t < 1.12) w += 1.6 * Math.sin(2 * Math.PI * 7 * t);
-    if (t > 1.55 && t < 2.1) w -= 2.6 * Math.exp(-(t - 1.55) * 9) * Math.sin((t - 1.55) * 30);
-    wPrev = w; last = t;
-    g.setAttribute("transform", `translate(${x.toFixed(2)} ${(y - 2.4).toFixed(2)}) rotate(${(ang - wPrev).toFixed(2)}) scale(.6)`);
-    g.setAttribute("opacity", t < .2 ? 0 : t > 2.25 ? Math.max(0, 1 - (t - 2.25) / .2) : Math.min(1, (t - .2) / .08));
-    streaks.setAttribute("opacity", (Math.min(1, f * 1.4) * .85).toFixed(2));
-    const spin = (s / 9 * 180 / Math.PI / .6) % 360; spR.setAttribute("transform", `rotate(${spin.toFixed(1)} 0 -9)`); spF.setAttribute("transform", `rotate(${spin.toFixed(1)} 44 -9)`);
-    if (t < 3.2 || !last) requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
-  window.BR_riderRestart = () => requestAnimationFrame(frame);
-})();
-</script>
-<script>
-/* Ignition sound, locked to the tachometer needle. Runs before the map library loads.
-   Autoplay is allowed for installed apps on Android; elsewhere one tap on the intro starts it. */
-(() => {
-  const KEY = "brn:introSound";
-  let on = true; try { on = JSON.parse(localStorage.getItem(KEY) ?? "true"); } catch (e) { }
-  window.BR_introHold = 2350;
-  if (!on || matchMedia("(prefers-reduced-motion: reduce)").matches || !window.AudioContext && !window.webkitAudioContext) return;
-  try { const last = +sessionStorage.getItem("brn:introAt") || 0; if (Date.now() - last < 15000) return; sessionStorage.setItem("brn:introAt", Date.now()); } catch (e) { }
-  const intro = document.getElementById("intro"), btn = document.getElementById("ignBtn");
-  const anims = () => intro.getAnimations({ subtree: true }).filter(a => /sweep|nlight|draw/.test(a.animationName || ""));
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const gain = ctx.createGain(); gain.gain.value = 0.85; gain.connect(ctx.destination);
-  let buf = null, played = false;
-  const ready = fetch("sounds/ignition.mp3").then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej))).then(b => (buf = b)).catch(() => null);
-  const play = (offset) => { if (!buf || played) return; played = true; const s = ctx.createBufferSource(); s.buffer = buf; s.connect(gain); s.start(0, Math.max(0, offset)); window.BR_introHold = Math.max(window.BR_introHold, performance.now() + (buf.duration - offset) * 1000 - 500); };
-  const elapsed = () => { const a = anims()[0]; return a && a.currentTime != null ? a.currentTime / 1000 : performance.now() / 1000; };
-  ready.then(() => {
-    if (!buf) return;
-    if (ctx.state === "running") { const off = elapsed(); if (off < 1.0) play(off); return; }
-    ctx.resume().then(() => { if (ctx.state === "running") { const off = elapsed(); if (off < 1.0) play(off); } }).catch(() => { });
-    setTimeout(() => { if (!played && !intro.classList.contains("out")) { btn.hidden = false; window.BR_introHold = Math.max(window.BR_introHold, performance.now() + 1600); } }, 250);
-  });
-  const ignite = async e => {
-    if (played) return; e && e.preventDefault();
-    try { await ctx.resume(); } catch (err) { }
-    await ready; if (!buf) return;
-    btn.hidden = true;
-    anims().forEach(a => { a.cancel(); a.play(); });
-    play(0); window.BR_riderRestart && window.BR_riderRestart();
-  };
-  btn.addEventListener("click", ignite);
-  intro.addEventListener("pointerdown", e => { if (e.target !== btn && !btn.contains(e.target)) ignite(e); });
-})();
-</script>
+<script src="intro.js"></script>
 
 <div id="map" aria-label="מפת הצפון"></div>
 
@@ -440,6 +384,8 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
   <div class="brand">BLUE RONIN <span>· צפון</span></div>
   <button type="button" class="now" id="nowChip" aria-label="מזג אוויר עכשיו"><span id="nowIcon"></span><b id="nowTemp">--°</b><span id="nowText" class="small muted">טוען</span></button>
 </header>
+<div class="annc" id="annc" role="status" hidden><div class="t"><span id="anncT"></span> <a id="anncL" target="_blank" rel="noopener" hidden>פרטים</a></div><button type="button" id="anncX" aria-label="סגירה">×</button></div>
+<div class="maint" id="maint" role="dialog" aria-modal="true" aria-labelledby="maintH" hidden><div class="box"><b id="maintH">עבודות בשטח</b><p id="maintT" style="margin:0"></p><button type="button" class="btn primary" id="maintX">המשך למפה</button></div></div>
 
 <div class="fabs" id="fabs">
   <button type="button" class="fab home" id="fHome" aria-label="בית: כל הצפון מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="lbl">בית</span></button>

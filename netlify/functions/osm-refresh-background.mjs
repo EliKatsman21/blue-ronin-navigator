@@ -4,7 +4,7 @@
 import { refresh, store } from "./lib/osm.mjs";
 export default async () => {
   const s = store(); const last = await s.get("lastRun", { type: "json" });
-  if (last && Date.now() - last.t < 10 * 6e4) return;
+  if (last && Date.now() - last.t < 5 * 6e4) return;
   await s.setJSON("lastRun", { t: Date.now() });
-  try { const d = await refresh(120000); console.log("osm refreshed", d.fuel.length, d.cafes.length); } catch (e) { console.log("osm refresh failed", e.message); }
+  try { const d = await refresh(120000); console.log("osm refreshed", d.fuel.length, "fuel", d.cafes ? d.cafes.length : "no", "cafes"); } catch (e) { console.log("osm refresh failed", e.message); }
 };

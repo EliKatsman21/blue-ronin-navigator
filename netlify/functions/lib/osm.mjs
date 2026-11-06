@@ -4,7 +4,8 @@ import { getStore } from "@netlify/blobs";
 
 /* North (Carmel to Rosh HaNikra and the Golan) and the Jerusalem hills / Judean lowlands (chapter 5). s,w,n,e */
 export const BBOXES = ["32.40,34.86,33.34,35.90", "31.52,34.76,31.84,35.20", "31.74,35.30,32.40,35.62"];
-const QUERY = "[out:json][timeout:60];(" + BBOXES.map(b => `node["highway"="speed_camera"](${b});nwr["amenity"="fuel"](${b});node["tourism"="viewpoint"](${b});nwr["amenity"="cafe"](${b});nwr["shop"="coffee"](${b});`).join("") + ");out center tags;";
+const QUERY = "[out:json][timeout:90];(" + BBOXES.map(b => `node["highway"="speed_camera"](${b});nwr["amenity"="fuel"](${b});node["tourism"="viewpoint"](${b});`).join("") + ");out center tags;";
+const cafeQuery = b => `[out:json][timeout:90];(nwr["amenity"="cafe"](${b});nwr["shop"="coffee"](${b}););out center tags;`;
 const MIRRORS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 export const store = () => getStore({ name: "brn-osm", consistency: "strong" });
 
@@ -32,34 +33,33 @@ function normalize(j) {
   };
 }
 
-/* Ask every mirror at once, keep the first good answer. */
-export async function fetchOverpass(timeoutMs = 45000) {
+/* Ask every mirror at once, keep the first good answer; say why each one failed if none did. */
+async function runQuery(q, timeoutMs, allowEmpty = false) {
   const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const body = "data=" + encodeURIComponent(QUERY);
-    const j = await Promise.any(MIRRORS.map(async u => {
-      const r = await fetch(u, { method: "POST", body, signal: ctl.signal, headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "BlueRoninNavigator/1.1 (northern Israel motorcycle navigator)" } });
-      if (!r.ok) throw new Error(u + " " + r.status);
-      const data = await r.json(); if (!data.elements || !data.elements.length) throw new Error("empty");
+    const body = "data=" + encodeURIComponent(q);
+    return await Promise.any(MIRRORS.map(async u => {
+      const r = await fetch(u, { method: "POST", body, signal: ctl.signal, headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "BlueRoninNavigator/1.2 (northern Israel motorcycle navigator; netlify)" } });
+      if (!r.ok) throw new Error(new URL(u).host + " " + r.status);
+      const data = await r.json(); if (!data.elements || (!allowEmpty && !data.elements.length)) throw new Error(new URL(u).host + " empty");
       return data;
     }));
-    return normalize(j);
-  } finally { clearTimeout(timer); ctl.abort(); }
+  } catch (e) { throw new Error((e.errors || [e]).map(x => x.name === "AbortError" ? "timeout" : x.message).join("; ")); }
+  finally { clearTimeout(timer); ctl.abort(); }
 }
+export async function fetchOverpass(timeoutMs = 45000) { return normalize(await runQuery(QUERY, timeoutMs)); }
 
-/* Cafes alone: a small, fast query used to upgrade older cached data without waiting for the full refresh. */
-export async function addCafes(data, timeoutMs = 8000) {
-  const q = "[out:json][timeout:25];(" + BBOXES.map(b => `nwr["amenity"="cafe"](${b});nwr["shop"="coffee"](${b});`).join("") + ");out center tags;";
-  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const j = await Promise.any(MIRRORS.map(async u => { const r = await fetch(u, { method: "POST", body: "data=" + encodeURIComponent(q), signal: ctl.signal, headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "BlueRoninNavigator/1.1 (northern Israel motorcycle navigator)" } }); if (!r.ok) throw new Error(u + " " + r.status); const d = await r.json(); if (!d.elements) throw new Error("bad"); return d; }));
-    const out = Object.assign({}, data, { cafes: normalize(j).cafes });
-    await store().setJSON("v4", out); return out;
-  } finally { clearTimeout(timer); ctl.abort(); }
-}
-
-export async function refresh(timeoutMs) {
+/* Base layers in one query, cafes one region at a time (small queries pass where one big one times out).
+   If cafes fail, the previous cafes are kept. */
+export async function refresh(timeoutMs = 45000) {
+  const prev = await getCached().catch(() => null);
   const data = await fetchOverpass(timeoutMs);
+  const cafes = []; let ok = true;
+  for (const b of BBOXES) {
+    try { cafes.push(...normalize(await runQuery(cafeQuery(b), Math.max(timeoutMs, 60000), true)).cafes); }
+    catch (e) { ok = false; console.log("cafes", b, e.message); }
+  }
+  if (ok) data.cafes = cafes; else if (prev && prev.cafes) data.cafes = prev.cafes;
   await store().setJSON("v4", data);
   return data;
 }

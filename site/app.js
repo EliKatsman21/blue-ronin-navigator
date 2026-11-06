@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.3.0";
+  const APP_VER = "2.3.1";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -342,6 +342,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.3.1", d: "2026-11-06", items: ["תיקון דחוף: התדריך והמסלול נטענים תמיד, גם כששירות מזג האוויר החיצוני עמוס", "התחזית מגיעה עכשיו ממטמון משותף בשרת שלנו, עם גיבוי ישיר ושמירת התחזית האחרונה", "אם לשונית נתקלת בבעיה מוצגת הודעה עם כפתור טעינה מחדש במקום מסך ריק"] },
     { v: "2.3.0", d: "2026-11-06", items: ["שחזור 3D של רכיבה שרכבת: השעון האמיתי, צבע השמיים של אותה שעה, ועצירה על כל תמונה במקום שבו צילמת", "רכיבה קבוצתית: כל הרוכבים על מפה אחת, נקודת מפגש, וקריאת חירום שמגיעה לכל הקבוצה", "העברת נתונים בקוד מוצפן (גם באייפון), וגיבוי ושחזור לקובץ", "צילום מהמצלמה נשמר כבר מהפעם הראשונה, ועיבוד תמונות מהיר יותר", "חיפוש קולי עם מסך האזנה שתמיד אפשר לסגור, ומעבר להכתבה מהמקלדת כשצריך", "אישור ברור אחרי שליחת דיווח, עם מספר פנייה", "מנגנון שמונע היתקעות בפתיחה, ודיווח תקלות אוטומטי לצוות", "שמירת הנתונים שלך קודמת לכל מטמון כשהזיכרון בטלפון מתמלא"] },
     { v: "2.2.0", d: "2026-11-06", items: ["לשונית חדשה ״שלי״: בטיחות, מיקום חי, האופנוע והזיכרונות שלך", "איש קשר לחירום: כפתור SOS במצב רכיבה (לחיצה ארוכה), התקשרות ו־וואטסאפ עם המיקום בלחיצה, והתראה דחופה לטלפון של איש הקשר", "זיהוי נפילה במצב רכיבה (בטא): ספירה של 30 שניות, ואם אין תשובה יוצאת התראה", "שיתוף מיקום חי בקישור, עד 12 שעות", "איפה חניתי: המיקום נשמר לבד כשעוצרים, וחץ שמוביל ברגל חזרה לאופנוע", "זיכרונות: צילום והקלטה מהדרך, מסודרים לפי תאריך ופרק, ותמונות הרכיבה בסיכום שלה", "חיפוש קולי בבניית מסלול", "משוב לצוות עם תמונה או הקלטה, ודיווח לקבוצה עם תמונה", "מצב רכיבה: ההנחיות הקוליות עובדות מהלחיצה הראשונה, הכרזה בהגעה לעצירה, ק״מ ושעת הגעה, אזהרה לפני עיקול חד ותזכורת שקיעה", "תוכנית הדלק המלאה עברה ל־Pro. התשובה אם הדלק מספיק, האזהרה ואיתור התחנה נשארים חינם", "מעבר לכתובת הקבועה blueronin.app עם כל הנתונים"] },
     { v: "2.1.0", d: "2026-11-06", items: ["Blue Ronin Pro: תובנות לכל פרק, יומן רכיבות מלא ו־7 ימי ניסיון", "יומן רכיבות: כל רכיבה נשמרת אוטומטית", "כרטיס ״השבת שלי״ לשיתוף בוואטסאפ", "מרכז הודעות עם היסטוריה", "מצפורים נפתחים עם תמונות, ומיון לפי המרחק ממך"] },
@@ -628,34 +629,59 @@
   }
 
   /* ---------- weather (Open-Meteo, live) ---------- */
+  /* Weather: a shared server cache (/api/wx) first, Open-Meteo direct as a fallback, and the last good forecast kept
+     if both fail. A reply is accepted only when every point carries an hourly series, so a quota or error answer
+     (e.g. Open-Meteo 429) can never overwrite good data or break the tabs. */
+  const wxOk = arr => Array.isArray(arr) && arr.length > 0 && arr.every(x => x && x.hourly && Array.isArray(x.hourly.time) && x.hourly.time.length > 24);
+  const wxValid = w => !!(w && Array.isArray(w.pts) && w.pts.length && w.pts.every(p => p && p.h && Array.isArray(p.h.time)));
+  if (!wxValid(st.wx)) { st.wx = null; try { localStorage.removeItem("brn:wx2"); } catch (e) { } }
   function wxPoints() {
     const pts = [];
     CHAPTERS.filter(c => !c.combo && (!c.custom || c.id === st.chap)).forEach(c => { const s = c.stops; [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].forEach(p => pts.push({ lat: p.lat, lon: p.lon, name: p.name.split(" · ")[0], chap: c.id })); });
-    pts.push({ lat: st.me ? st.me.lat : 32.651, lon: st.me ? st.me.lon : 35.105, name: st.me ? "המיקום שלך" : "יוקנעם", chap: "now" });
+    /* "now" uses the rider's position rounded to ~10 km: precise enough for current conditions, and riding
+       around no longer invalidates the cache and refetches every point. */
+    const r1 = v => Math.round(v * 10) / 10;
+    pts.push({ lat: st.me ? r1(st.me.lat) : 32.651, lon: st.me ? r1(st.me.lon) : 35.105, name: st.me ? "המיקום שלך" : "יוקנעם", chap: "now" });
     return pts;
   }
   const wxSig = () => wxPoints().map(p => p.lat.toFixed(2) + p.lon.toFixed(2)).join("");
-  async function loadWeather(force) {
-    if (!force && st.wx && Date.now() - st.wx.ts < 30 * 6e4 && st.wx.sat === st.sat.iso && st.wx.sig === wxSig()) { renderNow(); return; }
-    const pts = wxPoints();
-    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + pts.map(p => p.lat.toFixed(3)).join(",") + "&longitude=" + pts.map(p => p.lon.toFixed(3)).join(",") +
-      "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,visibility,cloud_cover" +
-      "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation&forecast_days=9&timezone=Asia%2FJerusalem&wind_speed_unit=kmh";
-    try {
-      const j = await (await fetch(url)).json(); const arr = Array.isArray(j) ? j : [j];
-      st.wx = { ts: Date.now(), sat: st.sat.iso, sig: wxSig(), pts: arr.map(x => ({ h: x.hourly, cur: x.current })) };
-      LS.set("wx2", st.wx);
-    } catch (e) { if (!st.wx) toast("אין חיבור למזג האוויר. נסו שוב בעוד רגע."); }
-    renderNow(); renderMarkers(); if (st.tab === "brief") renderBrief();
+  const WX_Q = "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,visibility,cloud_cover" +
+    "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation&forecast_days=9&timezone=Asia%2FJerusalem&wind_speed_unit=kmh";
+  async function wxFromServer(pts) {
+    const r = await withTimeout(fetch("/api/wx?p=" + pts.map(p => p.lat.toFixed(2) + "," + p.lon.toFixed(2)).join(";")), 10000);
+    const j = await r.json(); if (!r.ok || !j || !wxOk(j.data) || j.data.length !== pts.length) throw new Error((j && j.error) || "wx " + r.status);
+    return j.data;
+  }
+  async function wxDirect(pts) {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + pts.map(p => p.lat.toFixed(2)).join(",") + "&longitude=" + pts.map(p => p.lon.toFixed(2)).join(",") + WX_Q;
+    const r = await withTimeout(fetch(url), 10000); const j = await r.json(); const arr = Array.isArray(j) ? j : [j];
+    if (!r.ok || !wxOk(arr) || arr.length !== pts.length) throw new Error((j && j.reason) || "open-meteo " + r.status);
+    return arr;
+  }
+  let wxBusy = null;
+  function loadWeather(force) {
+    if (!force && st.wx && Date.now() - st.wx.ts < 30 * 6e4 && st.wx.sat === st.sat.iso && st.wx.sig === wxSig()) { renderNow(); return Promise.resolve(); }
+    if (wxBusy) return wxBusy;
+    if (!force && st.wxFailTs && Date.now() - st.wxFailTs < 3 * 6e4) return Promise.resolve(); /* back off after a failed round */
+    return wxBusy = (async () => {
+      const pts = wxPoints(), sig = wxSig(); let arr = null;
+      try { arr = await wxFromServer(pts); } catch (e) { try { arr = await wxDirect(pts); } catch (e2) { if (window.BRG) BRG.report("weather", String((e2 && e2.message) || e2) + " / " + String((e && e.message) || e)); } }
+      st.wxFail = !arr; st.wxFailTs = arr ? 0 : Date.now();
+      if (arr) { st.wx = { ts: Date.now(), sat: st.sat.iso, sig, pts: arr.map(x => ({ h: x.hourly, cur: x.current })) }; LS.set("wx2", st.wx); }
+      else if (st.wx && st.wx.sig !== sig) { /* the cached forecast is for other points: keep it only if it still lines up */ if (st.wx.pts.length !== pts.length) st.wx = null; }
+      if (!st.wx && force) toast("התחזית לא זמינה כרגע. ננסה שוב בעוד כמה דקות.");
+      const s = f => { try { f(); } catch (e) { if (window.BRG) BRG.report("weather-render", String(e && e.stack || e)); } };
+      s(renderNow); s(renderMarkers); if (st.tab === "brief") s(renderBrief);
+    })().finally(() => { wxBusy = null; });
   }
   function satHour(i, hour) {
-    const p = st.wx && st.wx.pts[i]; if (!p) return null; const iso = `${st.sat.iso}T${String(hour).padStart(2, "0")}:00`; const k = p.h.time.indexOf(iso); if (k < 0) return null;
+    const p = st.wx && st.wx.pts[i]; if (!p || !p.h || !Array.isArray(p.h.time)) return null; const iso = `${st.sat.iso}T${String(hour).padStart(2, "0")}:00`; const k = p.h.time.indexOf(iso); if (k < 0) return null;
     return { t: p.h.temperature_2m[k], code: p.h.weather_code[k], p: p.h.precipitation_probability[k], g: p.h.wind_gusts_10m[k], vis: p.h.visibility ? p.h.visibility[k] : null };
   }
   function wxMid(cid) { const cc = CHAPTERS.find(c => c.id === cid); const id = cc && cc.combo ? cc.combo[Math.floor(cc.combo.length / 2)] : cid; return wxPoints().findIndex(x => x.chap === id) + 1; }
   function chapterWx(cid) {
     if (!st.wx) return null; const pts = wxPoints(); const rows = []; const cc = CHAPTERS.find(c => c.id === cid); const ids = cc && cc.combo ? cc.combo : [cid];
-    pts.forEach((p, i) => { if (!ids.includes(p.chap) || !st.wx.pts[i]) return; const w = L.windowStats(st.wx.pts[i].h, `${st.sat.iso}T06:00`, `${st.sat.iso}T12:00`, `${st.sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
+    pts.forEach((p, i) => { if (!ids.includes(p.chap) || !st.wx.pts[i] || !st.wx.pts[i].h || !Array.isArray(st.wx.pts[i].h.time)) return; const w = L.windowStats(st.wx.pts[i].h, `${st.sat.iso}T06:00`, `${st.sat.iso}T12:00`, `${st.sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
     if (!rows.length) return null;
     const agg = { tMin: Math.min(...rows.map(r => r.w.tMin)), tMax: Math.max(...rows.map(r => r.w.tMax)), maxP: Math.max(...rows.map(r => r.w.maxP)), sumMm: Math.max(...rows.map(r => r.w.sumMm)), maxGust: Math.max(...rows.map(r => r.w.maxGust)), minVis: Math.min(...rows.map(r => r.w.minVis)), wet: rows.some(r => r.w.wet), storm: rows.some(r => r.w.storm), fog: rows.some(r => r.w.fog) };
     return { rows, agg, ri: L.rideIndex(agg), code: rows[Math.floor(rows.length / 2)].w.code };
@@ -725,12 +751,24 @@
 
   /* ---------- briefing ---------- */
   const gauge = (i, k) => { const col = { go: "--go", ok: "--ok", warn: "--caution", no: "--no" }[k]; const a = (i / 100) * 251.3; return `<svg class="gauge" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="var(--line)" stroke-width="6"/><circle cx="32" cy="32" r="26" fill="none" stroke="var(${col})" stroke-width="6" stroke-linecap="round" stroke-dasharray="${a.toFixed(1)} 400" transform="rotate(-90 32 32)"/><text x="32" y="39" text-anchor="middle">${i}</text></svg>`; };
-  function renderBrief() {
+  /* Error boundary for every tab: if a render throws (bad cached data, a flaky API answer), the tab shows a short
+     note with a retry instead of going blank, and the error is reported from the field. */
+  function paneSafe(name, f) {
+    const fail = e => {
+      if (window.BRG) BRG.report("tab-" + name, String(e && e.message || e), "", 0, String(e && e.stack || ""));
+      const el = $("p-" + name); if (!el) return;
+      el.innerHTML = `<div class="card" style="text-align:center;padding:22px 16px"><div style="font-weight:800;margin-bottom:6px">משהו לא נטען כמו שצריך</div><div class="muted" style="margin-bottom:12px">ייתכן שאחד מהשירותים החיצוניים לא זמין כרגע. הנתונים שלכם שמורים.</div><button type="button" class="btn primary" id="paneRetry-${name}">טעינה מחדש של הלשונית</button></div>`;
+      const b = $("paneRetry-" + name); if (b) b.onclick = () => { if (name === "brief" || name === "route") loadWeather(true); paneSafe(name, f); };
+    };
+    try { const r = f(); if (r && typeof r.catch === "function") r.catch(fail); return r; } catch (e) { fail(e); }
+  }
+  function renderBrief() { return paneSafe("brief", renderBrief_); }
+  function renderBrief_() {
     const p = $("p-brief"); const satDate = st.sat.noonUTC; const t = SunCalc.getTimes(satDate, 32.651, 35.105);
     const golden = new Date(t.sunrise.getTime() + 60 * 6e4);
     let h = `<div class="brief-head"><div><div class="small muted">${st.sat.isToday ? "היום" : st.sat.daysAway === 1 ? "מחר" : `בעוד ${st.sat.daysAway} ימים`}</div><h2>${esc(fmtD(satDate))}</h2></div><button type="button" class="btn sm" id="wxRefresh">רענון</button></div>
       <div class="sunrow"><div><div class="k">זריחה</div><div class="v sun mono">${fmtT(t.sunrise)}</div></div><div><div class="k">יציאה מיוקנעם</div><div class="v mono">${fmtT(departFor(CHAPTERS[0]))}</div></div><div><div class="k">אור זהב עד</div><div class="v mono">${fmtT(golden)}</div></div></div>`;
-    if (!st.wx) { h += `<p class="muted">טוען תחזית לשבת…</p>` + shareSatBtn(); p.innerHTML = h; bindBrief(); return; }
+    if (!st.wx) { h += st.wxFail ? `<div class="alert info">התחזית לשבת לא זמינה כרגע (שירות מזג האוויר עמוס). המסלולים, העצירות והניווט עובדים כרגיל, והתחזית תתעדכן לבד. אפשר גם ללחוץ ״רענון״.</div>` : `<p class="muted">טוען תחזית לשבת…</p>`; h += shareSatBtn(); p.innerHTML = h; bindBrief(); return; }
     const res = CHAPTERS.filter(c => !c.hidden && (!c.custom || c.id === st.chap)).map(c => ({ c, w: chapterWx(c.id) })).filter(x => x.w);
     const best = res.filter(x => !x.c.combo).sort((a, b) => b.w.ri.i - a.w.ri.i)[0];
     if (st.sat.daysAway > 5) h += `<div class="alert info">התחזית ל־${st.sat.daysAway} ימים עדיין רחוקה. התדריך מתעדכן אוטומטית ככל שהשבת מתקרבת.</div>`;
@@ -794,7 +832,8 @@
       <div class="small muted">${d.grade != null ? `שיפוע מרבי בדגימה ${d.grade}% · ` : ""}${d.climb != null ? `טיפוס מצטבר ${d.climb} מ׳` : "טיפוס: מחשב…"}${c.note ? ` · ${esc(c.note)}` : ""}</div></div>`;
   }
   const stars = n => "●".repeat(n) + "○".repeat(5 - n);
-  function renderRoute() {
+  function renderRoute() { return paneSafe("route", renderRoute_); }
+  function renderRoute_() {
     const c = chap(), r = st.routes[c.id], cs = st.cstats[c.id], e = st.elev[c.id];
     let h = `<div class="chapsel">${CHAPTERS.filter(x => x.id !== DRAFT && !x.hidden).map(x => `<button type="button" data-c="${x.id}" aria-pressed="${x.id === st.chap && !st.build}"><span>${x.custom ? "★ " + esc(x.short) : `פרק ${CHAPTERS.indexOf(x) + 1} · ${esc(x.short)}`}</span>${leds(diffOf(x.id), true)}</button>`).join("")}${st.flags.builder ? `<button type="button" class="newroute" id="bNew" aria-pressed="${!!st.build}">＋ מסלול משלי</button><button type="button" class="newroute" id="bImp">⤓ מסלול מקישור</button>` : ""}</div>`;
     if (st.build) h += builderPanel();
@@ -869,7 +908,8 @@
     if (p.t === "cafe") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b>${p.curated ? ' <span class="chip sun">מומלץ</span>' : ""}<span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${meTxt(p)}${p.place ? " · " + esc(p.place) : ""}</span><div class="chips" style="margin-top:3px">${cafePill(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", p.curated ? wazeQ(p.name + " " + p.place) : wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-cf="${p.id}">במפה</button></div></div>`;
     return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${meTxt(p)}</span></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-vw="${p.lat},${p.lon}">במפה</button></div></div>`;
   }
-  function renderStops() {
+  function renderStops() { return paneSafe("stops", renderStops_); }
+  function renderStops_() {
     const c = chap(), r = st.routes[c.id], cat = st.stopsCat;
     let h = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h2>לאורך ${esc(c.title)}</h2><span class="small muted">${r ? Math.round(r.km) + " ק״מ · " : ""}קפה עד 2.5 ק״מ מהכביש, דלק ומצפורים עד 1.5 ק״מ</span></div><label class="toggle"><input type="checkbox" id="shab" ${st.shabbat ? "checked" : ""}> מצב שבת</label></div>`;
     if (!r) { $("p-stops").innerHTML = h + `<p class="small muted">מחשב את המסלול…</p>`; return; }
@@ -1424,7 +1464,8 @@
   /* ---------- tools pane ---------- */
   let installEvt = null;
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; if (st.tab === "tools") renderTools(); });
-  function renderTools() {
+  function renderTools() { return paneSafe("tools", renderTools_); }
+  function renderTools_() {
     const off = LS.get("offline", null); const ios = /iphone|ipad|ipod/i.test(navigator.userAgent); const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
     let h = `<h2>כלים</h2>
     <div class="card"><h3>מפות אופליין לצפון</h3><p class="small muted" style="margin:0">מוריד את מפת הצפון עד רמת רחוב, את מסלולי שלושת הפרקים בפירוט מלא ואת התבליט. עד כ־50MB, כדאי ב־Wi-Fi.</p><div class="progress"><span id="offBar" style="width:${off ? 100 : 0}%"></span></div><div class="row"><button type="button" class="btn primary" id="offGo">${off ? "עדכון ההורדה" : "הורדה לאופליין"}</button><span class="small muted" id="offTxt">${off ? `${off.n} אריחים · ${ago(off.ts)}` : "עוד לא הורד"}</span></div></div>
@@ -2054,7 +2095,8 @@
 
   /* ---------- the "שלי" tab ---------- */
   const renderMeIf = () => { if (st.tab === "me") renderMe(); };
-  async function renderMe() {
+  function renderMe() { return paneSafe("me", renderMe_); }
+  async function renderMe_() {
     const p = $("p-me"), c = st.sos, mems = await memAll(), pro = isPro();
     const days = []; mems.forEach(m => { const k = new Date(m.t).toISOString().slice(0, 10) + "|" + (m.title || ""); let d = days.find(x => x.k === k); if (!d) days.push(d = { k, t: m.t, title: m.title, items: [] }); d.items.push(m); });
     const lim = pro ? null : FREE_MEM, used = mems.length;

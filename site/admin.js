@@ -26,9 +26,10 @@
     inbox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></svg>',
     fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5A1.5 1.5 0 0 1 17 11v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg>',
     shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
   };
-  const VIEWS = [["overview", "סקירה", I.gauge], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["system", "מערכת", I.shield]];
+  const VIEWS = [["overview", "סקירה", I.gauge], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["pro", "Pro", I.star], ["system", "מערכת", I.shield]];
   const S = { authed: false, view: location.hash.slice(1) || "overview", content: null, draft: null, stats: null, feedback: null, fuel: null, audit: null, map: null };
   if (!VIEWS.some(v => v[0] === S.view)) S.view = "overview";
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -94,7 +95,7 @@
   function show(v) {
     S.view = v; history.replaceState(null, "", "#" + v);
     $("nav").querySelectorAll("[data-v]").forEach(b => { if (b.dataset.v !== v) b.removeAttribute("aria-current"); else b.setAttribute("aria-current", "page"); });
-    ({ overview, notice, chapters, hazards, inbox, fuel, system })[v]();
+    ({ overview, notice, chapters, hazards, inbox, fuel, pro, system })[v]();
     scrollTo({ top: 0 });
   }
   const V = html => { $("views").innerHTML = `<section class="view">${html}</section>`; return $("views"); };
@@ -160,12 +161,21 @@
         <label class="f">טקסט<textarea id="mText" maxlength="280">${esc(m.text)}</textarea></label></div>
       <div class="card"><h3>התראה לכל הטלפונים</h3><p class="small muted" style="margin:0">נשלחת מיד לכל ${S.stats ? S.stats.subs : ""} המנויים. לא נשמרת כטיוטה ואין ביטול. מוגבל לשידור אחד בכל 10 דקות.</p>
         <label class="f">כותרת (עד 60)<input id="pT" maxlength="60"></label><label class="f">טקסט (עד 180)<textarea id="pB" maxlength="180"></textarea></label>
-        <label class="f">לאישור, הקלידו <b>שלח</b><input id="pC" autocomplete="off"></label><div class="row"><button type="button" class="btn primary" id="pGo">שליחה עכשיו</button><span class="small muted" id="pRes"></span></div></div>`);
+        <label class="f">לאישור, הקלידו <b>שלח</b><input id="pC" autocomplete="off"></label><div class="row"><button type="button" class="btn primary" id="pGo">שליחה עכשיו</button><span class="small muted" id="pRes"></span></div></div>
+      <div class="card"><div class="head"><h3>היסטוריית הודעות</h3><span class="small muted">מה שהרוכבים רואים בפעמון 🔔</span></div><div class="list" id="hList"><div class="small muted">טוען…</div></div></div>`);
+    loadHistory();
     $("aLvl").value = a.level;
     const up = () => { a.on = $("aOn").checked; a.text = $("aText").value; a.level = $("aLvl").value; a.until = $("aUntil").value; a.link = $("aLink").value.trim(); m.on = $("mOn").checked; m.text = $("mText").value;
       $("aPrev").className = "note " + a.level; $("aPrev").textContent = a.text || "ריק"; syncSave(); };
     el.querySelectorAll("input,textarea,select").forEach(x => { if (!x.id.startsWith("p")) x.oninput = x.onchange = up; });
     $("pGo").onclick = async () => { if (!confirmInline($("pGo"), "בטוח? זה יגיע לכולם")) return; try { const r = await api("POST", "broadcast", { title: $("pT").value, body: $("pB").value, confirm: $("pC").value.trim() }); $("pRes").textContent = `נשלח ל־${r.sent} מתוך ${r.total}${r.gone ? ` · ${r.gone} מנויים ישנים נוקו` : ""}`; $("pC").value = ""; } catch (e) { $("pRes").textContent = e.message; } };
+  }
+  async function loadHistory() {
+    const box = $("hList"); if (!box) return; let items = [];
+    try { items = (await api("GET", "history")).items; } catch (e) { box.innerHTML = `<div class="small muted">${esc(e.message)}</div>`; return; }
+    if (!$("hList")) return;
+    box.innerHTML = items.length ? items.map(x => `<div class="item"><div class="meta"><span class="tag">${x.kind === "push" ? "התראה" : "הודעה"}</span><span>${fmt(x.t)}</span></div><div>${x.title ? `<b>${esc(x.title)}</b> · ` : ""}${esc(x.text)}</div><div class="row"><button type="button" class="btn sm danger" data-hd="${esc(x.id)}">הסרה מההיסטוריה</button></div></div>`).join("") : `<div class="small muted">עוד אין. כל הודעה שמתפרסמת וכל התראה שנשלחת נשמרות כאן ומוצגות לרוכבים בפעמון.</div>`;
+    box.querySelectorAll("[data-hd]").forEach(b => b.onclick = async () => { if (!confirmInline(b, "להסיר?")) return; try { await api("POST", "history/delete", { id: b.dataset.hd }); toast("הוסר. הרוכבים יראו את השינוי תוך דקות"); loadHistory(); } catch (e) { toast(e.message); } });
   }
   /* Two-tap confirm on the button itself (no browser dialogs). */
   function confirmInline(btn, msg) { if (btn.dataset.armed === "1") { btn.dataset.armed = ""; btn.textContent = btn.dataset.lbl; return true; } btn.dataset.lbl = btn.textContent; btn.dataset.armed = "1"; btn.textContent = msg; setTimeout(() => { if (btn.dataset.armed === "1") { btn.dataset.armed = ""; btn.textContent = btn.dataset.lbl; } }, 4000); return false; }
@@ -220,7 +230,7 @@
   }
 
   /* ---------- inbox ---------- */
-  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר" };
+  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר", pro: "Pro" };
   const STAT = { new: "חדש", open: "בטיפול", done: "טופל" };
   async function inbox(filter = S.inboxFilter || "active") {
     S.inboxFilter = filter;
@@ -251,6 +261,30 @@
       <div class="card scroll"><table class="tbl"><thead><tr><th>תחנה (OSM)</th><th>רוכבים</th><th>פתוח/סגור בשבת</th><th>98 כן/לא</th><th>אחרון</th><th></th></tr></thead><tbody>
       ${S.fuel.length ? S.fuel.map(r => `<tr><td><a class="mono" target="_blank" rel="noopener" href="https://www.openstreetmap.org/${{ n: "node", w: "way", r: "relation" }[r.id[0]]}/${r.id.slice(1)}">${r.id}</a></td><td>${r.riders}</td><td>${r.open} / ${r.closed}</td><td>${r.y98} / ${r.n98}</td><td>${fmt(r.last)}</td><td><button type="button" class="btn sm danger" data-r="${r.id}">איפוס</button></td></tr>`).join("") : '<tr><td colspan="6" class="muted">עוד אין סימונים.</td></tr>'}</tbody></table></div>`);
     el.querySelectorAll("[data-r]").forEach(b => b.onclick = async () => { if (!confirmInline(b, "לאפס?")) return; try { await api("POST", "fuel/reset", { id: b.dataset.r }); toast("אופס"); fuel(); } catch (e) { toast(e.message); } });
+  }
+
+  /* ---------- Blue Ronin Pro: codes, trials, demand ---------- */
+  async function pro() {
+    V(`<div class="head"><h2>Blue Ronin Pro</h2></div><div class="small muted">טוען…</div>`);
+    let d; try { d = await api("GET", "pro"); } catch (e) { return; }
+    const live = d.codes.filter(c => !c.revoked), used = live.reduce((a, c) => a + (c.used || 0), 0);
+    const el = V(`<div class="head"><h2>Blue Ronin Pro</h2><span class="small muted">עד שהתשלום בגוגל פליי נפתח, Pro ניתן בניסיון של 7 ימים או בקוד ממך</span></div>
+      <div class="kpis"><div class="kpi"><span class="k">ניסיונות שהופעלו</span><div class="v">${d.trials}</div></div><div class="kpi"><span class="k">שריון שנתי ₪99</span><div class="v">${d.interest.yearly || 0}</div></div><div class="kpi"><span class="k">שריון חודשי</span><div class="v">${d.interest.monthly || 0}</div></div><div class="kpi"><span class="k">מימושי קודים</span><div class="v">${used}</div></div></div>
+      <div class="card"><h3>הנפקת קודים</h3><p class="small muted" style="margin:0">לחברי קבוצה, בודקי בטא, הגרלות ושיתופי פעולה. כל קוד נותן Pro למספר ימים, ואפשר להגביל כמה מכשירים יממשו אותו.</p>
+        <div class="grid2"><label class="f">כמה קודים<input id="cN" type="number" min="1" max="50" value="1"></label><label class="f">ימי Pro לכל מימוש<input id="cD" type="number" min="1" max="730" value="30"></label>
+        <label class="f">מימושים לכל קוד<input id="cM" type="number" min="1" max="1000" value="1"></label><label class="f">תווית (למי)<input id="cL" maxlength="60" placeholder="למשל: קבוצת רוכבי הגליל"></label></div>
+        <div class="row"><button type="button" class="btn primary" id="cGo">הנפקה</button></div><div id="cOut"></div></div>
+      <div class="card scroll"><h3>קודים</h3><table class="tbl"><thead><tr><th>קוד</th><th>תווית</th><th>ימים</th><th>מומשו</th><th>נוצר</th><th></th></tr></thead><tbody>
+      ${d.codes.length ? d.codes.map(c => `<tr${c.revoked ? ' style="opacity:.45"' : ""}><td class="mono" dir="ltr">${esc(c.code)}</td><td>${esc(c.label || "")}</td><td>${c.days}</td><td>${c.used} / ${c.max}</td><td>${fmt(c.created)}</td><td>${c.revoked ? "בוטל" : `<button type="button" class="btn sm danger" data-rv="${esc(c.code)}">ביטול</button>`}</td></tr>`).join("") : `<tr><td colspan="6" class="muted">עוד לא הונפקו קודים</td></tr>`}</tbody></table></div>
+      <p class="small muted">ביטול קוד מבטל גם את ה־Pro של מי שכבר מימש אותו, בבדיקה הבאה של האפליקציה (עד 6 שעות). שריונים מגיעים גם לתיבת הדיווחים בסוג ״Pro״.</p>`);
+    const showCodes = codes => {
+      $("cOut").innerHTML = `<label class="f">הקודים החדשים (להעתקה)<textarea readonly dir="ltr" class="mono" rows="${Math.min(8, codes.length + 1)}">${esc(codes.join("\n"))}</textarea></label><div class="row"><button type="button" class="btn sm" id="cCopy">העתקה</button></div>`;
+      $("cCopy").onclick = () => navigator.clipboard.writeText(codes.join("\n")).then(() => toast("הועתק")).catch(() => { $("cOut").querySelector("textarea").select(); });
+    };
+    if (S.newCodes) { showCodes(S.newCodes); S.newCodes = null; }
+    $("cGo").onclick = async () => { $("cGo").disabled = true; try { const r = await api("POST", "pro/codes", { count: +$("cN").value, days: +$("cD").value, max: +$("cM").value, label: $("cL").value });
+      toast(`הונפקו ${r.codes.length} קודים`); S.newCodes = r.codes; return pro(); } catch (e) { toast(e.message); } $("cGo").disabled = false; };
+    el.querySelectorAll("[data-rv]").forEach(b => b.onclick = async () => { if (!confirmInline(b, "לבטל?")) return; try { await api("POST", "pro/revoke", { code: b.dataset.rv }); toast("הקוד בוטל"); pro(); } catch (e) { toast(e.message); } });
   }
 
   /* ---------- system: feature switches, security, audit ---------- */

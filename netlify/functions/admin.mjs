@@ -4,8 +4,9 @@ import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import {
   store, json, sleep, hashPw, checkPw, pwProblem, b32encode, totpStep, otpauth, issue, clearCookie, session,
-  sameOrigin, throttled, failed, cleared, audit, cleanContent, getContent, ipHash
+  sameOrigin, throttled, failed, cleared, audit, cleanContent, getContent, ipHash, addHistory, getHistory
 } from "./lib/admin.mjs";
+import { proStore, newCode } from "./lib/pro.mjs";
 import { sendAll } from "./lib/push.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
@@ -66,6 +67,8 @@ export default async req => {
     const cur = await getContent(); if (typeof b.baseV === "number" && b.baseV !== cur.v) return json({ error: "התוכן השתנה בינתיים. רעננו.", current: cur }, 409);
     const next = cleanContent(b.content); next.v = (cur.v || 0) + 1; next.updated = Date.now();
     await s.setJSON("content", next); await audit("content", { v: next.v, what: String(b.what || "").slice(0, 80) });
+    const pa = cur.announce || {}, na = next.announce;
+    if (na.on && na.text && (!pa.on || pa.text !== na.text || pa.level !== na.level)) await addHistory({ kind: "announce", level: na.level, text: na.text, link: na.link || "" });
     return json(next);
   }
   if (route === "GET stats") {
@@ -101,8 +104,28 @@ export default async req => {
     if (!title || !text || b.confirm !== "שלח") return json({ error: "חסרים כותרת, טקסט או אישור" }, 400);
     const last = await s.get("lastBroadcast", { type: "json" }); if (last && Date.now() - last.t < 10 * 6e4) return json({ error: "שידור אחד בכל 10 דקות" }, 429);
     await s.setJSON("lastBroadcast", { t: Date.now() });
-    const r = await sendAll({ title, body: text, tag: "admin-" + Date.now(), url: "./" }); await audit("broadcast", { title, sent: r.sent });
+    const r = await sendAll({ title, body: text, tag: "admin-" + Date.now(), url: "./#inbox" }); await audit("broadcast", { title, sent: r.sent });
+    await addHistory({ kind: "push", title, text });
     return json(r);
+  }
+  if (route === "GET history") return json({ items: (await getHistory()).slice().reverse() });
+  if (route === "POST history/delete") { const h = await getHistory(); const n = h.filter(x => x.id !== b.id); await s.setJSON("history", n); await audit("history-delete", { id: b.id }); return json({ ok: true }); }
+  if (route === "GET pro") {
+    const ps = proStore(); const codes = (await ps.get("codes", { type: "json" })) || {};
+    let trials = 0; try { trials = (await ps.list({ prefix: "trial:" })).blobs.length; } catch (e) { }
+    const interest = (await ps.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 };
+    return json({ trials, interest, codes: Object.entries(codes).map(([code, c]) => ({ code, days: c.days, max: c.max, used: c.used, label: c.label, created: c.created, revoked: !!c.revoked })).sort((a, b) => b.created - a.created) });
+  }
+  if (route === "POST pro/codes") {
+    const count = Math.max(1, Math.min(50, +b.count || 1)), days = Math.max(1, Math.min(730, +b.days || 30)), max = Math.max(1, Math.min(1000, +b.max || 1));
+    const label = String(b.label || "").replace(/[\u0000-\u001F]/g, "").trim().slice(0, 60);
+    const ps = proStore(); const codes = (await ps.get("codes", { type: "json" })) || {}; const made = [];
+    for (let i = 0; i < count; i++) { let c; do c = newCode(); while (codes[c]); codes[c] = { days, max, used: 0, label, created: Date.now(), by: [] }; made.push(c); }
+    await ps.setJSON("codes", codes); await audit("pro-codes", { count, days, max, label }); return json({ codes: made });
+  }
+  if (route === "POST pro/revoke") {
+    const ps = proStore(); const codes = (await ps.get("codes", { type: "json" })) || {}; if (!codes[b.code]) return json({ error: "not found" }, 404);
+    codes[b.code].revoked = true; await ps.setJSON("codes", codes); await audit("pro-revoke", { code: b.code }); return json({ ok: true });
   }
   if (route === "GET audit") return json({ items: ((await s.get("audit", { type: "json" })) || []).slice().reverse().slice(0, 150) });
   if (route === "POST password") {

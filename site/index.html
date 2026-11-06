@@ -380,6 +380,78 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
 .vbtn[aria-pressed="false"]{opacity:.55;text-decoration:line-through}
 .vbtn svg{width:18px;height:18px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.intro .road path{stroke-dashoffset:0}.tacho .neutral{opacity:1}}
+
+/* ---------- notifications bell ---------- */
+.bell{position:relative;width:38px;height:38px;display:grid;place-items:center;border-radius:999px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(8px);color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bell svg{width:19px;height:19px}
+.bell .bn{position:absolute;top:-3px;inset-inline-start:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--warn);color:#fff;font:700 11px/18px var(--mono);text-align:center;box-shadow:0 0 0 2px var(--bg)}
+/* ---------- modal sheet ---------- */
+.modal{position:fixed;inset:0;z-index:25;display:flex;align-items:flex-end;justify-content:center;background:color-mix(in srgb,#000 0%,transparent);transition:background .22s ease}
+.modal.in{background:color-mix(in srgb,#000 48%,transparent)}
+.msheet{position:relative;width:min(560px,100%);max-height:min(88dvh,820px);overflow:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;padding:22px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);box-shadow:0 -10px 40px rgba(0,0,0,.35)}
+.modal.in .msheet{transform:none}
+@media (min-width:900px){.modal{align-items:center}.msheet{border-radius:20px;border-bottom:1px solid var(--line);transform:translateY(24px) scale(.98);opacity:0;transition:transform .24s cubic-bezier(.2,.8,.2,1),opacity .2s}.modal.in .msheet{opacity:1}}
+@media (prefers-reduced-motion:reduce){.msheet,.modal{transition:none}}
+.mx{position:absolute;top:10px;inset-inline-end:10px;width:34px;height:34px;border-radius:999px;border:1px solid var(--line);background:var(--raised);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
+#mbody{display:grid;gap:12px}
+#mbody h2{margin:0;font-size:22px;text-wrap:balance}
+#mbody h3{margin:6px 0 0;font-size:14px;color:var(--muted);font-weight:700}
+/* ---------- Pro ---------- */
+.probadge{display:inline-block;font:700 10.5px/1 var(--mono);letter-spacing:1.2px;padding:4px 7px 3px;border-radius:6px;color:#0B1424;background:linear-gradient(120deg,var(--sun),#FFD27A)}
+.probadge.soft{background:none;color:var(--muted);border:1px solid var(--line)}
+.probadge.hb{font-size:9.5px;vertical-align:middle;margin-inline-start:6px;transform:translateY(-3px)}
+.pw{display:grid;gap:14px}
+.pwhead{display:grid;gap:6px;padding-inline-end:36px}
+.pwhead p{margin:0;color:var(--muted)}
+.pwlogo{justify-self:start;font:700 12px/1 var(--mono);letter-spacing:2px;padding:6px 9px 5px;border-radius:7px;color:#0B1424;background:linear-gradient(120deg,var(--sun),#FFD27A)}
+.pwme{font-size:13.5px;background:color-mix(in srgb,var(--accent) 12%,var(--raised));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:10px;padding:8px 10px}
+.btn.big{padding:13px 16px;font-size:16px;font-weight:700;border-radius:12px;width:100%;justify-content:center}
+.pwf{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.pwf li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start}
+.pwf b{display:block;font-size:15px}.pwf li span:not(.pwi){font-size:13px;color:var(--muted)}
+.pwi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--sun) 16%,var(--raised));color:var(--sun)}
+.pwi svg{width:18px;height:18px}
+.pwplans{display:grid;grid-template-columns:1.25fr 1fr;gap:8px}
+.plan{position:relative;display:grid;gap:2px;text-align:center;padding:14px 8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--ink);font:inherit;cursor:pointer;transition:transform .12s,border-color .2s}
+.plan:active{transform:scale(.98)}
+.plan b{font:700 24px/1.1 var(--mono)}.plan span{font-size:12px;color:var(--muted)}
+.plan.best{border-color:var(--sun);box-shadow:inset 0 0 0 1px var(--sun)}
+.plan .tag{position:absolute;top:-9px;inset-inline:0;margin:auto;width:max-content;font-size:10.5px!important;font-weight:700;color:#0B1424!important;background:var(--sun);padding:2px 8px;border-radius:999px}
+.plan.chosen{border-color:var(--go);box-shadow:inset 0 0 0 1px var(--go)}
+.plan.chosen::after{content:"✓ שמור לך";font-size:11.5px;color:var(--go);font-weight:700}
+.pwcode summary{cursor:pointer;font-size:13.5px;color:var(--accent)}
+.pwcode .row{margin-top:8px}
+.pwfree{font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+.pwfree b{color:var(--ink)}
+.err{color:var(--warn);min-height:1em}
+.card.ins{border-color:color-mix(in srgb,var(--sun) 40%,var(--line))}
+.lockwrap{position:relative;border-radius:10px;overflow:hidden}
+.lockwrap .blur{filter:blur(5px) saturate(.7);opacity:.55;pointer-events:none;user-select:none;max-height:190px;overflow:hidden;display:grid;gap:8px}
+.lockbtn{position:absolute;inset:0;margin:auto;width:max-content;height:max-content;gap:6px;box-shadow:0 6px 22px rgba(0,0,0,.35)}
+.lockbtn svg{width:16px;height:16px}
+.insbest{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.insbest .k{font-size:12px;color:var(--muted)}.insbest b{font-size:26px;color:var(--sun)}
+.wins{display:flex;align-items:flex-end;gap:3px;height:74px;direction:ltr}
+.wins .w{flex:1;display:grid;grid-template-rows:1fr auto;height:100%;gap:3px;min-width:0}
+.wins i{align-self:end;border-radius:4px 4px 2px 2px;opacity:.8}
+.wins .w.best i{opacity:1;box-shadow:0 0 0 2px var(--sun)}
+.wins span{font:10px var(--mono);color:var(--muted);text-align:center;overflow:hidden}
+.insl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.insl b{font-size:13px;width:100%}
+.insl .chip{cursor:pointer;background:none;font:inherit;font-size:12px}
+.procard{background:linear-gradient(135deg,color-mix(in srgb,var(--sun) 10%,var(--raised)),var(--raised) 60%);border-color:color-mix(in srgb,var(--sun) 35%,var(--line))}
+.lockrow{display:flex;align-items:center;gap:8px;width:100%;text-align:start;font:inherit;font-size:13px;color:var(--ink);background:color-mix(in srgb,var(--sun) 9%,var(--surface));border:1px dashed color-mix(in srgb,var(--sun) 45%,var(--line));border-radius:10px;padding:9px 10px;cursor:pointer}
+.lockrow svg{width:16px;height:16px;flex:none;color:var(--sun)}
+.sharesat{display:flex;align-items:center;gap:12px;width:100%;text-align:start;font:inherit;color:var(--ink);background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer}
+.sharesat b{display:block;font-size:15px}
+.sharesat:disabled{opacity:.6}
+/* ---------- inbox ---------- */
+.inbox .item.ibtn{width:100%;font:inherit;color:inherit;background:none;border-inline:0;border-bottom:0;text-align:start;cursor:pointer;justify-content:flex-start;gap:10px}
+.inbox .imsg{align-items:flex-start}
+.inbox .imsg.new b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-inline-end:6px;vertical-align:middle}
+.inbox .imsg span.small{display:block;margin-top:2px}
+.chlog ul{margin:4px 0 0;padding-inline-start:18px;font-size:13.5px;display:grid;gap:3px}
+.ridesum{display:grid;gap:12px}
 </style>
 </head>
 <body>
@@ -409,8 +481,9 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
 <div id="map" aria-label="מפת הצפון"></div>
 
 <header class="bar">
-  <div class="brand">BLUE RONIN <span>· צפון</span></div>
-  <button type="button" class="now" id="nowChip" aria-label="מזג אוויר עכשיו"><span id="nowIcon"></span><b id="nowTemp">--°</b><span id="nowText" class="small muted">טוען</span></button>
+  <div class="brand">BLUE RONIN <span>· צפון</span><span class="probadge hb" id="proBadge" hidden>PRO</span></div>
+  <div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="bell" id="bellBtn" aria-label="הודעות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bn" id="bellN" hidden></span></button>
+  <button type="button" class="now" id="nowChip" aria-label="מזג אוויר עכשיו"><span id="nowIcon"></span><b id="nowTemp">--°</b><span id="nowText" class="small muted">טוען</span></button></div>
 </header>
 <div class="annc" id="annc" role="status" hidden><div class="t"><span id="anncT"></span> <a id="anncL" target="_blank" rel="noopener" hidden>פרטים</a></div><button type="button" id="anncX" aria-label="סגירה">×</button></div>
 <div class="maint" id="maint" role="dialog" aria-modal="true" aria-labelledby="maintH" hidden><div class="box"><b id="maintH">עבודות בשטח</b><p id="maintT" style="margin:0"></p><button type="button" class="btn primary" id="maintX">המשך למפה</button></div></div>
@@ -488,6 +561,7 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
   <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
 </div>
 
+<div class="modal" id="modal" role="dialog" aria-modal="true" hidden><div class="msheet"><button type="button" class="mx" id="mx" aria-label="סגירה">×</button><div id="mbody"></div></div></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>

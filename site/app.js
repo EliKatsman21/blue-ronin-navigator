@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.0.0";
+  const APP_VER = "2.1.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -134,6 +134,254 @@
     haz: ["M12 4 3 19.5h18z", "M12 10v4.5", "M12 17h.01"],
     cup: ["M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z", "M16 10.5h1.4a2 2 0 0 1 0 4H16", "M8.5 4.5c0 1 1 1.2 1 2.2M12 4.5c0 1 1 1.2 1 2.2", "M4 20.5h13"]
   };
+  /* ================= modal sheet (one at a time) ================= */
+  function openModal(html, cls = "") {
+    const m = $("modal"); $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
+    requestAnimationFrame(() => m.classList.add("in")); const f = m.querySelector("[autofocus], .btn.primary"); if (f) setTimeout(() => f.focus(), 250);
+    return $("mbody");
+  }
+  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; }, 220); }
+  $("mx").onclick = closeModal; $("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+  addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  /* ================= Blue Ronin Pro =================
+     Free forever: the Saturday brief, all chapters, ride mode with voice, cameras, hazards, territory alerts,
+     fuel planner and the nearest-station finder, offline maps. Safety is never behind a paywall.
+     Pro: route insights, the full ride journal + GPX, the full fly-through, unlimited own routes. */
+  st.pro = LS.get("pro", null);
+  const isPro = () => !!(st.pro && st.pro.exp > Date.now());
+  const FREE_ROUTES = 2, FLY_FREE = 0.3;
+  const proPost = async (path, body) => { const r = await fetch("/api/pro/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "אין חיבור"); return j; };
+  function setPro(j) { st.pro = { token: j.token, exp: j.exp, src: j.src, checked: Date.now(), trialUsed: (st.pro && st.pro.trialUsed) || j.src === "trial" }; LS.set("pro", st.pro); proBadge(); renderAll(); }
+  async function proCheck() {
+    if (!st.pro || !st.pro.token || Date.now() - (st.pro.checked || 0) < 6 * 36e5) return;
+    try { const j = await proPost("status", { token: st.pro.token }); st.pro.exp = j.pro ? j.exp : 0; st.pro.checked = Date.now(); LS.set("pro", st.pro); proBadge(); renderAll(); } catch (e) { }
+  }
+  function proBadge() { const b = $("proBadge"); if (b) { b.hidden = !isPro(); b.title = isPro() ? `Pro עד ${fmtD(new Date(st.pro.exp))}` : ""; } }
+  const daysLeft = () => isPro() ? Math.max(1, Math.ceil((st.pro.exp - Date.now()) / 864e5)) : 0;
+  const PW = {
+    insights: ["התובנות של הפרק מוכנות", "מתי לצאת, איפה העיקולים הטכניים, איפה הטיפוסים ואיפה השמש בעיניים. מחושב מהמסלול ומהתחזית של השבת הזאת."],
+    fly: ["רוצים לראות את כל הדרך?", "המעוף המלא עובר על כל הפרק, עיקול אחרי עיקול, לפני שיוצאים."],
+    routes: ["עוד מסלול משלך", `בחינם שומרים עד ${FREE_ROUTES} מסלולים. עם Pro בונים כמה שרוצים, ומשתפים כל אחד בקישור.`],
+    journal: ["היומן המלא שלך", "כל הרכיבות שהקלטת שמורות במכשיר. Pro פותח את כולן, עם סטטיסטיקה מצטברת וייצוא GPX."],
+    gpx: ["ייצוא הרכיבה", "קובץ GPX של המסלול שרכבת בפועל, ל־Strava, ל־OsmAnd או לארכיון שלך."],
+    default: ["Blue Ronin Pro", "כלים לרוכב שיוצא כל שבת: תובנות לכל פרק, יומן רכיבות, מעוף מלא ומסלולים בלי הגבלה."]
+  };
+  function personalLine() {
+    const c = chap(), cs = st.cstats[c.id], ins = routeInsights(c.id), rides = (LS.get("rides", []) || []).length;
+    const bits = [];
+    if (cs && cs.twisty >= 1) bits.push(`${Math.round(cs.twisty)} ק״מ מפותלים`);
+    if (ins) { if (ins.tech.length) bits.push(`${ins.tech.length} קטעים טכניים`); if (ins.climbs.length) bits.push(`${ins.climbs.length} טיפוסים`); }
+    if (rides) bits.push(`${rides} רכיבות שמורות אצלך`);
+    return bits.length ? `ב${c.title}: ${bits.join(" · ")}` : "";
+  }
+  function openPaywall(reason = "default") {
+    const [h, sub] = PW[reason] || PW.default, pl = personalLine(), used = st.pro && st.pro.trialUsed;
+    const f = [
+      ["spark", "תובנות לכל פרק", "חלון היציאה הטוב לפי התחזית, קטעים טכניים, טיפוסים וסנוור, בקילומטר המדויק"],
+      ["book", "יומן רכיבות מלא", "כל רכיבה: ק״מ, זמן תנועה, ממוצע ודלק משוער. סיכום חודשי ו־GPX"],
+      ["play", "מעוף ציפור מלא", "כל הפרק במצלמת רדיפה, עם טעינה מראש"],
+      ["route", "מסלולים בלי הגבלה", "בונים, שומרים ומשתפים כמה שרוצים"],
+      ["star", "פרקים חדשים קודם", "מנויי Pro מקבלים כל פרק חדש לפני כולם"]
+    ];
+    const box = openModal(`<div class="pw">
+      <div class="pwhead"><span class="pwlogo">PRO</span><h2>${esc(h)}</h2><p>${esc(sub)}</p>${pl ? `<div class="pwme">${esc(pl)}</div>` : ""}</div>
+      ${isPro() ? `<div class="alert info">Pro פעיל עוד ${daysLeft()} ימים${st.pro.src === "trial" ? " (תקופת ניסיון)" : ""}.</div>` : `<button type="button" class="btn primary big" id="pwTrial" ${used ? "hidden" : ""}>7 ימי Pro חינם · בלי כרטיס אשראי</button>`}
+      <ul class="pwf">${f.map(([i, t, d]) => `<li><span class="pwi">${PWI[i]}</span><div><b>${t}</b><span>${d}</span></div></li>`).join("")}</ul>
+      <div class="pwplans"><button type="button" class="plan best" data-plan="yearly"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly"><b>₪14.90</b><span>לחודש</span></button></div>
+      <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום.</p>
+      <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
+      <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, מצב רכיבה עם הנחיות קוליות, מצלמות ומפגעים, התראות שטחים, תוכנית דלק ואיתור תחנה, מפות אופליין. בטיחות לא נמכרת.</div>
+      <div class="err small" id="pwErr"></div></div>`, "pwmodal");
+    const err = m => { $("pwErr").textContent = m; };
+    if ($("pwTrial")) $("pwTrial").onclick = async () => { $("pwTrial").disabled = true; try { setPro(await proPost("trial", { cid })); closeModal(); toast("Pro פעיל ל־7 ימים. רכיבה טובה!"); if (reason === "fly" && st.fly) { st.fly.cap = Infinity; } } catch (e) { err(e.message); $("pwTrial").disabled = false; if (/נוצלה/.test(e.message)) { st.pro = Object.assign(st.pro || {}, { trialUsed: true }); LS.set("pro", st.pro); $("pwTrial").hidden = true; } } };
+    $("pwRedeem").onclick = async () => { try { const j = await proPost("redeem", { cid, code: $("pwCode").value }); setPro(j); closeModal(); toast(`הקוד הופעל. Pro פעיל ל־${Math.round((j.exp - Date.now()) / 864e5)} ימים`); if (st.fly) st.fly.cap = Infinity; } catch (e) { err(e.message); } };
+    box.querySelectorAll("[data-plan]").forEach(b => b.onclick = async () => { b.disabled = true; try { await proPost("interest", { plan: b.dataset.plan, ver: APP_VER }); b.classList.add("chosen"); toast("נשמר. מחיר המייסדים שמור לך, ונעדכן כשהתשלום ייפתח"); } catch (e) { err(e.message); b.disabled = false; } });
+  }
+  const PWI = {
+    spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>',
+    book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg>',
+    route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+  };
+
+  /* ---------- route insights (Pro): what this road does, and when to ride it ---------- */
+  const insCache = new Map();
+  function routeInsights(cid) {
+    const r = st.routes[cid]; if (!r) return null; const segs = st.curves[cid] || [], e = st.elev[cid];
+    const key = `${cid}|${r.km.toFixed(1)}|${segs.length}|${!!e}|${st.wx ? st.wx.ts : 0}|${st.sat.iso}`; if (insCache.has(key)) return insCache.get(key);
+    /* technical stretches: tight-curve segments merged across short gaps */
+    const tech = []; segs.forEach(s => { if (s.cls < 3) return; const last = tech[tech.length - 1]; if (last && s.startKm - (last.from + last.km) < 0.35) last.km = s.startKm + s.km - last.from; else tech.push({ from: s.startKm, km: s.km }); });
+    const techL = tech.filter(t => t.km >= 0.35).sort((a, b) => b.km - a.km).slice(0, 6).sort((a, b) => a.from - b.from);
+    /* sustained climbs from the elevation profile */
+    const climbs = []; if (e && e.el) { const n = e.el.length, dk = e.km / (n - 1); let s = 0; for (let i = 1; i <= n; i++) { const up = i < n && e.el[i] >= e.el[i - 1] - 3; if (!up) { const gain = e.el[i - 1] - e.el[s], km = (i - 1 - s) * dk; if (gain >= 110 && km > 0.6) climbs.push({ from: s * dk, km, gain: Math.round(gain), grade: gain / (km * 10) }); s = i; } } climbs.sort((a, b) => b.gain - a.gain); climbs.splice(4); climbs.sort((a, b) => a.from - b.from); }
+    /* best departure: for each start between sunrise and 11:00, weather over the riding window + low-sun glare */
+    let windows = [];
+    const cw = chapterWx(cid); const c = CHAPTERS.find(x => x.id === cid);
+    if (cw && c) {
+      const base = departFor(c), hours = r.min / 60 * 1.25 + 0.5;
+      for (let k = 0; k < 12; k++) {
+        const t0 = new Date(base.getTime() + k * 30 * 6e4); const hr0 = +new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(t0); if (hr0 > 11) break;
+        let sc = 0, nn = 0, why = new Set();
+        for (let h = hr0; h <= Math.min(17, hr0 + Math.ceil(hours)); h++) cw.rows.forEach(rw => { const x = satHour(rw.i, h); if (!x) return; nn++; let s = 100; s -= (x.p || 0) * 0.7; if (x.p >= 40) why.add("גשם"); s -= Math.max(0, x.g - 28) * 1.3; if (x.g >= 40) why.add("רוח"); if (x.vis != null && x.vis < 3000) { s -= 30; why.add("ערפל"); } if (x.t < 9) { s -= (9 - x.t) * 3.5; why.add("קור"); } if (x.t > 31) { s -= (x.t - 31) * 3; why.add("חום"); } sc += s; });
+        if (!nn) continue; sc /= nn;
+        const gl = L.glareSegments(r.coords, t0, 55, sunAt); const glKm = gl.reduce((a, g) => a + g.km, 0); sc -= Math.min(20, glKm * 2); if (glKm > 2) why.add("סנוור");
+        windows.push({ t: t0, score: Math.round(Math.max(0, Math.min(100, sc))), glKm, why: [...why] });
+      }
+    }
+    const best = windows.slice().sort((a, b) => b.score - a.score)[0] || null;
+    const out = { tech: techL, climbs, windows, best, glare: st.glare[cid] || [] };
+    if (insCache.size > 30) insCache.clear(); insCache.set(key, out); return out;
+  }
+  function insightsCard(cid) {
+    const ins = routeInsights(cid); if (!ins) return "";
+    const pro = isPro(), kmt = km => `ק״מ ${Math.round(km)}`;
+    const teaser = [ins.best ? "חלון יציאה מומלץ" : "", ins.tech.length ? `${ins.tech.length} קטעים טכניים` : "", ins.climbs.length ? `${ins.climbs.length} טיפוסים` : "", ins.glare.length ? `${ins.glare.length} קטעי סנוור` : ""].filter(Boolean).join(" · ");
+    const mk = (pro, v) => pro ? v : v.replace(/[0-9]/g, "•");
+    const wbarOf = pro => ins.windows.length ? `<div class="wins" role="img" aria-label="ציון יציאה לפי שעה">${ins.windows.map(w => `<div class="w${ins.best && w === ins.best ? " best" : ""}"><i style="height:${Math.max(6, w.score)}%;background:hsl(${Math.round(w.score * 1.3)} 65% 48%)"></i><span>${w.t.getMinutes() < 30 ? mk(pro, fmtT(w.t)) : ""}</span></div>`).join("")}</div>` : `<p class="small muted" style="margin:0">החלון מחושב כשהתחזית לשבת זמינה.</p>`;
+    const bodyOf = pro => `${ins.best ? `<div class="insbest"><span class="k">היציאה הטובה</span><b class="mono">${mk(pro, fmtT(ins.best.t))}</b><span class="small muted">ציון ${mk(pro, String(ins.best.score))}/100${pro && ins.best.why.length ? " · שימו לב: " + esc(ins.best.why.join(", ")) : ""}${ins.best.glKm > 0.5 ? ` · ${mk(pro, ins.best.glKm.toFixed(1))} ק״מ סנוור` : ""}</span></div>` : ""}${wbarOf(pro)}
+      ${ins.tech.length ? `<div class="insl"><b>קטעים טכניים</b>${ins.tech.map(t => `<button type="button" class="chip road" ${pro ? `data-ikm="${t.from.toFixed(2)}"` : ""}>${mk(pro, kmt(t.from) + " · " + t.km.toFixed(1))} ק״מ</button>`).join("")}</div>` : ""}
+      ${ins.climbs.length ? `<div class="insl"><b>טיפוסים</b>${ins.climbs.map(t => `<button type="button" class="chip road" ${pro ? `data-ikm="${t.from.toFixed(2)}"` : ""}>${mk(pro, kmt(t.from) + " · +" + t.gain)} מ׳ · ${mk(pro, t.grade.toFixed(1))}%</button>`).join("")}</div>` : ""}
+      ${ins.glare.length ? `<div class="insl"><b>סנוור בבוקר</b>${ins.glare.slice(0, 5).map(g => `<span class="chip sun">${mk(pro, fmtT(g.at) + " · " + g.km.toFixed(1))} ק״מ</span>`).join("")}</div>` : ""}`;
+    return `<div class="card ins${pro ? "" : " locked"}" id="insCard"><div class="row" style="justify-content:space-between"><h3>תובנות הפרק</h3><span class="probadge">PRO</span></div>
+      ${pro ? bodyOf(true) : `<p class="small" style="margin:0">${esc(teaser || "תובנות מחושבות מהמסלול")}</p><div class="lockwrap"><div class="blur" aria-hidden="true" inert>${bodyOf(false)}</div><button type="button" class="btn primary lockbtn" id="insOpen">${PWI.lock}פתיחת התובנות</button></div>`}</div>`;
+  }
+  function bindInsights(cid) {
+    const c = $("insCard"); if (!c) return;
+    if ($("insOpen")) $("insOpen").onclick = () => openPaywall("insights");
+    c.querySelectorAll("[data-ikm]").forEach(b => b.onclick = () => { const r = st.routes[cid]; const p = L.pointAt(r.coords, r.cum || (r.cum = L.cumulative(r.coords)), +b.dataset.ikm); map.flyTo({ center: p, zoom: 14, padding: sheetPad() }); if (innerWidth < 900) setSheet("peek"); });
+  }
+
+  /* ================= ride journal ================= */
+  function rideTrack(R, me, p, spd) {
+    const t = p.timestamp, last = R.trk[R.trk.length - 1];
+    if (!last || L.hav([last[0], last[1]], me) > 0.025 || t - last[2] > 10000) R.trk.push([+me[0].toFixed(5), +me[1].toFixed(5), t, spd != null ? Math.round(spd) : null]);
+    if (R.trk.length % 20 === 0 && R.trk.length !== R.liveN) { R.liveN = R.trk.length; LS.set("rideLive", { cid: R.c.id, title: R.c.title, odo: R.odo, moving: R.moving, vmax: R.vmax, trk: R.trk.slice(-1500) }); }
+    if (spd != null && spd < 230) { R.vmax = Math.max(R.vmax || 0, spd); if (spd > 5 && R.lastT) R.moving += Math.min(30, (t - R.lastT) / 1000); }
+    R.lastT = t;
+  }
+  function saveRide(R) {
+    if (!R.trk || R.trk.length < 3 || R.odo < 1) return null;
+    const trk = R.trk.length > 600 ? R.trk.filter((_, i) => i % Math.ceil(R.trk.length / 600) === 0 || i === R.trk.length - 1) : R.trk;
+    const cidR = R.c ? R.c.id : R.cid, sim = cidR && st.routes[cidR] ? fuelSimFor(cidR) : null, rate = sim ? sim.burn / sim.total : (bikeEff().cons * bikeEff().style / 100);
+    const ride = { id: "r" + Date.now().toString(36), chap: cidR, title: R.c ? R.c.title : R.title, start: R.trk[0][2], end: R.trk[R.trk.length - 1][2], km: +R.odo.toFixed(1), moving: Math.round(R.moving > 60 ? R.moving : (R.trk[R.trk.length - 1][2] - R.trk[0][2]) / 1000), vmax: Math.round(R.vmax || 0), fuel: +(R.odo * rate).toFixed(1), bike: bikeEff().name, trk };
+    const rides = LS.get("rides", []); rides.unshift(ride); LS.set("rides", rides.slice(0, 60));
+    return ride;
+  }
+  const dur = s => `${Math.floor(s / 3600)}:${String(Math.round(s % 3600 / 60)).padStart(2, "0")}`;
+  function rideSummary(ride) {
+    const avg = ride.moving > 60 ? ride.km / (ride.moving / 3600) : 0;
+    openModal(`<div class="ridesum"><div class="small muted">${esc(fmtD(new Date(ride.start)))} · ${esc(ride.title)}</div><h2>רכיבה טובה!</h2>
+      <div class="fsum"><div><span class="k">מרחק</span><b class="mono">${ride.km}</b><span class="k">ק״מ</span></div><div><span class="k">זמן תנועה</span><b class="mono">${dur(ride.moving)}</b></div><div><span class="k">ממוצע</span><b class="mono">${Math.round(avg)}</b><span class="k">קמ״ש</span></div><div><span class="k">דלק משוער</span><b class="mono">${ride.fuel}</b><span class="k">ל׳</span></div></div>
+      <p class="small muted" style="margin:0">נשמר ביומן הרכיבות בלשונית ״כלים״. המהירות המרבית לא מוצגת כאן בכוונה.</p>
+      <div class="row"><button type="button" class="btn primary" id="rsShow">הצגה במפה</button><button type="button" class="btn" id="rsClose">סגירה</button></div></div>`);
+    $("rsShow").onclick = () => { closeModal(); showRide(ride); }; $("rsClose").onclick = closeModal;
+  }
+  function showRide(ride) {
+    st.rideShown = ride; pushSources();
+    const b = new maplibregl.LngLatBounds(); ride.trk.forEach(p => b.extend([p[0], p[1]])); map.fitBounds(b, { padding: 60, duration: 900, maxZoom: 13 }); if (innerWidth < 900) setSheet("peek");
+    toast(`${ride.title} · ${ride.km} ק״מ`);
+  }
+  function rideGpx(ride) {
+    if (!isPro()) return openPaywall("gpx");
+    const g = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Blue Ronin Navigator" xmlns="http://www.topografix.com/GPX/1/1">\n<trk><name>${esc(ride.title)}</name><trkseg>\n${ride.trk.map(p => `<trkpt lat="${p[1]}" lon="${p[0]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join("\n")}\n</trkseg></trk>\n</gpx>\n`;
+    saveFile(`blue-ronin-ride-${new Date(ride.start).toISOString().slice(0, 10)}.gpx`, g, "application/gpx+xml");
+  }
+  function journalCard() {
+    const rides = LS.get("rides", []); const pro = isPro();
+    if (!rides.length) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3><span class="probadge soft">יומן</span></div><p class="small muted" style="margin:0">כל רכיבה במצב רכיבה נרשמת כאן אוטומטית: מרחק, זמן תנועה, ממוצע ודלק משוער. הכול נשמר רק במכשיר שלך.</p></div>`;
+    const month = new Date().toISOString().slice(0, 7), mrides = rides.filter(r => new Date(r.start).toISOString().slice(0, 7) === month);
+    const tot = (list, f) => list.reduce((a, r) => a + (r[f] || 0), 0);
+    const row = (r, i) => `<div class="item"><div style="min-width:0"><b>${esc(r.title)}</b><span class="small muted mono">${esc(fmtD(new Date(r.start)))} · ${r.km} ק״מ · ${dur(r.moving)} · ${r.fuel} ל׳</span></div><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm" data-rshow="${i}">במפה</button><button type="button" class="btn sm" data-rgpx="${i}">GPX</button></div></div>`;
+    const visible = pro ? rides : rides.slice(0, 1), hiddenN = rides.length - visible.length;
+    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3>${pro ? '<span class="probadge">PRO</span>' : ""}</div>
+      ${pro ? `<div class="fsum"><div><span class="k">החודש</span><b class="mono">${Math.round(tot(mrides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">רכיבות</span><b class="mono">${mrides.length}</b></div><div><span class="k">סה״כ</span><b class="mono">${Math.round(tot(rides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">דלק</span><b class="mono">${Math.round(tot(rides, "fuel"))}</b><span class="k">ל׳</span></div></div>` : ""}
+      ${visible.map(row).join("")}
+      ${hiddenN ? `<button type="button" class="lockrow" id="jMore">${PWI.lock}<span>עוד ${hiddenN} רכיבות שמורות במכשיר שלך. היומן המלא פתוח ב־Pro</span></button>` : ""}</div>`;
+  }
+  function bindJournal() {
+    const rides = LS.get("rides", []);
+    document.querySelectorAll("[data-rshow]").forEach(b => b.onclick = () => showRide(rides[+b.dataset.rshow]));
+    document.querySelectorAll("[data-rgpx]").forEach(b => b.onclick = () => rideGpx(rides[+b.dataset.rgpx]));
+    if ($("jMore")) $("jMore").onclick = () => openPaywall("journal");
+  }
+  function proCard() {
+    if (isPro()) return `<div class="card procard on"><div class="row" style="justify-content:space-between"><h3>Blue Ronin Pro</h3><span class="probadge">PRO</span></div><p class="small" style="margin:0">פעיל עוד ${daysLeft()} ימים${st.pro.src === "trial" ? " · תקופת ניסיון" : ""}. תודה שאת/ה חלק מזה.</p><div class="row"><button type="button" class="btn sm" id="proMore">מה כלול</button></div></div>`;
+    return `<div class="card procard"><div class="row" style="justify-content:space-between"><h3>Blue Ronin Pro</h3><span class="probadge">PRO</span></div><p class="small" style="margin:0">${esc(personalLine() || "תובנות לכל פרק, יומן רכיבות מלא, מעוף מלא ומסלולים בלי הגבלה.")}</p><div class="row"><button type="button" class="btn primary" id="proMore">${st.pro && st.pro.trialUsed ? "מה כלול ב־Pro" : "7 ימים חינם"}</button></div></div>`;
+  }
+
+  /* ================= notifications center ================= */
+  const CHANGELOG = [
+    { v: "2.1.0", d: "2026-11-06", items: ["Blue Ronin Pro: תובנות לכל פרק, יומן רכיבות מלא ו־7 ימי ניסיון", "יומן רכיבות: כל רכיבה נשמרת אוטומטית", "כרטיס ״השבת שלי״ לשיתוף בוואטסאפ", "מרכז הודעות עם היסטוריה", "מצפורים נפתחים עם תמונות, ומיון לפי המרחק ממך"] },
+    { v: "2.0.0", d: "2026-11-05", items: ["עצירות, קפה ודלק לאורך הפרק שבחרת", "תוכנית דלק לפי דגם האופנוע, מד מיכל צבעוני ואיתור תחנה", "מעוף ציפור חלק עם טעינה מראש", "פרק 6 על כביש 90 בלבד"] }
+  ];
+  function inboxItems() {
+    const ct = st.content || {}, out = [];
+    (ct.history || []).forEach(h => out.push({ t: h.t, kind: h.kind, level: h.level, title: h.kind === "push" ? h.title : "הודעה מהצוות", text: h.text, link: h.link }));
+    out.sort((a, b) => b.t - a.t); return out;
+  }
+  function unreadCount() { const seen = LS.get("inboxSeen", 0); return inboxItems().filter(x => x.t > seen).length + (CHANGELOG[0] && LS.get("seenVer", "") !== CHANGELOG[0].v ? 1 : 0); }
+  function renderBell() { const n = unreadCount(), b = $("bellN"); if (!b) return; b.hidden = !n; b.textContent = n > 9 ? "9+" : n; $("bellBtn").setAttribute("aria-label", n ? `הודעות, ${n} חדשות` : "הודעות"); }
+  function openInbox() {
+    const items = inboxItems(), seen = LS.get("inboxSeen", 0), hz = st.hazards || [], ct = st.content || {};
+    const fmtDT = t => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(t));
+    const ic = { announce: "📣", push: "🔔" };
+    const box = openModal(`<div class="inbox"><h2>הודעות</h2>
+      ${ct.announce && ct.announce.on ? `<div class="alert ${ct.announce.level === "info" ? "info" : ""}"><b>עכשיו:</b> ${esc(ct.announce.text)}${ct.announce.link ? ` <a href="${esc(ct.announce.link)}" target="_blank" rel="noopener">פרטים</a>` : ""}</div>` : ""}
+      ${hz.length ? `<h3>עדכוני דרך פעילים</h3>${hz.map(h => `<button type="button" class="item ibtn" data-hz="${esc(h.id)}"><span class="pic" style="background:var(--caution)">${glyphSvgRaw("haz")}</span><div style="min-width:0"><b>${esc(HZK[h.kind] || "עדכון דרך")}</b><span class="small muted">${esc(h.text)}${h.until ? ` · עד ${esc(h.until.split("-").reverse().join("."))}` : ""}</span></div></button>`).join("")}` : ""}
+      <h3>מהצוות</h3>${items.length ? items.map(x => `<div class="item imsg${x.t > seen ? " new" : ""}"><div style="min-width:0"><b>${x.kind === "push" ? "התראה: " : ""}${esc(x.title)}</b><span class="small">${esc(x.text)}</span>${x.link ? `<a class="small" href="${esc(x.link)}" target="_blank" rel="noopener">פרטים</a>` : ""}</div><span class="small muted mono" style="white-space:nowrap">${esc(fmtDT(x.t))}</span></div>`).join("") : `<p class="small muted">עוד אין הודעות. כשהצוות מפרסם משהו, הוא נשמר כאן.</p>`}
+      <h3>מה חדש באפליקציה</h3>${CHANGELOG.map(c => `<div class="chlog"><b class="mono">${c.v}</b> <span class="small muted">${esc(c.d.split("-").reverse().join("."))}</span><ul>${c.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")}</div>`, "inboxm");
+    box.querySelectorAll("[data-hz]").forEach(b => b.onclick = () => { const h = hz.find(x => x.id === b.dataset.hz); if (!h) return; closeModal(); map.flyTo({ center: [h.lon, h.lat], zoom: 13.5, padding: sheetPad() }); if (innerWidth < 900) setSheet("peek"); });
+    LS.set("inboxSeen", Math.max(Date.now(), ...items.map(x => x.t))); LS.set("seenVer", CHANGELOG[0].v); renderBell();
+  }
+  const glyphSvgRaw = g => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">${GLYPH[g].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+  $("bellBtn").onclick = openInbox;
+  if (location.hash === "#inbox") setTimeout(openInbox, 1200);
+
+  /* ================= "My Saturday" share card ================= */
+  function shareSatBtn() { return `<button type="button" class="sharesat" id="shareSat"><span class="pwi">${PWI.share}</span><span><b>השבת שלי</b><span class="small muted">כרטיס עם ${esc(chap().title)}, שעת היציאה והתחזית. מוכן לוואטסאפ</span></span></button>`; }
+  async function shareSaturday() {
+    const c = chap(), r = st.routes[c.id], w = chapterWx(c.id), sim = fuelSimFor(c.id), ins = isPro() ? routeInsights(c.id) : null;
+    const dep = ins && ins.best ? ins.best.t : departFor(c);
+    const P = placesAlong(c.id); const cafe = P.cafes.find(x => x.curated || x.sat === "open") || P.cafes[0];
+    try { await Promise.all(["700 76px Assistant, system-ui, sans-serif", "500 36px Assistant, system-ui, sans-serif", "700 46px Karantina"].map(f => document.fonts.load(f))); } catch (e) { }
+    const W = 1080, H = 1350, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 0, H); grd.addColorStop(0, "#0B1424"); grd.addColorStop(1, "#16233B"); g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    /* the route itself, drawn as the hero */
+    if (r) { const s = L.simplifyByDist(r.coords, Math.max(0.05, r.km / 600)); let w0 = 180, e0 = -180, s0 = 90, n0 = -90; s.forEach(p => { w0 = Math.min(w0, p[0]); e0 = Math.max(e0, p[0]); s0 = Math.min(s0, p[1]); n0 = Math.max(n0, p[1]); });
+      const kx = Math.cos((s0 + n0) / 2 * Math.PI / 180), bw = (e0 - w0) * kx, bh = n0 - s0, sc = Math.min(800 / bw, 560 / bh), ox = (W - bw * sc) / 2, oy = 330 + (560 - bh * sc) / 2;
+      const X = p => ox + (p[0] - w0) * kx * sc, Y = p => oy + (n0 - p[1]) * sc;
+      g.lineJoin = g.lineCap = "round"; g.strokeStyle = "rgba(92,141,255,.25)"; g.lineWidth = 26; g.beginPath(); s.forEach((p, i) => i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))); g.stroke();
+      g.strokeStyle = "#5C8DFF"; g.lineWidth = 9; g.stroke(); g.fillStyle = "#FFA24A"; g.beginPath(); g.arc(X(s[0]), Y(s[0]), 16, 0, Math.PI * 2); g.fill(); }
+    g.direction = "rtl"; g.textAlign = "right"; const R0 = W - 72;
+    g.fillStyle = "#5C8DFF"; g.font = "700 46px Karantina, Assistant, sans-serif"; g.fillText("BLUE RONIN · השבת שלי", R0, 96);
+    g.fillStyle = "#E6ECF4"; g.font = "700 76px Assistant, system-ui, sans-serif"; g.fillText(c.title, R0, 196);
+    g.fillStyle = "#8C9DB3"; g.font = "500 40px Assistant, system-ui, sans-serif"; g.fillText(fmtD(st.sat.noonUTC), R0, 260);
+    const tiles = [["יציאה", fmtT(dep)], ["מרחק", r ? Math.round(r.km) + " ק״מ" : "--"], ["טמפ׳", w ? `${Math.round(w.agg.tMin)}°–${Math.round(w.agg.tMax)}°` : "--"], ["ציון שבת", w ? w.ri.i + "/100" : "--"]];
+    tiles.forEach(([k, v], i) => { const x = R0 - i * 240, y = 940; g.fillStyle = "rgba(255,255,255,.06)"; g.beginPath(); if (g.roundRect) g.roundRect(x - 220, y, 220, 150, 22); else g.rect(x - 220, y, 220, 150); g.fill(); g.fillStyle = "#8C9DB3"; g.font = "500 32px Assistant, system-ui, sans-serif"; g.fillText(k, x - 22, y + 50); g.fillStyle = "#E6ECF4"; g.font = "700 50px Assistant, system-ui, sans-serif"; g.direction = /^[\d\s°–:/.-]+$/.test(v) ? "ltr" : "rtl"; g.fillText(v, x - 22, y + 115); g.direction = "rtl"; });
+    g.font = "500 36px Assistant, system-ui, sans-serif"; g.fillStyle = "#E6ECF4"; let y = 1160;
+    if (cafe) { g.fillText(`☕ עצירה: ${cafe.name}${cafe.km != null ? ` · ק״מ ${Math.round(cafe.km)}` : ""}`, R0, y); y += 58; }
+    if (sim) { g.fillText(sim.refuels.length ? `⛽ תדלוק: ${sim.refuels.map(x => x.label).join(", ")}` : `⛽ ${sim.be.name}: בלי לתדלק בדרך`, R0, y); y += 58; }
+    g.fillStyle = "#8C9DB3"; g.font = "500 30px Assistant, system-ui, sans-serif"; g.fillText(location.host, R0, H - 50);
+    const blob = await new Promise(res => cv.toBlob(res, "image/png")); const file = new File([blob], "blue-ronin-shabbat.png", { type: "image/png" });
+    const text = `השבת שלי: ${c.title}. יציאה ${fmtT(dep)}, ${r ? Math.round(r.km) + " ק״מ" : ""}. מצטרפים? ${location.origin}/?c=${c.id}`;
+    try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } } catch (e) { if (e.name === "AbortError") return; }
+    const u = URL.createObjectURL(blob); openModal(`<div class="ridesum"><h2>השבת שלי</h2><img src="${u}" alt="כרטיס השבת" style="border-radius:14px;width:100%"><div class="row"><a class="btn primary" href="${u}" download="blue-ronin-shabbat.png">שמירת התמונה</a><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text)}">שליחה בוואטסאפ</a></div></div>`);
+  }
+
+  /* ================= viewpoints: same floating card as cafes, with photos ================= */
+  function viewPopup(v) {
+    const c = chap(), r = st.routes[c.id]; let onRoute = "";
+    const nr = nearRoute([v], c.id, 1.5, "vp:" + v.lat + "," + v.lon); if (nr.length) onRoute = `ק״מ ${Math.round(nr[0].km)} בפרק${nr[0].d > 0.15 ? ` · ${nr[0].d < 1 ? Math.round(nr[0].d * 1000) + " מ׳" : nr[0].d.toFixed(1) + " ק״מ"} מהכביש` : ""}`;
+    const sun = SunCalc.getTimes(st.sat.noonUTC, v.lat, v.lon);
+    const q = `${v.name || "מצפור"} מצפור`;
+    const pop = new maplibregl.Popup({ closeButton: false, maxWidth: "290px" }).setLngLat([v.lon, v.lat]).setHTML(`${photoSlot(v.lat, v.lon, "view")}<b>${esc(v.name || "מצפור")}</b><div class="small muted">${onRoute ? esc(onRoute) + " · " : ""}מצפור · OpenStreetMap</div><div class="chips" style="margin-top:4px"><span class="chip sun">זריחה ${fmtT(sun.sunrise)}</span><span class="chip sun">שקיעה ${fmtT(sun.sunset)}</span></div><div class="row" style="margin-top:6px">${navBtn("w", wazeLL(v.lat, v.lon))}${navBtn("g", gmLL(v.lat, v.lon))}<a class="navb m" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(q)}">${IC.mountain}<span>עוד</span></a></div>`).addTo(map);
+    fillPhotos(pop.getElement());
+  }
+
   function iconImage(color, glyph, dot) {
     const px = 2, S = 30 * px, c = document.createElement("canvas"); c.width = S; c.height = S; const g = c.getContext("2d");
     g.save(); g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 4 * px; g.shadowOffsetY = 1.5 * px;
@@ -163,7 +411,7 @@
     if (!map.getSource("dem")) map.addSource("dem", DEM);
     if (!map.getSource("dem-hs")) map.addSource("dem-hs", DEM);
     map.addLayer({ id: "br-hill", type: "hillshade", source: "dem-hs", layout: { visibility: st.layers.hillshade ? "visible" : "none" }, paint: { "hillshade-exaggeration": isDark() ? 0.45 : 0.3, "hillshade-shadow-color": isDark() ? "#000814" : "#55657a", "hillshade-highlight-color": isDark() ? "#2a3a55" : "#ffffff", "hillshade-accent-color": isDark() ? "#0b1424" : "#6b7a8c" } }, under);
-    ["br-route", "br-curves", "br-glare", "br-enf", "br-osm", "br-terr", "br-green", "br-trafpts", "br-fly", "br-pick", "br-haz", "br-cafes"].forEach(id => { if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: FC() }); });
+    ["br-route", "br-curves", "br-glare", "br-enf", "br-osm", "br-terr", "br-green", "br-trafpts", "br-fly", "br-pick", "br-haz", "br-cafes", "br-ride"].forEach(id => { if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: FC() }); });
     const c = n => css(n);
     map.addLayer({ id: "br-enf-line", type: "line", source: "br-enf", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": c("--warn"), "line-width": 9, "line-opacity": 0.28 }, layout: { "line-cap": "round" } }, sym);
     map.addLayer({ id: "br-route-dim", type: "line", source: "br-route", filter: ["!=", ["get", "active"], true], paint: { "line-color": c("--accent"), "line-width": 3, "line-opacity": 0.45, "line-dasharray": [2, 1.5] }, layout: { "line-cap": "round", "line-join": "round" } }, sym);
@@ -178,6 +426,8 @@
     if (!map.getSource("br-fuelline")) map.addSource("br-fuelline", { type: "geojson", lineMetrics: true, data: FC() });
     map.addLayer({ id: "br-fuelline", type: "line", source: "br-fuelline", layout: { "line-cap": "round", "line-join": "round", visibility: "none" }, paint: { "line-width": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "line-color": c("--go") } }, sym);
     map.addLayer({ id: "br-fly", type: "line", source: "br-fly", paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 14, 5], "line-opacity": 0.85, "line-blur": 0.5 }, layout: { "line-cap": "round", "line-join": "round" } });
+    map.addLayer({ id: "br-ride-casing", type: "line", source: "br-ride", paint: { "line-color": c("--bg"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 9] }, layout: { "line-cap": "round", "line-join": "round" } });
+    map.addLayer({ id: "br-ride", type: "line", source: "br-ride", paint: { "line-color": c("--sun"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5] }, layout: { "line-cap": "round", "line-join": "round" } });
     map.addLayer({ id: "br-trafpts", type: "circle", source: "br-trafpts", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "circle-color": ["case", [">=", ["get", "r"], 0.8], c("--go"), [">=", ["get", "r"], 0.55], c("--caution"), c("--no")], "circle-stroke-color": "#fff", "circle-stroke-width": 1.8, "circle-opacity": 0.95 } });
     map.addLayer({ id: "br-pick", type: "circle", source: "br-pick", paint: { "circle-radius": 9, "circle-color": c("--report"), "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
     if (st.cfg.traffic) addTrafficLayer();
@@ -207,6 +457,7 @@
       const f = e.features[0], p = f.properties; const [lon, lat] = e.lngLat.toArray ? e.lngLat.toArray() : [e.lngLat.lng, e.lngLat.lat];
       let h = "";
       if (id === "br-fuel") { const n = st.osm && st.osm.fuel.find(x => x.id === p.id); if (n) { openFuelPopup(n); return; } }
+      if (id === "br-view") { const [vl, vt] = f.geometry.coordinates; viewPopup({ name: p.name, lat: vt, lon: vl }); return; }
       if (id === "br-cam") h = `<b>מצלמת מהירות</b><div class="small muted">OpenStreetMap${p.maxspeed ? " · מהירות " + esc(p.maxspeed) : ""}</div>`;
       else if (id.startsWith("br-enf")) h = `<b>${esc(p.name)}</b><div class="small muted">${esc(p.src)}</div>`;
       else h = `<b>${esc(p.name || (id === "br-fuel" ? "תחנת דלק" : "מצפור"))}</b><div class="small muted">${id === "br-fuel" ? esc(p.brand || "תחנת דלק") : "מצפור · OpenStreetMap"}</div><div class="row" style="margin-top:6px">${navBtn("w", wazeLL(lat, lon))}${navBtn("g", gmLL(lat, lon))}</div>`;
@@ -229,6 +480,7 @@
   function pushSources() {
     if (!map.getSource("br-route")) return;
     setSrc("br-route", FC(CHAPTERS.filter(c => st.routes[c.id] && (!c.hidden || c.id === st.chap) && (!c.combo || c.id === st.chap) && (c.region === chap().region || c.id === st.chap)).map(c => ({ type: "Feature", properties: { chap: c.id, active: c.id === st.chap }, geometry: { type: "LineString", coordinates: st.routes[c.id].coords } }))));
+    setSrc("br-ride", FC(st.rideShown ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: st.rideShown.trk.map(p => [p[0], p[1]]) } }] : []));
     setSrc("br-curves", FC((st.curves[st.chap] || []).map(s => ({ type: "Feature", properties: { cls: s.cls }, geometry: { type: "LineString", coordinates: s.coords } }))));
     setSrc("br-terr", FC((st.terr[st.chap] || []).flatMap(t => [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: t.coords } }, { type: "Feature", properties: { k: "in" }, geometry: { type: "Point", coordinates: t.enter } }].concat(t.exit ? [{ type: "Feature", properties: { k: "out" }, geometry: { type: "Point", coordinates: t.exit } }] : []))));
     const tr = st.traffic[st.chap]; setSrc("br-trafpts", FC(tr && tr.pts ? tr.pts.filter(p => p.ratio != null && p.ratio < 0.8 || p.closed).map(p => ({ type: "Feature", properties: { r: p.closed ? 0 : p.ratio }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } })) : []));
@@ -448,7 +700,7 @@
     const golden = new Date(t.sunrise.getTime() + 60 * 6e4);
     let h = `<div class="brief-head"><div><div class="small muted">${st.sat.isToday ? "היום" : st.sat.daysAway === 1 ? "מחר" : `בעוד ${st.sat.daysAway} ימים`}</div><h2>${esc(fmtD(satDate))}</h2></div><button type="button" class="btn sm" id="wxRefresh">רענון</button></div>
       <div class="sunrow"><div><div class="k">זריחה</div><div class="v sun mono">${fmtT(t.sunrise)}</div></div><div><div class="k">יציאה מיוקנעם</div><div class="v mono">${fmtT(departFor(CHAPTERS[0]))}</div></div><div><div class="k">אור זהב עד</div><div class="v mono">${fmtT(golden)}</div></div></div>`;
-    if (!st.wx) { h += `<p class="muted">טוען תחזית לשבת…</p>`; p.innerHTML = h; bindBrief(); return; }
+    if (!st.wx) { h += `<p class="muted">טוען תחזית לשבת…</p>` + shareSatBtn(); p.innerHTML = h; bindBrief(); return; }
     const res = CHAPTERS.filter(c => !c.hidden && (!c.custom || c.id === st.chap)).map(c => ({ c, w: chapterWx(c.id) })).filter(x => x.w);
     const best = res.filter(x => !x.c.combo).sort((a, b) => b.w.ri.i - a.w.ri.i)[0];
     if (st.sat.daysAway > 5) h += `<div class="alert info">התחזית ל־${st.sat.daysAway} ימים עדיין רחוקה. התדריך מתעדכן אוטומטית ככל שהשבת מתקרבת.</div>`;
@@ -472,11 +724,13 @@
       const gr = L.gear(cw.agg.tMin, cw.agg.tMax, cw.agg.maxP, cw.agg.fog);
       h += `<div class="card"><h3>מה לובשים</h3><div class="small muted">תחושת קור ב־80 קמ״ש בבוקר: <b class="mono">${gr.wc}°</b></div><ul class="gear">${gr.items.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
     }
+    h += shareSatBtn();
     h += `<div class="fresh">תחזית: Open-Meteo, עודכנה ${ago(st.wx.ts)} · מתעדכנת בכל פתיחה ובכל 30 דקות${st.osm ? ` · OSM: ${ago(st.osm.ts)}` : ""}</div>`;
     p.innerHTML = h; bindBrief();
   }
   function bindBrief() {
     const r = $("wxRefresh"); if (r) r.onclick = () => { loadWeather(true); toast("מרענן תחזית"); };
+    const sh = $("shareSat"); if (sh) sh.onclick = async () => { sh.disabled = true; try { await shareSaturday(); } catch (e) { toast("לא הצלחנו להכין את הכרטיס"); } sh.disabled = false; };
     document.querySelectorAll("#p-brief [data-chap]").forEach(b => b.onclick = () => { setChap(b.dataset.chap); setTab("route"); });
   }
 
@@ -521,6 +775,7 @@
     h += terrCard(c.id) + diffCard(c.id) + trafficCard(c.id);
     if (cs) h += `<div><div class="curvebar">${cs.km.map((k, i) => `<span style="width:${(k / cs.total * 100).toFixed(1)}%;background:var(--c${i})"></span>`).join("")}</div><div class="legend" style="margin-top:6px">${L.CURVE_LABEL.map((l, i) => `<span><i style="background:var(--c${i})"></i>${l} ${Math.round(cs.km[i])}</span>`).join("")}</div></div>`;
     h += `<div id="profWrap">${profileSvg(e)}</div>`;
+    h += insightsCard(c.id);
     h += fuelPlanCard();
     if (r && !r.real) h += `<div class="alert">המסלול משוער (שרת הניתוב לא היה זמין). הקישור לגוגל מנווט על הכבישים האמיתיים.</div>`;
     h += `<div class="row"><a class="btn primary" target="_blank" rel="noopener" href="${gmRoute(c.stops)}">${IC.nav}ניווט הפרק בגוגל</a><a class="btn" target="_blank" rel="noopener" href="${wazeLL(c.stops[0].lat, c.stops[0].lon)}">Waze לנקודת הפתיחה</a>${st.flags.fly ? '<button type="button" class="btn" id="bFly">מעוף על הפרק</button>' : ""}<button type="button" class="btn" id="bGpx">GPX</button></div>`;
@@ -530,7 +785,7 @@
     if ($("bNew")) $("bNew").onclick = () => startBuild(); if ($("bEdit")) $("bEdit").onclick = () => startBuild(c); if ($("bShareR")) $("bShareR").onclick = () => shareRoute(c);
     if (st.build) bindBuilder(); bindTraffic(c.id);
     $("p-route").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { const s = c.stops.find(x => x.id === b.dataset.s); map.flyTo({ center: lonlat(s), zoom: 13, padding: sheetPad(), duration: 1100 }); stopPopup(s, c.stops.indexOf(s) + 1); if (innerWidth < 900) setSheet("peek"); });
-    if ($("bFly")) $("bFly").onclick = () => startFly(); $("bGpx").onclick = gpx; bindFuelPlan();
+    if ($("bFly")) $("bFly").onclick = () => startFly(); $("bGpx").onclick = gpx; bindFuelPlan(); bindInsights(c.id);
     if (!st.traffic[c.id] || Date.now() - st.traffic[c.id].ts > 3 * 6e4) loadTraffic(c.id);
     if (!e) loadElev(c.id).then(x => { if (x && st.tab === "route" && st.chap === c.id) renderRoute(); });
     else bindProfile(e);
@@ -576,12 +831,13 @@
       ${items.map(p => `<circle cx="${X(p.km).toFixed(1)}" cy="${lanes[p.t]}" r="${p.curated || (p.t === "fuel" && p.ok) ? 4.6 : 3.4}" fill="${PIC[p.t][0]}" stroke="var(--bg)" stroke-width="1.2"${p.t !== "view" && p.sat === "closed" ? ' opacity=".35"' : ""}/>`).join("")}
       <text x="10" y="60" font-size="10" fill="var(--muted)">0</text><text x="${W / 2}" y="60" font-size="10" fill="var(--muted)" text-anchor="middle">${Math.round(total / 2)}</text><text x="${W - 10}" y="60" font-size="10" fill="var(--muted)" text-anchor="end">${Math.round(total)} ק״מ</text></svg>`;
   }
+  const meTxt = p => p.dme != null ? ` · ${p.dme < 1 ? Math.round(p.dme * 1000) + " מ׳" : p.dme.toFixed(1) + " ק״מ"} ממך` : "";
   function placeRow(p) {
     const off = p.d > 0.15 ? `${p.d < 1 ? Math.round(p.d * 1000) + " מ׳" : p.d.toFixed(1) + " ק״מ"} מהכביש` : "על הדרך";
     const ic = `<span class="pic" style="background:${PIC[p.t][0]}">${glyphSvg(p.t)}</span>`;
-    if (p.t === "fuel") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.label)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}</span><div class="chips" style="margin-top:3px">${satPill(p)}${octChips(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-fx="${p.id}">פרטים</button></div></div>`;
-    if (p.t === "cafe") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b>${p.curated ? ' <span class="chip sun">מומלץ</span>' : ""}<span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${p.place ? " · " + esc(p.place) : ""}</span><div class="chips" style="margin-top:3px">${cafePill(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", p.curated ? wazeQ(p.name + " " + p.place) : wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-cf="${p.id}">במפה</button></div></div>`;
-    return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}</span></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-ll="${p.lon},${p.lat}">במפה</button></div></div>`;
+    if (p.t === "fuel") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.label)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${meTxt(p)}</span><div class="chips" style="margin-top:3px">${satPill(p)}${octChips(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-fx="${p.id}">פרטים</button></div></div>`;
+    if (p.t === "cafe") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b>${p.curated ? ' <span class="chip sun">מומלץ</span>' : ""}<span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${meTxt(p)}${p.place ? " · " + esc(p.place) : ""}</span><div class="chips" style="margin-top:3px">${cafePill(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", p.curated ? wazeQ(p.name + " " + p.place) : wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-cf="${p.id}">במפה</button></div></div>`;
+    return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${meTxt(p)}</span></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-vw="${p.lat},${p.lon}">במפה</button></div></div>`;
   }
   function renderStops() {
     const c = chap(), r = st.routes[c.id], cat = st.stopsCat;
@@ -594,9 +850,10 @@
     const fuelOkF = f => (!ff.oct || f.o98 !== false);
     const sets = { cafe: P.cafes.filter(keep), fuel: P.fuel.filter(keep).filter(fuelOkF), view: P.views };
     const all = sets.cafe.concat(sets.fuel, sets.view).sort((a, b) => a.km - b.km);
-    const shown = cat === "all" ? all : sets[cat];
+    let shown = cat === "all" ? all : sets[cat];
+    if (st.stopsNear && st.me) { const me = [st.me.lon, st.me.lat]; shown = shown.map(x => Object.assign({}, x, { dme: L.hav(me, [x.lon, x.lat]) })).sort((a, b) => a.dme - b.dme); }
     h += `<div class="seg pcat" role="tablist" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" role="tab" data-pc="${k}" aria-selected="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
-    h += placeStrip(all, r.km);
+    h += `<div class="row" style="justify-content:space-between;margin:0">${placeStrip(all, r.km)}</div><div class="row small" style="margin:0;justify-content:space-between"><span class="muted">${st.stopsNear && st.me ? "ממוין לפי המרחק ממך" : "ממוין לפי הקילומטר בפרק"}</span><button type="button" class="btn sm" id="pNear" aria-pressed="${!!st.stopsNear}">${IC.nav}${st.stopsNear ? "לפי הפרק" : "קרוב אליי"}</button></div>`;
     if (cat === "fuel") h += `<div class="row small" style="margin:0"><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק תחנות עם 98</label><span class="muted">אימות רוכבים: לוחצים ״פרטים״</span></div>`;
     if (st.shabbat) h += `<p class="small muted" style="margin:0">מצב שבת מסתיר מקומות שמסומנים סגורים בשבת. ״לבדוק״ = אין מידע, כדאי להתקשר.</p>`;
     const lim = st.stopsMore ? 400 : 30;
@@ -610,6 +867,8 @@
     const fly = (lon, lat) => { map.flyTo({ center: [lon, lat], zoom: 14, padding: sheetPad() }); if (innerWidth < 900) setSheet("peek"); };
     $("p-stops").querySelectorAll("[data-cf]").forEach(b => b.onclick = () => { const x = allCafes().find(k => k.id === b.dataset.cf); if (x) { fly(x.lon, x.lat); cafePopup(x); } });
     $("p-stops").querySelectorAll("[data-ll]").forEach(b => b.onclick = () => fly(...b.dataset.ll.split(",").map(Number)));
+    $("p-stops").querySelectorAll("[data-vw]").forEach(b => b.onclick = () => { const [la, lo] = b.dataset.vw.split(",").map(Number); const v = P.views.find(x => x.lat === la && x.lon === lo) || { lat: la, lon: lo, name: "מצפור" }; fly(lo, la); viewPopup(v); });
+    $("pNear").onclick = async () => { if (st.stopsNear) { st.stopsNear = false; return renderStops(); } const b = $("pNear"); b.disabled = true; try { await getPos(); st.stopsNear = true; renderMarkers(); } catch (e) { toast("אין גישה למיקום"); } renderStops(); };
     $("p-stops").querySelectorAll("[data-fx]").forEach(x => x.onclick = () => { const n = st.osm.fuel.find(k => k.id === x.dataset.fx); if (!n) return; fly(n.lon, n.lat); openFuelPopup(n); });
   }
 
@@ -752,6 +1011,7 @@
     $("bkCons").onchange = e => { st.bike.cons = Math.max(1.5, Math.min(12, +e.target.value || 5)); st.bike.id = "custom"; st.bike.measured = null; save(); };
     $("calGo").onclick = () => { const km = +$("calKm").value, l = +$("calL").value; if (!(km >= 20 && l >= 1)) return toast("מזינים כמה ק״מ נסעתם ובכמה ליטר מילאתם"); const m = Math.round(l / km * 1000) / 10; if (m < 1.5 || m > 15) return toast("המספרים לא נראים הגיוניים. בודקים שוב"); st.bike.measured = m; toast(`מכויל: ${m} ל׳/100 ק״מ`); save(); };
     if ($("calClr")) $("calClr").onclick = () => { st.bike.measured = null; save(); };
+    if (!$("fuelLineT")) return; /* route still loading: the rest of the card isn't drawn yet */
     $("fuelLineT").onchange = e => { st.layers.fuelline = e.target.checked; LS.set("layers", st.layers); paintFuelLine(); applyLayerVis(); };
     $("fuelNear").onclick = fuelNearMe;
     if (st.fuelLiveHtml && st.fuelLiveChap === st.chap) { $("fuelLive").innerHTML = st.fuelLiveHtml; bindFuelLive(); }
@@ -1040,6 +1300,7 @@
   }
   function saveBuild() {
     const b = st.build; if (b.pts.length < 2) return;
+    if (!b.editing && st.myRoutes.length >= FREE_ROUTES && !isPro()) return openPaywall("routes");
     const title = (b.title || "").trim() || `${b.pts[0].name.split(",")[0]} ← ${b.pts[b.pts.length - 1].name.split(",")[0]}`;
     const id = b.editing || "u" + Date.now().toString(36);
     const rec = { id, title, stops: b.pts, opts: b.opts };
@@ -1110,7 +1371,7 @@
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; if (st.tab === "tools") renderTools(); });
   function renderTools() {
     const off = LS.get("offline", null); const ios = /iphone|ipad|ipod/i.test(navigator.userAgent); const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-    let h = `<h2>כלים</h2>
+    let h = `<h2>כלים</h2>${proCard()}${journalCard()}
     <div class="card"><h3>מפות אופליין לצפון</h3><p class="small muted" style="margin:0">מוריד את מפת הצפון עד רמת רחוב, את מסלולי שלושת הפרקים בפירוט מלא ואת התבליט. עד כ־50MB, כדאי ב־Wi-Fi.</p><div class="progress"><span id="offBar" style="width:${off ? 100 : 0}%"></span></div><div class="row"><button type="button" class="btn primary" id="offGo">${off ? "עדכון ההורדה" : "הורדה לאופליין"}</button><span class="small muted" id="offTxt">${off ? `${off.n} אריחים · ${ago(off.ts)}` : "עוד לא הורד"}</span></div></div>
     <div class="card"><h3>התקנה כאפליקציה</h3>${standalone ? '<p class="small muted" style="margin:0">האפליקציה מותקנת.</p>' : installEvt ? '<button type="button" class="btn primary" id="instGo">התקנה למסך הבית</button>' : ios ? '<p class="small muted" style="margin:0">באייפון: כפתור השיתוף בספארי ← ״הוספה למסך הבית״.</p>' : '<p class="small muted" style="margin:0">בתפריט הדפדפן: ״התקנת אפליקציה״ או ״הוספה למסך הבית״.</p>'}</div>
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
@@ -1125,6 +1386,7 @@
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
     if ($("fbGo")) $("fbGo").onclick = sendFeedback;
+    $("proMore").onclick = () => openPaywall(); bindJournal();
     $("icsGo").onclick = ics; $("shareGo").onclick = share; $("repGo").onclick = report; renderPush();
     $("themeSel").value = st.theme; $("themeSel").onchange = e => { st.theme = e.target.value; LS.set("theme", st.theme); applyTheme(); const want = isDark() ? "dark" : "liberty"; if (want !== styleName) { styleName = want; styleReady = false; map.setStyle(OFM + styleName, { diff: false }); } };
     $("introSnd").onchange = e => { LS.set("introSound", e.target.checked); toast(e.target.checked ? "הצליל יתנגן בפתיחה הבאה" : "הפתיחה תהיה שקטה"); };
@@ -1242,7 +1504,7 @@
     const base = Math.min(2.4, Math.max(0.5, P.km / 85));
     const el = document.createElement("div"); el.className = "bike"; el.innerHTML = BIKE_SVG;
     const cam = map.getCenter();
-    st.fly = { c, P, cls, E: st.elev[st.chap], km: 0, rate: LS.get("flyRate", 1), playing: false, loading: true, last: null, base, v: 0, uiT: 0, trT: 0, pfKm: -99, tpl: tileTemplates(),
+    st.fly = { c, P, cls, E: st.elev[st.chap], km: 0, cap: isPro() ? Infinity : FLY_FREE, rate: LS.get("flyRate", 1), playing: false, loading: true, last: null, base, v: 0, uiT: 0, trT: 0, pfKm: -99, tpl: tileTemplates(),
       brg: { x: map.getBearing(), v: 0 }, bh: { x: P.head[0], v: 0 }, zoom: { x: map.getZoom(), v: 0 }, pitch: { x: map.getPitch(), v: 0 },
       from: [cam.lng, cam.lat], blend: 0, prevExag: st.terrain ? 1.5 : null,
       marker: new maplibregl.Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(P.pts[0]).addTo(map) };
@@ -1287,6 +1549,7 @@
         const target = F.base * F.rate * [1.35, 1.0, 0.62, 0.44][mx] * endEase;
         F.v += (target - F.v) * (1 - Math.exp(-dt * 1.4));
         F.km = Math.min(P.km, F.km + F.v * dt);
+        if (F.km >= P.km * F.cap) { F.km = P.km * F.cap; F.playing = false; F.v = 0; flyUI(); setTimeout(() => openPaywall("fly"), 350); }
         if (F.km >= P.km - 0.002) { F.km = P.km; F.playing = false; F.v = 0; flyUI(); }
       } else F.v *= Math.exp(-dt * 4);
       const at = flyAt(P, F.km); pos = at.p; i0 = at.i;
@@ -1329,11 +1592,12 @@
     document.querySelectorAll("#flyui [data-rate]").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.rate === F.rate)));
   }
   $("flPlay").onclick = () => { const F = st.fly; if (!F || F.loading) return; if (F.km >= F.P.km) { F.km = 0; F.snap = true; }
+    if (!F.playing && F.km >= F.P.km * F.cap - 0.01) return openPaywall("fly");
     if (!F.playing) { const cm = map.getCenter(); F.from = [cm.lng, cm.lat]; F.blend = 0; F.brg.x = map.getBearing(); F.brg.v = 0; F.zoom.x = map.getZoom(); F.zoom.v = 0; F.pitch.x = map.getPitch(); F.pfKm = -99; }
     F.hold = false; F.playing = !F.playing; flyUI(); };
   $("flClose").onclick = () => stopFly(true);
   document.querySelectorAll("#flyui [data-rate]").forEach(x => x.onclick = () => { const F = st.fly; if (!F) return; F.rate = +x.dataset.rate; LS.set("flyRate", F.rate); flyUI(); });
-  $("flSeek").addEventListener("input", e => { const F = st.fly; if (!F) return; flySeeking = true; F.km = e.target.value / 1000 * F.P.km; F.snap = true; F.v = F.base * 0.5; F.pfKm = -99; warmAhead(F, F.km, F.km + 8); });
+  $("flSeek").addEventListener("input", e => { const F = st.fly; if (!F) return; flySeeking = true; F.km = e.target.value / 1000 * F.P.km; if (F.km > F.P.km * F.cap) { F.km = F.P.km * F.cap; e.target.value = Math.round(F.cap * 1000); if (!F.capT || Date.now() - F.capT > 4000) { F.capT = Date.now(); toast("המעוף החינמי מגיע עד 30% מהפרק. המעוף המלא ב־Pro"); } } F.snap = true; F.v = F.base * 0.5; F.pfKm = -99; warmAhead(F, F.km, F.km + 8); });
   $("flSeek").addEventListener("change", () => { flySeeking = false; });
   function stopFly(done) {
     const F = st.fly; if (!F) return;
@@ -1361,7 +1625,7 @@
     if (st.ride) return stopRide();
     if (!navigator.geolocation) return toast("מצב רכיבה צריך גישה למיקום");
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
-    st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, off: 0, rerouting: false, inT: null, terrMsg: null };
+    st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, off: 0, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
     loadSteps(c, r).then(s => { if (st.ride && st.ride.c === c) st.ride.G.steps = s; });
     try { st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { }
     document.body.classList.add("riding"); $("hud").hidden = false; $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
@@ -1372,6 +1636,8 @@
   function stopRide() {
     if (!st.ride) return; navigator.geolocation.clearWatch(st.ride.watch); try { st.ride.lock && st.ride.lock.release(); } catch (e) { }
     try { speechSynthesis.cancel(); } catch (e) { }
+    let done = null; try { done = saveRide(st.ride); } catch (e) { } LS.set("rideLive", null);
+    if (done) setTimeout(() => rideSummary(done), 500);
     st.ride = null; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
   }
   function nearestOn(G, me) {
@@ -1404,6 +1670,7 @@
     if (R.last) { const step = L.hav(R.last.p, me); if (step < 1.5) R.odo += step; }
     R.last = { p: me, t: p.timestamp };
     $("hudSpeed").textContent = spd != null ? Math.round(spd) : "--";
+    try { rideTrack(R, me, p, spd); } catch (e) { }
     const G = R.G; const near = nearestOn(G, me); const myKm = near.km;
     const ni = G.stopKm.findIndex(k => k > myKm + 0.08);
     if (ni >= 0) { $("hudNext").textContent = G.stops[ni].name.split(" · ")[0]; $("hudDist").textContent = distTxt(G.stopKm[ni] - myKm); } else { $("hudNext").textContent = "סוף המסלול"; $("hudDist").textContent = ""; }
@@ -1489,7 +1756,7 @@
   }
   const renderTab = () => ({ brief: renderBrief, route: renderRoute, stops: renderStops, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
-  function setChap(id) { stopFly(); st.chap = id; if (id !== DRAFT) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
+  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; if (id !== DRAFT) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
   const renderAll = () => { renderTab(); renderMarkers(); };
 
   /* ---------- layers popover ---------- */
@@ -1536,14 +1803,17 @@
     $("maintX").onclick = () => { try { sessionStorage.setItem("brn:maintSeen", "1"); } catch (e) { } $("maint").hidden = true; };
     $("fFly").hidden = !st.flags.fly;
   }
-  renderNotice();
+  renderNotice(); renderBell(); proBadge(); proCheck();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") proCheck(); });
+  /* a ride the phone cut short (app killed, battery) is still saved to the journal */
+  (() => { const lv = LS.get("rideLive", null); if (lv && lv.trk && lv.trk.length > 2) { LS.set("rideLive", null); const d = saveRide({ cid: lv.cid, title: lv.title, odo: lv.odo, moving: lv.moving, vmax: lv.vmax, trk: lv.trk }); if (d) toast("הרכיבה הקודמת נשמרה ביומן"); } })();
   /* admin content: on open, whenever the app comes back to the screen, and every 5 minutes while open */
   let contentAt = 0;
   function syncContent() {
     contentAt = Date.now();
     fetch("/api/content?t=" + Math.floor(Date.now() / 5000), { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(ct => {
       if (!ct || (st.content && JSON.stringify(ct) === JSON.stringify(st.content))) return;
-      LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
+      LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); renderBell(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
     }).catch(() => { });
   }
   syncContent();

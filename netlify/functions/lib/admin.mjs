@@ -145,3 +145,10 @@ export function publicContent(c) {
   const live = u => !u || u.slice(0, 10) >= today;
   return Object.assign({}, c, { announce: c.announce.on && live(c.announce.until) ? c.announce : { on: false }, hazards: c.hazards.filter(h => live(h.until)) });
 }
+
+/* Message history riders can reopen from the bell: announcements and push broadcasts, newest last. */
+export async function addHistory(item) {
+  const s = store(); const h = (await s.get("history", { type: "json" })) || [];
+  h.push(Object.assign({ id: b64u(randomBytes(6)), t: Date.now() }, item)); await s.setJSON("history", h.slice(-40));
+}
+export async function getHistory() { return (await store().get("history", { type: "json" })) || []; }

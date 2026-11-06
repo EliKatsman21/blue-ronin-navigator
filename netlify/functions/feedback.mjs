@@ -5,7 +5,7 @@ import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import { ipHash } from "./lib/admin.mjs";
 const fb = () => getStore({ name: "brn-feedback", consistency: "strong" });
-const KINDS = ["bug", "idea", "data", "hazard", "other"];
+const KINDS = ["bug", "idea", "data", "hazard", "pro", "other"];
 const clean = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/g, "").trim().slice(0, n);
 export default async req => {
   if (req.method !== "POST") return new Response("method", { status: 405 });

@@ -11,6 +11,8 @@ import { sendAll } from "./lib/push.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
+const fbMedia = () => getStore({ name: "brn-fb-media", consistency: "strong" });
+const dropMedia = async items => { for (const x of items) for (const k of x.media || []) await fbMedia().delete(x.id + "-" + k).catch(() => { }); };
 const statStore = () => getStore({ name: "brn-stats", consistency: "strong" });
 const subsStore = () => getStore({ name: "brn-subs", consistency: "strong" });
 
@@ -89,14 +91,19 @@ export default async req => {
     const all = (await fuelStore().get("all", { type: "json" })) || {}; delete all[b.id]; await fuelStore().setJSON("all", all); await audit("fuel-reset", { id: b.id });
     return json({ ok: true });
   }
+  if (route === "GET feedback/media") {
+    const q = new URL(req.url).searchParams, id = q.get("id") || "", k = q.get("k"); if (!/^[a-f0-9]{12}$/.test(id) || !["p", "a"].includes(k)) return json({ error: "bad" }, 400);
+    const r = await fbMedia().getWithMetadata(id + "-" + k, { type: "arrayBuffer" }); if (!r) return json({ error: "not found" }, 404);
+    return new Response(r.data, { headers: { "content-type": r.metadata && r.metadata.ct || "application/octet-stream", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
+  }
   if (route === "GET feedback") return json({ items: ((await fbStore().get("inbox", { type: "json" })) || []).slice().reverse() });
   if (route === "POST feedback/status") {
     const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const it = inbox.find(x => x.id === b.id); if (!it) return json({ error: "not found" }, 404);
-    if (b.status === "delete") inbox.splice(inbox.indexOf(it), 1); else if (["new", "open", "done"].includes(b.status)) it.status = b.status; else return json({ error: "bad status" }, 400);
+    if (b.status === "delete") { inbox.splice(inbox.indexOf(it), 1); await dropMedia([it]); } else if (["new", "open", "done"].includes(b.status)) it.status = b.status; else return json({ error: "bad status" }, 400);
     await fbStore().setJSON("inbox", inbox); await audit("feedback", { id: b.id, s: b.status }); return json({ ok: true });
   }
   if (route === "POST feedback/purge") {
-    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length;
+    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length; await dropMedia(inbox.filter(x => x.status === "done"));
     await fbStore().setJSON("inbox", keep); await audit("feedback-purge", { n }); return json({ ok: true, removed: n });
   }
   if (route === "POST broadcast") {

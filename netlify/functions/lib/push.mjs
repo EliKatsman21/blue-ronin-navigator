@@ -7,6 +7,7 @@ const meta = () => getStore({ name: "brn", consistency: "strong" });
 const subs = () => getStore({ name: "brn-subs", consistency: "strong" });
 export const keyOf = endpoint => createHash("sha256").update(endpoint).digest("hex").slice(0, 40);
 
+export { configure };
 export async function vapid() {
   const s = meta(); let v = await s.get("vapid", { type: "json" });
   if (!v) { v = webpush.generateVAPIDKeys(); await s.setJSON("vapid", v); }
@@ -25,11 +26,11 @@ export async function saveSub(sub, prefs) {
 export const removeSub = endpoint => subs().delete(keyOf(endpoint));
 export const getSub = endpoint => subs().get(keyOf(endpoint), { type: "json" });
 
-const payloadOf = p => JSON.stringify({ title: p.title, body: p.body, tag: p.tag || "brief", url: p.url || "./" });
+const payloadOf = p => JSON.stringify({ title: p.title, body: p.body, tag: p.tag || "brief", url: p.url || "./", sos: !!p.sos });
 
-export async function sendOne(rec, payload) {
+export async function sendOne(rec, payload, opts = {}) {
   await configure();
-  try { await webpush.sendNotification(rec.sub, payloadOf(payload), { TTL: 12 * 3600, urgency: "normal" }); return true; }
+  try { await webpush.sendNotification(rec.sub, payloadOf(payload), { TTL: opts.ttl || 12 * 3600, urgency: opts.urgency || "normal" }); return true; }
   catch (e) { if (e.statusCode === 404 || e.statusCode === 410) await removeSub(rec.sub.endpoint); return false; }
 }
 export async function sendAll(payload, pref) {

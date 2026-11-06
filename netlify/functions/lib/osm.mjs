@@ -58,8 +58,8 @@ export async function addCafes(data, timeoutMs = 8000) {
   } finally { clearTimeout(timer); ctl.abort(); }
 }
 
-export async function refresh() {
-  const data = await fetchOverpass();
+export async function refresh(timeoutMs) {
+  const data = await fetchOverpass(timeoutMs);
   await store().setJSON("v4", data);
   return data;
 }

@@ -4,6 +4,6 @@
 import { getContent, publicContent } from "./lib/admin.mjs";
 export default async () => {
   const c = publicContent(await getContent());
-  return Response.json(c, { headers: { "cache-control": "public, max-age=60", "netlify-cdn-cache-control": "public, s-maxage=30, stale-while-revalidate=120" } });
+  return Response.json(c, { headers: { "cache-control": "no-cache", "netlify-cdn-cache-control": "public, s-maxage=5" } });
 };
 export const config = { path: "/api/content" };

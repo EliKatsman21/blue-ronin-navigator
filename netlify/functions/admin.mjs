@@ -92,6 +92,10 @@ export default async req => {
     if (b.status === "delete") inbox.splice(inbox.indexOf(it), 1); else if (["new", "open", "done"].includes(b.status)) it.status = b.status; else return json({ error: "bad status" }, 400);
     await fbStore().setJSON("inbox", inbox); await audit("feedback", { id: b.id, s: b.status }); return json({ ok: true });
   }
+  if (route === "POST feedback/purge") {
+    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length;
+    await fbStore().setJSON("inbox", keep); await audit("feedback-purge", { n }); return json({ ok: true, removed: n });
+  }
   if (route === "POST broadcast") {
     const title = String(b.title || "").trim().slice(0, 60), text = String(b.body || "").trim().slice(0, 180);
     if (!title || !text || b.confirm !== "שלח") return json({ error: "חסרים כותרת, טקסט או אישור" }, 400);

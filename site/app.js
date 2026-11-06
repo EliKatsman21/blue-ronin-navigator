@@ -65,7 +65,8 @@
     theme: LS.get("theme", "system"),
     routes: {}, curves: {}, cstats: {}, glare: {}, elev: {},
     wx: LS.get("wx2", null), osm: LS.get("osm4", null), radar: null, crowd: LS.get("crowd", {}), api: null,
-    bike: Object.assign({ range: 220, fuel: "95", name: "" }, LS.get("bike", {})), fuelFilter: LS.get("fuelFilter", { sat: true, oct: false }),
+    bike: Object.assign({ id: "", tank: 15, cons: 5.0, style: "normal", start: 100, fuel: "95", measured: null, range: 220 }, LS.get("bike", {})), fuelFilter: LS.get("fuelFilter", { sat: true, oct: false }),
+    stopsCat: LS.get("stopsCat", "all"), fuelRide: LS.get("fuelRide", null),
     terrain: false, ride: null, me: null, fly: null, tab: "brief",
     terr: {}, traffic: {}, cfg: { traffic: false, mapillary: false }, build: null, myRoutes: LS.get("myRoutes", []),
     buildPrefs: Object.assign({ noHighway: false, loop: false }, LS.get("buildPrefs", {})), voice: LS.get("voice", true),
@@ -130,7 +131,8 @@
     fuel: ["M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20", "M3.5 20h12", "M7.5 7h4v3.5h-4z", "M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"],
     view: ["M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z", "M16.5 7.2a1.8 1.8 0 1 0 .01 0"],
     cam: ["M3 8.5h11v7H3z", "M14 10.5l6-3v9l-6-3", "M6 12h.01"],
-    haz: ["M12 4 3 19.5h18z", "M12 10v4.5", "M12 17h.01"]
+    haz: ["M12 4 3 19.5h18z", "M12 10v4.5", "M12 17h.01"],
+    cup: ["M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z", "M16 10.5h1.4a2 2 0 0 1 0 4H16", "M8.5 4.5c0 1 1 1.2 1 2.2M12 4.5c0 1 1 1.2 1 2.2", "M4 20.5h13"]
   };
   function iconImage(color, glyph, dot) {
     const px = 2, S = 30 * px, c = document.createElement("canvas"); c.width = S; c.height = S; const g = c.getContext("2d");
@@ -152,6 +154,7 @@
     set("i-view", iconImage(css("--view"), "view"));
     set("i-cam", iconImage(css("--warn"), "cam"));
     set("i-haz", iconImage(css("--caution"), "haz"));
+    set("i-cafe", iconImage("#8F5A35", "cup")); set("i-cafe-top", iconImage(css("--sun"), "cup"));
   }
   function setupStyle() {
     hebrewize();
@@ -160,7 +163,7 @@
     if (!map.getSource("dem")) map.addSource("dem", DEM);
     if (!map.getSource("dem-hs")) map.addSource("dem-hs", DEM);
     map.addLayer({ id: "br-hill", type: "hillshade", source: "dem-hs", layout: { visibility: st.layers.hillshade ? "visible" : "none" }, paint: { "hillshade-exaggeration": isDark() ? 0.45 : 0.3, "hillshade-shadow-color": isDark() ? "#000814" : "#55657a", "hillshade-highlight-color": isDark() ? "#2a3a55" : "#ffffff", "hillshade-accent-color": isDark() ? "#0b1424" : "#6b7a8c" } }, under);
-    ["br-route", "br-curves", "br-glare", "br-enf", "br-osm", "br-terr", "br-green", "br-trafpts", "br-fly", "br-pick", "br-haz"].forEach(id => { if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: FC() }); });
+    ["br-route", "br-curves", "br-glare", "br-enf", "br-osm", "br-terr", "br-green", "br-trafpts", "br-fly", "br-pick", "br-haz", "br-cafes"].forEach(id => { if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: FC() }); });
     const c = n => css(n);
     map.addLayer({ id: "br-enf-line", type: "line", source: "br-enf", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": c("--warn"), "line-width": 9, "line-opacity": 0.28 }, layout: { "line-cap": "round" } }, sym);
     map.addLayer({ id: "br-route-dim", type: "line", source: "br-route", filter: ["!=", ["get", "active"], true], paint: { "line-color": c("--accent"), "line-width": 3, "line-opacity": 0.45, "line-dasharray": [2, 1.5] }, layout: { "line-cap": "round", "line-join": "round" } }, sym);
@@ -172,6 +175,8 @@
     map.addLayer({ id: "br-green", type: "line", source: "br-green", minzoom: 6.5, paint: { "line-color": c("--caution"), "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1, 12, 2.2], "line-opacity": 0.7, "line-dasharray": [3, 2] } }, sym);
     map.addLayer({ id: "br-terr", type: "line", source: "br-terr", paint: { "line-color": c("--caution"), "line-width": ["interpolate", ["linear"], ["zoom"], 7, 9, 13, 16], "line-opacity": 0.28 }, layout: { "line-cap": "round", "line-join": "round" } }, "br-route-casing");
     map.addLayer({ id: "br-terr-pt", type: "circle", source: "br-terr", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": c("--caution"), "circle-stroke-color": c("--bg"), "circle-stroke-width": 2.5 } });
+    if (!map.getSource("br-fuelline")) map.addSource("br-fuelline", { type: "geojson", lineMetrics: true, data: FC() });
+    map.addLayer({ id: "br-fuelline", type: "line", source: "br-fuelline", layout: { "line-cap": "round", "line-join": "round", visibility: "none" }, paint: { "line-width": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "line-color": c("--go") } }, sym);
     map.addLayer({ id: "br-fly", type: "line", source: "br-fly", paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 14, 5], "line-opacity": 0.85, "line-blur": 0.5 }, layout: { "line-cap": "round", "line-join": "round" } });
     map.addLayer({ id: "br-trafpts", type: "circle", source: "br-trafpts", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "circle-color": ["case", [">=", ["get", "r"], 0.8], c("--go"), [">=", ["get", "r"], 0.55], c("--caution"), c("--no")], "circle-stroke-color": "#fff", "circle-stroke-width": 1.8, "circle-opacity": 0.95 } });
     map.addLayer({ id: "br-pick", type: "circle", source: "br-pick", paint: { "circle-radius": 9, "circle-color": c("--report"), "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
@@ -181,6 +186,7 @@
     const sz = (a, b) => ["interpolate", ["linear"], ["zoom"], 7, a, 13, b];
     map.addLayer({ id: "br-view", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "view"], minzoom: 8.5, layout: { "icon-image": "i-view", "icon-size": sz(0.5, 0.9), "icon-allow-overlap": false, "icon-padding": 1, "symbol-sort-key": 3 } });
     map.addLayer({ id: "br-fuel", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "fuel"], minzoom: 7.5, layout: { "icon-image": ["concat", "i-fuel-", ["coalesce", ["get", "s"], "unknown"]], "icon-size": sz(0.55, 0.95), "icon-allow-overlap": true, "symbol-sort-key": 2 } });
+    map.addLayer({ id: "br-cafe", type: "symbol", source: "br-cafes", minzoom: 8, layout: { "icon-image": ["case", ["get", "top"], "i-cafe-top", "i-cafe"], "icon-size": sz(0.5, 0.88), "icon-allow-overlap": ["case", ["get", "top"], true, false], "icon-padding": 1, "symbol-sort-key": ["case", ["get", "top"], 0, 4] } });
     map.addLayer({ id: "br-cam", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "cam"], layout: { "icon-image": "i-cam", "icon-size": sz(0.55, 0.9), "icon-allow-overlap": true, "symbol-sort-key": 1 } });
     map.addLayer({ id: "br-haz-halo", type: "circle", source: "br-haz", paint: { "circle-radius": sz(9, 18), "circle-color": c("--caution"), "circle-opacity": 0.22 } });
     map.addLayer({ id: "br-haz", type: "symbol", source: "br-haz", layout: { "icon-image": "i-haz", "icon-size": sz(0.6, 1), "icon-allow-overlap": true, "symbol-sort-key": 0 } });
@@ -194,6 +200,8 @@
 
   const HZK = { closure: "כביש סגור", gravel: "חצץ או שמן", works: "עבודות", police: "אכיפה", info: "עדכון דרך" };
   map.on("click", "br-haz", e => { const p = e.features[0].properties; new maplibregl.Popup({ closeButton: false, maxWidth: "280px" }).setLngLat(e.lngLat).setHTML(`<b>${esc(HZK[p.kind] || "עדכון דרך")}</b><div>${esc(p.text)}</div><div class="small muted">עדכון מצוות Blue Ronin${p.until ? ` · בתוקף עד ${esc(p.until.split("-").reverse().join("."))}` : ""}</div>`).addTo(map); });
+  map.on("click", "br-cafe", e => { const c = allCafes().find(x => x.id === e.features[0].properties.id); if (c) cafePopup(c); });
+  map.on("mouseenter", "br-cafe", () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", "br-cafe", () => map.getCanvas().style.cursor = "");
   ["br-cam", "br-view", "br-fuel", "br-enf-pt", "br-enf-line"].forEach(id => {
     map.on("click", id, e => {
       const f = e.features[0], p = f.properties; const [lon, lat] = e.lngLat.toArray ? e.lngLat.toArray() : [e.lngLat.lng, e.lngLat.lat];
@@ -209,11 +217,12 @@
     map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
   });
 
-  const LAYER_MAP = { curves: ["br-curves"], glare: ["br-glare"], cams: ["br-cam", "br-enf-pt", "br-enf-line"], osmview: ["br-view"], fuel: ["br-fuel"], hillshade: ["br-hill"], radar: ["br-radar"], green: ["br-green", "br-terr", "br-terr-pt"], traffic: ["br-traffic", "br-trafpts"] };
+  const LAYER_MAP = { curves: ["br-curves"], glare: ["br-glare"], cams: ["br-cam", "br-enf-pt", "br-enf-line"], osmview: ["br-view"], fuel: ["br-fuel"], cafes: ["br-cafe"], fuelline: ["br-fuelline"], hillshade: ["br-hill"], radar: ["br-radar"], green: ["br-green", "br-terr", "br-terr-pt"], traffic: ["br-traffic", "br-trafpts"] };
   function applyLayerVis() {
     if (!styleReady) { renderMarkers(); return; }
     for (const k in LAYER_MAP) LAYER_MAP[k].forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", st.layers[k] ? "visible" : "none"); });
     if (map.getLayer("br-route-solid")) map.setLayoutProperty("br-route-solid", "visibility", st.layers.curves ? "none" : "visible");
+    if (map.getLayer("br-fuelline")) map.setLayoutProperty("br-fuelline", "visibility", st.layers.fuelline && !st.fly ? "visible" : "none");
     renderMarkers();
   }
   function setSrc(id, data) { const s = map.getSource(id); if (s) s.setData(data); }
@@ -225,6 +234,8 @@
     const tr = st.traffic[st.chap]; setSrc("br-trafpts", FC(tr && tr.pts ? tr.pts.filter(p => p.ratio != null && p.ratio < 0.8 || p.closed).map(p => ({ type: "Feature", properties: { r: p.closed ? 0 : p.ratio }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } })) : []));
     setSrc("br-glare", FC((st.glare[st.chap] || []).map(g => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: g.coords } }))));
     setSrc("br-enf", FC(ENF.map(e => ({ type: "Feature", properties: { name: e.name, src: e.src }, geometry: e.pts.length > 1 ? { type: "LineString", coordinates: e.pts.map(p => [p[1], p[0]]) } : { type: "Point", coordinates: [e.pts[0][1], e.pts[0][0]] } }))));
+    if (st.routes[st.chap]) { const cf = placesAlong(st.chap).cafes.filter(c => !st.shabbat || c.sat !== "closed"); setSrc("br-cafes", FC(cf.map(c => ({ type: "Feature", properties: { id: c.id, top: !!c.curated }, geometry: { type: "Point", coordinates: [c.lon, c.lat] } })))); }
+    paintFuelLine();
     setSrc("br-haz", FC(st.hazards.map(h => ({ type: "Feature", properties: { id: h.id, text: h.text, kind: h.kind, until: h.until || "" }, geometry: { type: "Point", coordinates: [h.lon, h.lat] } }))));
     const o = st.osm;
     if (o) setSrc("br-osm", FC([...o.cams.map(n => ({ type: "Feature", properties: { k: "cam", maxspeed: n.maxspeed || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.views.map(n => ({ type: "Feature", properties: { k: "view", name: n.name || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.fuel.map(n => { const f = fuelStatus(n); return { type: "Feature", properties: { k: "fuel", id: n.id, name: n.name || "", brand: n.brand || "", s: f.sat }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } }; })]));
@@ -241,12 +252,6 @@
       e.onclick = ev => { ev.stopPropagation(); stopPopup(s, n); };
       mk.push(new maplibregl.Marker({ element: e }).setLngLat(lonlat(s)).addTo(map));
     }));
-    if (st.layers.cafes && !st.fly) CAFES.filter(c => !st.shabbat || c.shabbat === true).forEach(c => {
-      const onRoute = chap().stops.some(s => s.cafe === c.id); if (onRoute && st.layers.stops) return;
-      const e = document.createElement("button"); e.type = "button"; e.className = "mkc"; e.innerHTML = IC.cup; e.setAttribute("aria-label", c.name);
-      e.onclick = ev => { ev.stopPropagation(); cafePopup(c); };
-      mk.push(new maplibregl.Marker({ element: e }).setLngLat([c.lon, c.lat]).addTo(map));
-    });
     if (st.layers.wx && st.wx && !st.fly) wxPoints().forEach((p, i) => {
       const h = satHour(i, 8); if (!h) return;
       const e = document.createElement("div"); e.className = "mkw"; e.innerHTML = `${wxIcon(h.code)}${Math.round(h.t)}°`;
@@ -255,8 +260,8 @@
     if (st.me) { const e = document.createElement("div"); e.className = "me"; mk.push(new maplibregl.Marker({ element: e }).setLngLat([st.me.lon, st.me.lat]).addTo(map)); }
   }
   function cafePopup(c) {
-    const q = `${c.name} ${c.place}`;
-    const pop = new maplibregl.Popup({ closeButton: false, maxWidth: "290px" }).setLngLat([c.lon, c.lat]).setHTML(`${photoSlot(c.lat, c.lon, "cafe")}<b>${esc(c.name)}</b><div class="small muted">${esc(c.place)} · ${esc(c.src)}</div><div class="row" style="margin-top:6px">${navBtn("w", wazeQ(q))}${navBtn("g", gmQ(q))}<a class="navb m" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(q + " תפריט")}">${IC.menu}<span>תפריט</span></a></div>`).addTo(map);
+    const q = `${c.name} ${c.place || ""}`.trim(), f = c.sat ? c : Object.assign({}, c, cafeStatus(c));
+    const pop = new maplibregl.Popup({ closeButton: false, maxWidth: "290px" }).setLngLat([c.lon, c.lat]).setHTML(`${photoSlot(c.lat, c.lon, "cafe")}<b>${esc(c.name)}</b><div class="small muted">${esc(c.place || "")}${c.place ? " · " : ""}${esc(c.src || "OpenStreetMap")}</div><div class="chips" style="margin-top:4px">${cafePill(f)}</div><div class="row" style="margin-top:6px">${navBtn("w", c.curated ? wazeQ(q) : wazeLL(c.lat, c.lon))}${navBtn("g", c.curated ? gmQ(q) : gmLL(c.lat, c.lon))}<a class="navb m" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(q + " תפריט")}">${IC.menu}<span>תפריט</span></a></div>`).addTo(map);
     fillPhotos(pop.getElement());
   }
   function stopPopup(s, n) {
@@ -387,36 +392,36 @@
     const t = n => n.tags || {}; const yes = v => v === "yes" ? true : v === "no" ? false : null;
     const pick = n => { const la = n.lat ?? (n.center && n.center.lat), lo = n.lon ?? (n.center && n.center.lon); const g = t(n); return { id: n.type[0] + n.id, lat: +la.toFixed(5), lon: +lo.toFixed(5), name: g["name:he"] || g.name || "", brand: g["brand:he"] || g.brand || g.operator || "", maxspeed: g.maxspeed || "", oh: g.opening_hours || "", o95: yes(g["fuel:octane_95"]), o98: yes(g["fuel:octane_98"]), diesel: yes(g["fuel:diesel"]) }; };
     const els = j.elements.filter(n => n.lat != null || n.center);
-    return { ts: Date.now(), cams: els.filter(n => t(n).highway === "speed_camera").map(pick), fuel: els.filter(n => t(n).amenity === "fuel").map(pick), views: els.filter(n => t(n).tourism === "viewpoint").map(pick) };
+    return { ts: Date.now(), cams: els.filter(n => t(n).highway === "speed_camera").map(pick), fuel: els.filter(n => t(n).amenity === "fuel").map(pick), views: els.filter(n => t(n).tourism === "viewpoint").map(pick), cafes: els.filter(n => t(n).amenity === "cafe" || t(n).shop === "coffee").map(pick) };
   }
   async function fromServer() { const r = await withTimeout(fetch("/api/osm"), 9000); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.fuel) throw new Error("bad"); return j; }
   async function fromOverpass() {
-    const q = "[out:json][timeout:40];(" + Object.values(REGIONS).map(B => { const bb = `${B[0][1]},${B[0][0]},${B[1][1]},${B[1][0]}`; return `node["highway"="speed_camera"](${bb});nwr["amenity"="fuel"](${bb});node["tourism"="viewpoint"](${bb});`; }).join("") + ");out center tags;";
+    const q = "[out:json][timeout:40];(" + Object.values(REGIONS).map(B => { const bb = `${B[0][1]},${B[0][0]},${B[1][1]},${B[1][0]}`; return `node["highway"="speed_camera"](${bb});nwr["amenity"="fuel"](${bb});node["tourism"="viewpoint"](${bb});nwr["amenity"="cafe"](${bb});nwr["shop"="coffee"](${bb});`; }).join("") + ");out center tags;";
     const ctl = new AbortController();
     try { return await withTimeout(Promise.any(["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"].map(async ep => { const r = await fetch(ep + "?data=" + encodeURIComponent(q), { signal: ctl.signal }); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.elements || !j.elements.length) throw new Error("empty"); return normOverpass(j); })), 25000); }
     finally { ctl.abort(); }
   }
-  let osmBusy = false;
-  async function loadOSM(force) {
+  let osmBusy = false, cafeRetry = 0;
+  async function loadOSM(force, quiet) {
     const age = st.osm ? Date.now() - st.osm.ts : 1e12;
-    if (!force && age < 20 * 3600e3) { pushSources(); return; }
+    if (!force && age < 20 * 3600e3 && st.osm.cafes) { pushSources(); return; }
     if (osmBusy) return; osmBusy = true;
     try {
       let d = null; try { d = await fromServer(); } catch (e) { }
-      if (!d && (!st.osm || force)) { try { d = await fromOverpass(); } catch (e) { } }
+      if ((!d && (!st.osm || force)) || (d && !d.cafes && quiet)) { try { d = await fromOverpass(); } catch (e) { } }
       if (d) {
         d.fuel.forEach(f => { f.name = f.name || ""; f.brand = f.brand || ""; f.oh = f.oh || ""; if (f.o95 === undefined) f.o95 = null; if (f.o98 === undefined) f.o98 = null; if (f.diesel === undefined) f.diesel = null; });
-        d.views.forEach(v => v.name = v.name || "");
+        d.views.forEach(v => v.name = v.name || ""); if (!d.cafes) { d.cafes = (st.osm && st.osm.cafes) || []; if (!d.cafes.length && cafeRetry++ < 2) setTimeout(() => loadOSM(true, true), 4000); }
         st.osm = d; nearCache.clear(); LS.set("osm4", st.osm); pushSources(); renderAll();
-        if (force) toast(`עודכן: ${st.osm.fuel.length} תחנות דלק, ${st.osm.views.length} מצפורים, ${st.osm.cams.length} מצלמות`);
+        if (force && !quiet) toast(`עודכן: ${st.osm.fuel.length} תחנות דלק, ${st.osm.views.length} מצפורים, ${st.osm.cams.length} מצלמות`);
       } else if (force || !st.osm) { toast("המידע על תחנות ומצפורים לא נטען כרגע. ננסה שוב בעוד רגע."); if (!st.osm) setTimeout(() => loadOSM(), 20000); }
     } finally { osmBusy = false; }
   }
   /* Cached per route+radius: the distance scan is the heaviest thing the stops tab does. */
   const nearCache = new Map();
-  function nearRoute(list, cid, maxKm) {
+  function nearRoute(list, cid, maxKm, tag) {
     const r = st.routes[cid]; if (!r || !list || !list.length) return [];
-    const key = `${cid}|${maxKm}|${list === (st.osm && st.osm.fuel) ? "f" : list === (st.osm && st.osm.views) ? "v" : list === (st.osm && st.osm.cams) ? "c" : list.length}|${st.osm ? st.osm.ts : 0}|${r.coords.length}`;
+    const key = `${cid}|${maxKm}|${tag || (list === (st.osm && st.osm.fuel) ? "f" : list === (st.osm && st.osm.views) ? "v" : list === (st.osm && st.osm.cams) ? "c" : "x")}|${list.length}|${st.osm ? st.osm.ts : 0}|${r.coords.length}|${r.km.toFixed(2)}`;
     if (nearCache.has(key)) { const ids = nearCache.get(key); return ids.map(([i, d, km]) => Object.assign({ d, km }, list[i])); }
     const simp = L.simplifyByDist(r.coords, 0.15); const cum = L.cumulative(simp);
     const pad = maxKm / 100; let w = 180, so = 90, e = -180, n = -90; simp.forEach(p => { w = Math.min(w, p[0]); e = Math.max(e, p[0]); so = Math.min(so, p[1]); n = Math.max(n, p[1]); });
@@ -539,21 +544,73 @@
     svg.addEventListener("pointerleave", () => { $("profCur") && $("profCur").setAttribute("visibility", "hidden"); profMk && profMk.remove(); });
   }
 
-  /* ---------- stops pane ---------- */
+  /* ---------- places along the chosen route: cafes, fuel, viewpoints ---------- */
+  let cafesMemo = null;
+  function allCafes() {
+    const o = st.osm, ts = o ? o.ts : 0, n = o && o.cafes ? o.cafes.length : 0;
+    if (cafesMemo && cafesMemo.ts === ts && cafesMemo.n === n) return cafesMemo.list;
+    const cur = CAFES.map(c => Object.assign({ curated: true }, c));
+    const osm = (o && o.cafes || []).filter(x => x.name && !cur.some(c => L.hav([c.lon, c.lat], [x.lon, x.lat]) < 0.15));
+    cafesMemo = { ts, n, list: cur.concat(osm) }; return cafesMemo.list;
+  }
+  function cafeStatus(c) {
+    if (c.curated) return c.shabbat === true ? { sat: "open", hours: null } : { sat: "unknown" };
+    const oh = L.saturdayHours(c.oh); return { sat: oh.k === "open" ? "open" : oh.k === "closed" ? "closed" : "unknown", hours: oh.t || null, inferred: oh.inferred };
+  }
+  const cafePill = f => f.sat === "open" ? `<span class="chip" style="border-color:var(--go);color:var(--go)">שבת: ${esc(f.hours || "פתוח")}</span>` : f.sat === "closed" ? `<span class="chip" style="border-color:var(--no);color:var(--no)">סגור בשבת${f.inferred ? "?" : ""}</span>` : `<span class="chip">שבת: לבדוק</span>`;
+  function placesAlong(cid) {
+    const cafes = nearRoute(allCafes(), cid, 2.5, "cafe").map(c => Object.assign({ t: "cafe" }, c, cafeStatus(c)));
+    const fuel = fuelAlong(cid, 1.5).map(f => Object.assign({ t: "fuel" }, f));
+    const views = nearRoute(st.osm && st.osm.views, cid, 1.5, "view").filter(v => v.name).map(v => Object.assign({ t: "view" }, v));
+    return { cafes, fuel, views };
+  }
+  const PCAT = { all: "הכול", cafe: "קפה", fuel: "דלק", view: "מצפורים" };
+  const PIC = { cafe: ["#8F5A35", "cup"], fuel: ["var(--fuel)", "fuel"], view: ["var(--view)", "view"] };
+  const glyphSvg = (t) => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">${GLYPH[PIC[t][1]].map(d => `<path d="${d}"/>`).join("")}</svg>`;
+  /* A strip of the whole route with every place at its kilometre: reading the ride at a glance. */
+  function placeStrip(items, total) {
+    const W = 360, X = km => 10 + (Math.max(0, Math.min(total, km)) / total) * (W - 20);
+    const lanes = { cafe: 12, fuel: 26, view: 40 };
+    return `<svg class="pstrip" direction="ltr" viewBox="0 0 ${W} 64" role="img" aria-label="המקומות לאורך המסלול, לפי קילומטר">
+      ${Object.entries(lanes).map(([t, y]) => `<line x1="10" x2="${W - 10}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`).join("")}
+      ${items.map(p => `<circle cx="${X(p.km).toFixed(1)}" cy="${lanes[p.t]}" r="${p.curated || (p.t === "fuel" && p.ok) ? 4.6 : 3.4}" fill="${PIC[p.t][0]}" stroke="var(--bg)" stroke-width="1.2"${p.t !== "view" && p.sat === "closed" ? ' opacity=".35"' : ""}/>`).join("")}
+      <text x="10" y="60" font-size="10" fill="var(--muted)">0</text><text x="${W / 2}" y="60" font-size="10" fill="var(--muted)" text-anchor="middle">${Math.round(total / 2)}</text><text x="${W - 10}" y="60" font-size="10" fill="var(--muted)" text-anchor="end">${Math.round(total)} ק״מ</text></svg>`;
+  }
+  function placeRow(p) {
+    const off = p.d > 0.15 ? `${p.d < 1 ? Math.round(p.d * 1000) + " מ׳" : p.d.toFixed(1) + " ק״מ"} מהכביש` : "על הדרך";
+    const ic = `<span class="pic" style="background:${PIC[p.t][0]}">${glyphSvg(p.t)}</span>`;
+    if (p.t === "fuel") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.label)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}</span><div class="chips" style="margin-top:3px">${satPill(p)}${octChips(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-fx="${p.id}">פרטים</button></div></div>`;
+    if (p.t === "cafe") return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b>${p.curated ? ' <span class="chip sun">מומלץ</span>' : ""}<span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}${p.place ? " · " + esc(p.place) : ""}</span><div class="chips" style="margin-top:3px">${cafePill(p)}</div></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", p.curated ? wazeQ(p.name + " " + p.place) : wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-cf="${p.id}">במפה</button></div></div>`;
+    return `<div class="item place"><div class="row" style="flex-wrap:nowrap;gap:10px;min-width:0">${ic}<div style="min-width:0"><b>${esc(p.name)}</b><span class="small muted mono">ק״מ ${Math.round(p.km)} · ${off}</span></div></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(p.lat, p.lon))}<button type="button" class="btn sm" data-ll="${p.lon},${p.lat}">במפה</button></div></div>`;
+  }
   function renderStops() {
-    const list = CAFES.filter(c => !st.shabbat || c.shabbat === true);
-    let h = `<div class="row" style="justify-content:space-between"><h2>קפה בדרך</h2><label class="toggle"><input type="checkbox" id="shab" ${st.shabbat ? "checked" : ""}> מצב שבת</label></div><p class="small muted" style="margin:0">במצב שבת מוצגים רק מקומות שמופיעים כפתוחים בשבת. שעות משתנות; כדאי לבדוק בבוקר.</p><div>` +
-      list.map(c => `<div class="item">${thumbSlot(c.lat, c.lon, "cafe", c.id)}<div class="grow"><b>${esc(c.name)}</b><span class="small muted">${esc(c.place)} · ${esc(c.src)}</span></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeQ(c.name + " " + c.place))}${navBtn("g", gmQ(c.name + " " + c.place))}</div></div>`).join("") + `</div>`;
-    const views = nearRoute(st.osm && st.osm.views, st.chap, 1.2).filter(v => v.name);
-    h += `<div><h3>מצפורים לאורך ${esc(chap().title)}</h3><p class="small muted" style="margin:2px 0 4px">מתוך OpenStreetMap, עד 1.2 ק״מ מהמסלול, לפי הסדר בדרך.</p>`;
-    h += views.length ? views.slice(0, 14).map(v => `<div class="item">${thumbSlot(v.lat, v.lon, "view", v.id)}<div class="grow"><b>${esc(v.name)}</b><span class="small muted mono">ק״מ ${Math.round(v.km)} · ${Math.round(v.d * 1000)} מ׳ מהכביש</span></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(v.lat, v.lon))}<button type="button" class="btn sm" data-ll="${v.lon},${v.lat}">במפה</button></div></div>`).join("") : `<p class="small muted">${st.osm ? "לא נמצאו מצפורים עם שם ליד הפרק." : "טוען מ־OpenStreetMap…"}</p>`;
-    h += `</div>`;
-    h += fuelSection();
-    $("p-stops").innerHTML = h;
-    bindFuelSection(); lazyThumbs($("p-stops"));
-    $("p-stops").querySelectorAll("[data-cafe]").forEach(x => x.onclick = () => { const c = CAFES.find(k => k.id === x.dataset.cafe); if (!c) return; map.flyTo({ center: [c.lon, c.lat], zoom: 14, padding: sheetPad() }); cafePopup(c); if (innerWidth < 900) setSheet("peek"); });
-    $("shab").onchange = e => { st.shabbat = e.target.checked; LS.set("shabbat", st.shabbat); renderStops(); renderMarkers(); };
-    $("p-stops").querySelectorAll("[data-ll]").forEach(b => b.onclick = () => { map.flyTo({ center: b.dataset.ll.split(",").map(Number), zoom: 14, padding: sheetPad() }); if (innerWidth < 900) setSheet("peek"); });
+    const c = chap(), r = st.routes[c.id], cat = st.stopsCat;
+    let h = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h2>לאורך ${esc(c.title)}</h2><span class="small muted">${r ? Math.round(r.km) + " ק״מ · " : ""}קפה עד 2.5 ק״מ מהכביש, דלק ומצפורים עד 1.5 ק״מ</span></div><label class="toggle"><input type="checkbox" id="shab" ${st.shabbat ? "checked" : ""}> מצב שבת</label></div>`;
+    if (!r) { $("p-stops").innerHTML = h + `<p class="small muted">מחשב את המסלול…</p>`; return; }
+    if (!st.osm) { $("p-stops").innerHTML = h + `<p class="small muted">טוען מקומות מ־OpenStreetMap…</p>`; return; }
+    const P = placesAlong(c.id);
+    const keep = p => !st.shabbat || p.t === "view" || p.sat !== "closed";
+    const ff = st.fuelFilter;
+    const fuelOkF = f => (!ff.oct || f.o98 !== false);
+    const sets = { cafe: P.cafes.filter(keep), fuel: P.fuel.filter(keep).filter(fuelOkF), view: P.views };
+    const all = sets.cafe.concat(sets.fuel, sets.view).sort((a, b) => a.km - b.km);
+    const shown = cat === "all" ? all : sets[cat];
+    h += `<div class="seg pcat" role="tablist" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" role="tab" data-pc="${k}" aria-selected="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
+    h += placeStrip(all, r.km);
+    if (cat === "fuel") h += `<div class="row small" style="margin:0"><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק תחנות עם 98</label><span class="muted">אימות רוכבים: לוחצים ״פרטים״</span></div>`;
+    if (st.shabbat) h += `<p class="small muted" style="margin:0">מצב שבת מסתיר מקומות שמסומנים סגורים בשבת. ״לבדוק״ = אין מידע, כדאי להתקשר.</p>`;
+    const lim = st.stopsMore ? 400 : 30;
+    h += shown.length ? `<div class="places">${shown.slice(0, lim).map(placeRow).join("")}</div>` + (shown.length > lim ? `<button type="button" class="btn sm" id="pMore">עוד ${shown.length - lim}</button>` : "") : `<p class="small muted">${cat === "cafe" ? "אין בתי קפה ידועים ליד הפרק. אפשר להציע מקום דרך ״משוב לצוות״ בלשונית כלים." : "לא נמצאו מקומות ליד הפרק."}</p>`;
+    h += `<p class="small muted" style="margin:6px 0 0">בתי קפה ושעות מ־OpenStreetMap ומהמלצות של הצוות. שעות בשבת משתנות; בודקים בבוקר.</p>`;
+    $("p-stops").innerHTML = h; lazyThumbs($("p-stops"));
+    $("shab").onchange = e => { st.shabbat = e.target.checked; LS.set("shabbat", st.shabbat); renderStops(); pushSources(); };
+    $("p-stops").querySelectorAll("[data-pc]").forEach(b => b.onclick = () => { st.stopsCat = b.dataset.pc; st.stopsMore = false; LS.set("stopsCat", st.stopsCat); renderStops(); });
+    if ($("ffOct")) $("ffOct").onchange = e => { st.fuelFilter.oct = e.target.checked; LS.set("fuelFilter", st.fuelFilter); renderStops(); };
+    if ($("pMore")) $("pMore").onclick = () => { st.stopsMore = true; renderStops(); };
+    const fly = (lon, lat) => { map.flyTo({ center: [lon, lat], zoom: 14, padding: sheetPad() }); if (innerWidth < 900) setSheet("peek"); };
+    $("p-stops").querySelectorAll("[data-cf]").forEach(b => b.onclick = () => { const x = allCafes().find(k => k.id === b.dataset.cf); if (x) { fly(x.lon, x.lat); cafePopup(x); } });
+    $("p-stops").querySelectorAll("[data-ll]").forEach(b => b.onclick = () => fly(...b.dataset.ll.split(",").map(Number)));
+    $("p-stops").querySelectorAll("[data-fx]").forEach(x => x.onclick = () => { const n = st.osm.fuel.find(k => k.id === x.dataset.fx); if (!n) return; fly(n.lon, n.lat); openFuelPopup(n); });
   }
 
   /* ---------- fuel: Shabbat hours, 95/98, rider-verified ---------- */
@@ -572,8 +629,8 @@
     return { sat, hours, src, o98, o95, diesel: n.diesel, votes: c ? c.open + c.closed + c.y98 + c.n98 : 0, last: c ? c.last : 0, inferred: oh.inferred };
   }
   const fuelOk = (f, strict) => (strict ? f.sat === "open" : f.sat !== "closed") && (st.bike.fuel === "98" ? (strict ? f.o98 === true : f.o98 !== false) : f.o95 !== false);
-  function fuelAlong(cid_) {
-    const list = nearRoute(st.osm && st.osm.fuel, cid_, 0.35);
+  function fuelAlong(cid_, maxKm = 0.8) {
+    const list = nearRoute(st.osm && st.osm.fuel, cid_, maxKm, "fuel");
     return list.map(n => { const f = fuelStatus(n); return Object.assign({}, n, f, { label: n.name || n.brand || "תחנת דלק", ok: fuelOk(f, true), okLoose: fuelOk(f, false) }); });
   }
   function satPill(f) {
@@ -624,46 +681,140 @@
     }
   }
   function bindFuelButtons(root) { if (root) root.querySelectorAll("[data-fr]").forEach(b => b.onclick = () => { const [id, f, v] = b.dataset.fr.split("|"); postFuel(id, f, v); }); }
-  function fuelSection() {
-    const all = fuelAlong(st.chap); const ff = st.fuelFilter;
-    const list = all.filter(f => (!ff.sat || f.sat !== "closed") && (!ff.oct || f.o98 !== false));
-    let h = `<div><div class="row" style="justify-content:space-between"><h3>דלק לאורך ${esc(chap().title)}</h3></div>
-      <div class="row small" style="margin:6px 0"><label class="toggle"><input type="checkbox" id="ffSat" ${ff.sat ? "checked" : ""}> בלי הסגורות בשבת</label><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק אם יש 98</label></div>
-      <div class="legend" style="margin-bottom:4px;align-items:center"><span class="small">במפה: משאבה בתכלת, והנקודה בפינה היא מצב השבת</span><span><i style="background:var(--go);width:9px;height:9px;border-radius:50%"></i>פתוח</span><span><i style="background:var(--no);width:9px;height:9px;border-radius:50%"></i>סגור</span><span><i style="background:#9AA5B4;width:9px;height:9px;border-radius:50%"></i>לא ידוע</span></div>`;
-    if (!st.osm) h += `<p class="small muted">טוען תחנות מ־OpenStreetMap…</p>`;
-    else if (!list.length) h += `<p class="small muted">אין תחנות שמתאימות לסינון ליד הפרק.</p>`;
-    h += list.map(f => `<div class="item" style="display:block"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div style="min-width:0"><b>${esc(f.label)}</b><span class="small muted mono">ק״מ ${Math.round(f.km)}${f.d > 0.08 ? ` · ${Math.round(f.d * 1000)} מ׳ מהכביש` : ""}</span></div><div class="row" style="flex-wrap:nowrap">${navBtn("w", wazeLL(f.lat, f.lon))}<button type="button" class="btn sm" data-fx="${f.id}">פרטים</button></div></div><div class="chips" style="margin-top:4px">${satPill(f)}${octChips(f)}<span class="small muted">${esc(srcLine(f))}</span></div></div>`).join("");
-    if (st.osm && st.api === false) h += `<p class="small muted">אימות רוכבים יופעל כשהשרת מחובר.</p>`;
-    return h + `</div>`;
+  /* ---------- fuel planner: your bike, your tank, litre by litre along the route ---------- */
+  const STYLES = { calm: [0.95, "רגוע"], normal: [1.08, "רגיל"], brisk: [1.22, "נמרץ"], sport: [1.4, "ספורטיבי"] };
+  const BIKES = (window.BRB && window.BRB.list) || [];
+  const bikeModel = () => BIKES.find(x => x.id === st.bike.id) || null;
+  function bikeEff() {
+    const b = st.bike, m = bikeModel();
+    return { tank: +b.tank || 15, cons: +(b.measured || b.cons) || 5, style: b.measured ? 1 : (STYLES[b.style] || STYLES.normal)[0], name: m ? `${m.brand} ${m.model}` : "אופנוע מותאם אישית", measured: !!b.measured };
   }
-  function bindFuelSection() {
-    const a = $("ffSat"), b = $("ffOct"); if (!a) return;
-    a.onchange = () => { st.fuelFilter.sat = a.checked; LS.set("fuelFilter", st.fuelFilter); renderStops(); };
-    b.onchange = () => { st.fuelFilter.oct = b.checked; LS.set("fuelFilter", st.fuelFilter); renderStops(); };
-    document.querySelectorAll("#p-stops [data-fx]").forEach(x => x.onclick = () => { const n = st.osm.fuel.find(k => k.id === x.dataset.fx); if (!n) return; map.flyTo({ center: [n.lon, n.lat], zoom: 14, padding: sheetPad() }); openFuelPopup(n); if (innerWidth < 900) setSheet("peek"); });
+  const simCache = new Map();
+  function fuelSimFor(cid) {
+    const r = st.routes[cid]; if (!r) return null; const be = bikeEff();
+    const stations = st.osm ? fuelAlong(cid, 0.8) : [];
+    const key = [cid, r.km.toFixed(2), JSON.stringify(be), st.bike.start, st.bike.fuel, st.osm ? st.osm.ts : 0, st.crowdTs || 0, !!st.elev[cid], (st.curves[cid] || []).length].join("|");
+    if (simCache.has(key)) return simCache.get(key);
+    const sim = L.fuelSim({ totalKm: r.km, segs: st.curves[cid] || [], elev: st.elev[cid], tank: be.tank, cons: be.cons, style: be.style, startPct: st.bike.start / 100, stations });
+    sim.stations = stations; sim.tank = be.tank; sim.total = r.km; sim.be = be;
+    if (simCache.size > 20) simCache.clear(); simCache.set(key, sim);
+    st.bike.range = Math.round(sim.rangeFull); return sim;
+  }
+  const fuelColor = (l, tank) => `hsl(${L.fuelHue(l / tank)} 72% 46%)`;
+  /* The gauge: the whole route as a bar coloured by what's in the tank at each kilometre. */
+  function fuelGauge(sim, meKm) {
+    const W = 360, x0 = 10, x1 = W - 10, T = sim.total, X = km => x0 + (Math.max(0, Math.min(T, km)) / T) * (x1 - x0);
+    const N = 90; let bars = "";
+    for (let i = 0; i < N; i++) { const a = T * i / N, b = T * (i + 1) / N, l = sim.levelAt((a + b) / 2); bars += `<rect x="${X(a).toFixed(1)}" y="30" width="${(X(b) - X(a) + 0.6).toFixed(1)}" height="14" fill="${fuelColor(l, sim.tank)}"/>`; }
+    const ticks = sim.stations.map(s => `<path d="M${X(s.km).toFixed(1)} 26l-3.2 -5h6.4z" fill="${s.ok ? "var(--go)" : "var(--muted)"}" opacity="${s.ok ? 1 : 0.55}"/>`).join("");
+    const ref = sim.refuels.map((s, i) => `<g><line x1="${X(s.km).toFixed(1)}" x2="${X(s.km).toFixed(1)}" y1="18" y2="48" stroke="var(--ink)" stroke-width="1.6"/><circle cx="${X(s.km).toFixed(1)}" cy="13" r="7" fill="var(--fuel)" stroke="var(--bg)" stroke-width="1.5"/><text x="${X(s.km).toFixed(1)}" y="16.5" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle">${i + 1}</text></g>`).join("");
+    const low = sim.lowAtKm != null ? `<g><line x1="${X(sim.lowAtKm).toFixed(1)}" x2="${X(sim.lowAtKm).toFixed(1)}" y1="28" y2="50" stroke="var(--no)" stroke-width="2" stroke-dasharray="2 2"/><text x="${X(sim.lowAtKm).toFixed(1)}" y="60" font-size="10" fill="var(--no)" text-anchor="middle">${sim.emptyAtKm != null ? "נגמר" : "נורית"} · ק״מ ${Math.round(sim.lowAtKm)}</text></g>` : "";
+    const me = meKm != null ? `<g><path d="M${X(meKm).toFixed(1)} 47l-5 8h10z" fill="var(--accent)" stroke="var(--bg)" stroke-width="1.2"/></g>` : "";
+    return `<svg class="fgauge" direction="ltr" viewBox="0 0 ${W} 66" role="img" aria-label="מצב המיכל לאורך המסלול">${bars}<rect x="${x0}" y="30" width="${x1 - x0}" height="14" fill="none" stroke="var(--line)" rx="2"/>${ticks}${ref}${low}${me}
+      ${sim.lowAtKm == null ? `<text x="${x0}" y="60" font-size="10" fill="var(--muted)">0</text><text x="${x1}" y="60" font-size="10" fill="var(--muted)" text-anchor="end">${Math.round(T)} ק״מ</text>` : ""}</svg>`;
+  }
+  function bikeOptions() {
+    const cur = st.bike.id;
+    return `<option value="">בחירת אופנוע…</option>` + (window.BRB ? window.BRB.brands.map(br => `<optgroup label="${esc(br)}">${BIKES.filter(x => x.brand === br).map(x => `<option value="${x.id}" ${x.id === cur ? "selected" : ""}>${esc(x.model)} · ${x.tank} ל׳</option>`).join("")}</optgroup>`).join("") : "") + `<option value="custom" ${cur === "custom" ? "selected" : ""}>אחר: הזנה ידנית</option>`;
   }
   function fuelPlanCard() {
-    const r = st.routes[st.chap]; const b = st.bike;
-    let h = `<div class="card"><div class="row" style="justify-content:space-between"><h3>תוכנית דלק לשבת</h3><span class="small muted">מתחילים עם מיכל מלא</span></div>
-      <div class="row small"><label for="bkRange">טווח מיכל מלא</label><input id="bkRange" class="btn sm mono" type="number" inputmode="numeric" min="80" max="600" step="10" value="${b.range}" style="width:84px"> ק״מ
-      <label for="bkFuel" style="margin-inline-start:8px">דלק</label><select id="bkFuel" class="btn sm"><option value="95">95</option><option value="98">98</option></select></div>`;
-    if (!r || !st.osm) return h + `<p class="small muted" style="margin:0">מחשב…</p></div>`;
-    const st8 = fuelAlong(st.chap); const total = r.km;
-    const strict = L.fuelPlan(st8, total, b.range);
-    if (!strict.plan.length && !strict.gap) h += `<p style="margin:0"><b style="color:var(--go)">אין צורך לתדלק בדרך.</b> <span class="muted">${Math.round(total)} ק״מ, בתוך הטווח עם רזרבה.</span></p>`;
-    else {
-      h += strict.plan.map(s => `<div class="item"><div><b>תדלוק: ${esc(s.label)}</b><span class="small muted mono">ק״מ ${Math.round(s.km)} · ${s.hours ? "שבת " + esc(s.hours) : "פתוח בשבת"}${s.o98 ? " · 98" : ""}</span></div>${navBtn("w", wazeLL(s.lat, s.lon))}</div>`).join("");
-      if (strict.gap) {
-        const loose = L.fuelPlan(st8.map(s => Object.assign({}, s, { ok: s.okLoose })), total, b.range);
-        h += `<div class="alert">${strict.gap.noMore ? `מק״מ ${strict.gap.from} אין עוד תחנה מאומתת שפתוחה בשבת${b.fuel === "98" ? " עם 98" : ""}.` : `בין ק״מ ${strict.gap.from} לק״מ ${strict.gap.to} אין תחנה מאומתת פתוחה בשבת${b.fuel === "98" ? " עם 98" : ""}.`} ${loose.gap ? "גם בלי אימות אין כיסוי. כדאי לתדלק לפני היציאה." : `אפשרות: ${esc(loose.plan.map(s => s.label + " (ק״מ " + Math.round(s.km) + ")").join(", "))}, בלי אימות לשבת.`}</div>`;
-      }
-    }
+    const r = st.routes[st.chap], b = st.bike, be = bikeEff();
+    let h = `<div class="card fuelplan" id="fuelPlan"><div class="row" style="justify-content:space-between"><h3>תוכנית דלק</h3><span class="small muted">${esc(be.name)} · ${be.tank} ל׳ · ${(+be.cons).toFixed(1)} ל׳/100${be.measured ? " (מכויל)" : ""}</span></div>
+      <label class="f small"><span class="muted">האופנוע</span><select id="bkModel" class="btn">${bikeOptions()}</select></label>
+      <div class="seg fstyle" role="radiogroup" aria-label="סגנון רכיבה">${Object.entries(STYLES).map(([k, [, t]]) => `<button type="button" role="radio" data-st="${k}" aria-checked="${b.style === k && !b.measured}">${t}</button>`).join("")}</div>
+      <div class="row small" style="gap:10px"><label for="bkStart">מיכל ביציאה</label><input id="bkStart" type="range" min="10" max="100" step="5" value="${b.start}" style="flex:1;min-width:120px"><b class="mono" id="bkStartV">${b.start}%</b><label for="bkFuel">דלק</label><select id="bkFuel" class="btn sm"><option value="95">95</option><option value="98">98</option></select></div>
+      <details class="small"><summary class="muted">התאמה ידנית וכיול מתדלוק אמיתי</summary><div class="row" style="margin-top:6px;gap:8px"><label>מיכל <input id="bkTank" class="btn sm mono" type="number" inputmode="decimal" min="5" max="40" step="0.1" value="${b.tank}" style="width:70px"> ל׳</label><label>צריכה <input id="bkCons" class="btn sm mono" type="number" inputmode="decimal" min="1.5" max="12" step="0.1" value="${b.cons}" style="width:70px"> ל׳/100</label></div>
+        <div class="row" style="margin-top:6px;gap:8px"><span class="muted">בתדלוק האחרון:</span><label><input id="calKm" class="btn sm mono" type="number" inputmode="decimal" min="10" max="900" placeholder="ק״מ" style="width:70px"> ק״מ</label><label><input id="calL" class="btn sm mono" type="number" inputmode="decimal" min="1" max="40" step="0.1" placeholder="ליטר" style="width:70px"> ליטר</label><button type="button" class="btn sm" id="calGo">כיול</button>${b.measured ? `<button type="button" class="btn sm" id="calClr">ביטול כיול (${b.measured} ל׳/100)</button>` : ""}</div>
+        <p class="muted" style="margin:6px 0 0">הצריכה היא נתון היצרן. סגנון הרכיבה מוסיף עליה, והמסלול מוסיף לפי עיקולים וטיפוס. כיול מתדלוק אמיתי הוא המדויק מכולם.</p></details>`;
+    if (!r) return h + `<p class="small muted" style="margin:0">מחשב…</p></div>`;
+    const sim = fuelSimFor(st.chap);
+    const pct = l => Math.round(Math.max(0, l) / sim.tank * 100);
+    h += fuelGauge(sim, st.fuelMeKm != null && st.fuelMeChap === st.chap ? st.fuelMeKm : null);
+    h += `<div class="fsum"><div><span class="k">צריכה צפויה</span><b class="mono">${sim.burn.toFixed(1)} ל׳</b></div><div><span class="k">ממוצע במסלול</span><b class="mono">${sim.avgL100.toFixed(1)}</b><span class="k">ל׳/100</span></div><div><span class="k">טווח מלא עד הנורית</span><b class="mono">${Math.round(sim.rangeFull)}</b><span class="k">ק״מ</span></div><div><span class="k">בסוף</span><b class="mono" style="color:${fuelColor(sim.endLiters, sim.tank)}">${pct(sim.endLiters)}%</b></div></div>`;
+    if (!st.osm) h += `<p class="small muted" style="margin:0">טוען תחנות…</p>`;
+    else if (sim.emptyAtKm != null) h += `<div class="alert">אין תחנה מתאימה בזמן: המיכל מתרוקן בערך בק״מ ${Math.round(sim.emptyAtKm)}. ${st.bike.start < 100 ? "צאו עם מיכל מלא, או " : ""}תדלקו לפני היציאה${sim.refuels.length ? " והקפידו על התדלוקים המסומנים" : ""}.</div>`;
+    else if (!sim.refuels.length) h += `<p style="margin:0"><b style="color:var(--go)">אין צורך לתדלק בדרך.</b> <span class="muted">מסיימים עם כ־${Math.max(0, sim.endLiters).toFixed(1)} ל׳${sim.lowAtKm != null ? `, הנורית נדלקת בערך בק״מ ${Math.round(sim.lowAtKm)}` : ""}.</span></p>`;
+    if (sim.refuels.length) h += sim.refuels.map((s, i) => `<div class="item"><div style="min-width:0"><b>${i + 1}. תדלוק: ${esc(s.label)}</b><span class="small muted mono">ק״מ ${Math.round(s.km)} · מגיעים עם ${pct(s.before)}% · נכנסים כ־${s.liters.toFixed(1)} ל׳${s.hours ? " · שבת " + esc(s.hours) : ""}${s.o98 ? " · 98" : ""}</span></div>${navBtn("w", wazeLL(s.lat, s.lon))}</div>`).join("");
+    if (st.osm && sim.stations.filter(x => x.ok).length === 0) h += `<p class="small muted" style="margin:0">אין תחנה מאומתת כפתוחה בשבת${st.bike.fuel === "98" ? " עם 98" : ""} עד 800 מ׳ מהמסלול. התוכנית מניחה שלא מתדלקים בדרך.</p>`;
+    h += `<div class="row"><button type="button" class="btn primary" id="fuelNear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>התחנה הקרובה לפי הדלק שנשאר</button><label class="toggle small"><input type="checkbox" id="fuelLineT" ${st.layers.fuelline ? "checked" : ""}> צביעת המסלול במפה</label></div><div id="fuelLive"></div>`;
+    h += `<div class="legend"><span><i style="background:hsl(140 72% 46%)"></i>מלא</span><span><i style="background:hsl(70 72% 46%)"></i>חצי</span><span><i style="background:hsl(25 72% 46%)"></i>רבע</span><span><i style="background:hsl(0 72% 46%)"></i>ריק</span><span><svg width="10" height="8"><path d="M5 8 0 0h10z" fill="var(--go)"/></svg> תחנה פתוחה בשבת</span></div>`;
     return h + `</div>`;
   }
   function bindFuelPlan() {
-    const rg = $("bkRange"), fu = $("bkFuel"); if (!rg) return; fu.value = st.bike.fuel;
-    const save = () => { st.bike.range = Math.max(80, Math.min(600, +rg.value || 220)); st.bike.fuel = fu.value; LS.set("bike", st.bike); renderRoute(); };
-    rg.onchange = save; fu.onchange = save;
+    const box = $("fuelPlan"); if (!box) return;
+    const save = () => { LS.set("bike", st.bike); renderRoute(); pushSources(); };
+    $("bkFuel").value = st.bike.fuel;
+    $("bkModel").onchange = e => { const v = e.target.value; if (v === "custom") st.bike.id = "custom"; else { const m = BIKES.find(x => x.id === v); if (!m) return; st.bike.id = m.id; st.bike.tank = m.tank; st.bike.cons = m.cons; st.bike.measured = null; } save(); };
+    box.querySelectorAll("[data-st]").forEach(b => b.onclick = () => { st.bike.style = b.dataset.st; st.bike.measured = null; save(); });
+    const sv = $("bkStart"); sv.oninput = () => { $("bkStartV").textContent = sv.value + "%"; }; sv.onchange = () => { st.bike.start = +sv.value; save(); };
+    $("bkFuel").onchange = e => { st.bike.fuel = e.target.value; save(); };
+    $("bkTank").onchange = e => { st.bike.tank = Math.max(5, Math.min(40, +e.target.value || 15)); st.bike.id = "custom"; save(); };
+    $("bkCons").onchange = e => { st.bike.cons = Math.max(1.5, Math.min(12, +e.target.value || 5)); st.bike.id = "custom"; st.bike.measured = null; save(); };
+    $("calGo").onclick = () => { const km = +$("calKm").value, l = +$("calL").value; if (!(km >= 20 && l >= 1)) return toast("מזינים כמה ק״מ נסעתם ובכמה ליטר מילאתם"); const m = Math.round(l / km * 1000) / 10; if (m < 1.5 || m > 15) return toast("המספרים לא נראים הגיוניים. בודקים שוב"); st.bike.measured = m; toast(`מכויל: ${m} ל׳/100 ק״מ`); save(); };
+    if ($("calClr")) $("calClr").onclick = () => { st.bike.measured = null; save(); };
+    $("fuelLineT").onchange = e => { st.layers.fuelline = e.target.checked; LS.set("layers", st.layers); paintFuelLine(); applyLayerVis(); };
+    $("fuelNear").onclick = fuelNearMe;
+    if (st.fuelLiveHtml && st.fuelLiveChap === st.chap) { $("fuelLive").innerHTML = st.fuelLiveHtml; bindFuelLive(); }
+  }
+  /* The same colours on the map, along the route line itself. */
+  function paintFuelLine() {
+    if (!styleReady || !map.getLayer("br-fuelline")) return;
+    const r = st.routes[st.chap]; if (!st.layers.fuelline || !r) { setSrc("br-fuelline", FC()); return; }
+    const sim = fuelSimFor(st.chap); if (!sim) return;
+    setSrc("br-fuelline", FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: r.coords } }]));
+    const stops = []; for (let i = 0; i <= 60; i++) { const p = i / 60; stops.push(p, fuelColor(sim.levelAt(p * sim.total), sim.tank)); }
+    map.setPaintProperty("br-fuelline", "line-gradient", ["interpolate", ["linear"], ["line-progress"], ...stops]);
+  }
+  /* Where am I, how much is left, and which station can I still reach? */
+  const shabbatNow = () => { const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jerusalem", weekday: "short", hour: "numeric", hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value])); return p.weekday === "Sat" || (p.weekday === "Fri" && +p.hour >= 15); };
+  function getPos() {
+    if (st.me && st.meTs && Date.now() - st.meTs < 90e3) return Promise.resolve([st.me.lon, st.me.lat]);
+    return new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error("no geo")); navigator.geolocation.getCurrentPosition(p => { st.me = { lat: p.coords.latitude, lon: p.coords.longitude }; st.meTs = Date.now(); res([p.coords.longitude, p.coords.latitude]); }, rej, { enableHighAccuracy: true, timeout: 9000, maximumAge: 30000 }); });
+  }
+  function fuelRideState() {
+    const today = new Date().toISOString().slice(0, 10); let f = st.fuelRide;
+    if (!f || f.date !== today || f.chap !== st.chap) f = st.fuelRide = { date: today, chap: st.chap, refills: [] };
+    return f;
+  }
+  async function fuelNearMe() {
+    const out = $("fuelLive"); if (!out) return; out.innerHTML = `<p class="small muted">מאתר את המיקום שלך…</p>`;
+    let me; try { me = await getPos(); } catch (e) { out.innerHTML = `<div class="alert">אין גישה למיקום. מאשרים מיקום לאתר בהגדרות הדפדפן ומנסים שוב.</div>`; return; }
+    const r = st.routes[st.chap], sim = fuelSimFor(st.chap); if (!r || !sim) return;
+    let bi = 0, bd = 1e9; for (let i = 0; i < r.coords.length; i++) { const d = L.hav(r.coords[i], me); if (d < bd) { bd = d; bi = i; } }
+    const cum = r.cum || (r.cum = L.cumulative(r.coords)); const myKm = cum[bi], onRoute = bd < 2;
+    const fr = fuelRideState(), be = bikeEff(), P = sim.profile, startL = sim.tank * st.bike.start / 100, rate = sim.burn / sim.total;
+    const left = onRoute ? L.fuelLeftAt(P, myKm, startL, sim.tank, fr.refills) : null;
+    const sat = shabbatNow();
+    const usable = f => (sat ? f.sat !== "closed" : true) && (st.bike.fuel === "98" ? f.o98 !== false : f.o95 !== false);
+    const all = (st.osm ? st.osm.fuel : []).map(n => Object.assign({}, n, fuelStatus(n), { label: n.name || n.brand || "תחנת דלק", dist: L.hav(me, [n.lon, n.lat]) }));
+    let cands;
+    if (onRoute) cands = fuelAlong(st.chap, 1.5).filter(f => f.km > myKm - 0.2 && usable(f)).map(f => { const need = P.at(f.km) - P.at(Math.min(myKm, f.km)) + f.d * 2 * rate; return Object.assign(f, { need, arrive: left - need, ahead: f.km - myKm }); });
+    else cands = all.filter(usable).sort((a, b) => a.dist - b.dist).slice(0, 12).map(f => Object.assign(f, { need: f.dist * 1.35 * rate, ahead: f.dist * 1.35 }));
+    const liters = left != null ? left : null;
+    const reach = cands.filter(f => liters == null || f.arrive > 0.3).sort((a, b) => (a.ahead || 0) - (b.ahead || 0));
+    /* the pick: on the route, the last reachable station before the reserve (or the next one if already low); off the route, the nearest */
+    let pick = null;
+    if (onRoute && liters != null) { const beforeLow = reach.filter(f => f.arrive >= sim.reserve); pick = liters - sim.reserve < 4 * rate * 10 ? reach[0] : (beforeLow[beforeLow.length - 1] || reach[0]); }
+    else pick = reach[0] || null;
+    st.fuelMeKm = onRoute ? myKm : null; st.fuelMeChap = st.chap;
+    const pct = l => Math.round(Math.max(0, l) / sim.tank * 100);
+    let h = `<div class="flive">`;
+    if (onRoute) h += `<div class="ftank" style="--f:${pct(liters)}%;--fc:${fuelColor(liters, sim.tank)}"><div class="fbar"><i></i></div><div><b class="mono">${pct(liters)}%</b> <span class="muted">כ־${Math.max(0, liters).toFixed(1)} ל׳ · עוד כ־${Math.max(0, Math.round((liters - sim.reserve) / rate))} ק״מ עד הנורית</span></div></div><p class="small muted" style="margin:0">ק״מ ${Math.round(myKm)} במסלול, לפי מיכל של ${st.bike.start}% ביציאה${fr.refills.length ? ` ותדלוק בק״מ ${fr.refills.map(Math.round).join(", ")}` : ""}.</p>`;
+    else h += `<p class="small" style="margin:0">את/ה ${bd.toFixed(1)} ק״מ מהמסלול. מוצגות התחנות הקרובות אלייך${sat ? " שלא ידוע שהן סגורות בשבת" : ""}.</p>`;
+    if (!pick) h += `<div class="alert">${onRoute ? "אין תחנה מתאימה שאפשר להגיע אליה לפי החישוב. מורידים קצב, והכי קרוב: " + (all.sort((a, b) => a.dist - b.dist)[0] ? esc(all[0].label) + ` (${all[0].dist.toFixed(1)} ק״מ באוויר)` : "לא ידוע") : "לא נמצאה תחנה קרובה."}</div>`;
+    else h += `<div class="fpick"><div class="k">${onRoute ? (pick === reach[0] ? "התחנה הבאה שאפשר להגיע אליה" : "תדלוק מומלץ לפני הנורית") : "הכי קרובה"}</div><b>${esc(pick.label)}</b><span class="small muted mono">${onRoute ? `${pick.ahead < 0.3 ? "ממש כאן" : `בעוד ${pick.ahead.toFixed(1)} ק״מ`} · מגיעים עם ${pct(pick.arrive)}%` : `${pick.dist.toFixed(1)} ק״מ באוויר`}</span><div class="chips">${satPill(pick)}${octChips(pick)}</div><div class="row">${navBtn("w", wazeLL(pick.lat, pick.lon))}${navBtn("g", gmLL(pick.lat, pick.lon))}<button type="button" class="btn sm" data-fx="${pick.id}">במפה</button></div></div>`;
+    const alt = reach.filter(f => f !== pick).slice(0, 3);
+    if (alt.length) h += `<div class="small muted">גם בדרך: ${alt.map(f => `${esc(f.label)} (${onRoute ? "בעוד " + Math.max(0, f.ahead).toFixed(1) : f.dist.toFixed(1)} ק״מ)`).join(" · ")}</div>`;
+    if (onRoute) h += `<div class="row"><button type="button" class="btn sm" id="fRefill">תדלקתי כאן, מיכל מלא</button>${fr.refills.length ? `<button type="button" class="btn sm" id="fRefillClr">איפוס תדלוקים</button>` : ""}</div>`;
+    h += `</div>`;
+    st.fuelLiveHtml = h; st.fuelLiveChap = st.chap;
+    renderRoute(); const fp = $("fuelPlan"); if (fp) fp.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function bindFuelLive() {
+    const root = $("fuelLive"); if (!root) return;
+    root.querySelectorAll("[data-fx]").forEach(x => x.onclick = () => { const n = st.osm.fuel.find(k => k.id === x.dataset.fx); if (!n) return; map.flyTo({ center: [n.lon, n.lat], zoom: 14, padding: sheetPad() }); openFuelPopup(n); if (innerWidth < 900) setSheet("peek"); });
+    if ($("fRefill")) $("fRefill").onclick = () => { const fr = fuelRideState(); if (st.fuelMeKm != null) fr.refills.push(st.fuelMeKm); LS.set("fuelRide", st.fuelRide); toast("נרשם: מיכל מלא מכאן"); fuelNearMe(); };
+    if ($("fRefillClr")) $("fRefillClr").onclick = () => { fuelRideState().refills = []; LS.set("fuelRide", st.fuelRide); fuelNearMe(); };
   }
 
   /* ---------- push notifications ---------- */
@@ -1288,8 +1439,16 @@
     for (const c of cams) { const d = L.hav(me, [c.lon, c.lat]); if (d < 0.7 && (head == null || L.angDiff(head, L.bearing(me, [c.lon, c.lat])) < 50)) { msg = `מצלמה בעוד ${Math.round(d * 1000)} מ׳`; cls = "cam"; const id = c.id || `${c.lat},${c.lon}`; if (!R.alerted.has(id)) { R.alerted.add(id); say("מצלמת מהירות"); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) { } } break; } }
     if (!msg) for (const h of st.hazards) { const d = L.hav(me, [h.lon, h.lat]); if (d < 1.2 && (head == null || d < 0.15 || L.angDiff(head, L.bearing(me, [h.lon, h.lat])) < 60)) { msg = `${h.text} · בעוד ${Math.round(d * 1000)} מ׳`; cls = "cam"; if (!R.alerted.has("h" + h.id)) { R.alerted.add("h" + h.id); say("זהירות. " + h.text); try { navigator.vibrate && navigator.vibrate([250, 100, 250]); } catch (e) { } } break; } }
     if (!msg && tmsg) { msg = tmsg; cls = "terr"; }
-    const left = st.bike.range - R.odo;
-    if (!msg && left < 60) { const nxt = fuelAlong(st.chap).find(f => f.km > myKm && f.ok); msg = nxt ? `דלק: נשארו כ־${Math.max(0, Math.round(left))} ק״מ. ${nxt.label} בעוד ${(nxt.km - myKm).toFixed(1)} ק״מ` : `דלק: נשארו כ־${Math.max(0, Math.round(left))} ק״מ`; cls = "cam"; if (!R.lowWarned) { R.lowWarned = true; say("דלק נמוך"); try { navigator.vibrate && navigator.vibrate([400]); } catch (e) { } } }
+    /* fuel: the same model as the planner — on the planned line by kilometre, after a reroute by odometer */
+    const sim = fuelSimFor(st.chap);
+    if (sim) {
+      const fr = fuelRideState(), startL = sim.tank * st.bike.start / 100, rate = sim.burn / sim.total;
+      const onPlan = G.coords === st.routes[R.c.id].coords;
+      const litres = onPlan ? L.fuelLeftAt(sim.profile, myKm, startL, sim.tank, fr.refills) : startL - R.odo * rate;
+      const toLow = Math.max(0, (litres - sim.reserve) / rate), pct = Math.max(0, Math.round(litres / sim.tank * 100));
+      const hf = $("hudFuel"); hf.hidden = false; hf.style.setProperty("--f", pct + "%"); hf.style.setProperty("--fc", fuelColor(litres, sim.tank)); $("hudFuelT").textContent = `${pct}% · ${Math.round(toLow)} ק״מ`;
+      if (!msg && toLow < 30) { const sat = shabbatNow(); const nxt = fuelAlong(st.chap, 1.5).find(f => f.km > myKm - 0.3 && (!sat || f.sat !== "closed")); const far = nxt && nxt.km - myKm > litres / rate; msg = nxt ? `דלק: עוד כ־${Math.round(toLow)} ק״מ עד הנורית. ${nxt.label} ${nxt.km - myKm < 0.3 ? "ממש כאן" : `בעוד ${(nxt.km - myKm).toFixed(1)} ק״מ`}${far ? " (מעבר לטווח)" : ""}` : `דלק: עוד כ־${Math.round(toLow)} ק״מ עד הנורית`; cls = "cam"; if (!R.lowWarned) { R.lowWarned = true; say(nxt ? `דלק נמוך. תחנה בעוד ${distSpeak(nxt.km - myKm)}` : "דלק נמוך"); try { navigator.vibrate && navigator.vibrate([400]); } catch (e) { } } }
+    }
     if (near.d > 0.25 && (spd == null || spd > 4)) { R.off++; if (R.off >= 3) reroute(me); } else R.off = 0;
     if (!msg && near.d > 0.25) msg = `מחוץ למסלול, ${near.d.toFixed(1)} ק״מ`;
     if (!msg) { const seg = (st.curves[st.chap] || []).find(s => s.cls >= 2 && s.startKm > myKm && s.startKm - myKm < 1.6); if (seg && G.coords === st.routes[R.c.id].coords) { msg = `${L.CURVE_LABEL[seg.cls]} בעוד ${(seg.startKm - myKm).toFixed(1)} ק״מ`; cls = "curve"; } }
@@ -1378,10 +1537,18 @@
     $("fFly").hidden = !st.flags.fly;
   }
   renderNotice();
-  fetch("/api/content", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(ct => {
-    if (!ct || (st.content && ct.v === st.content.v && ct.updated === st.content.updated && JSON.stringify(ct.hazards) === JSON.stringify(st.content.hazards))) return;
-    LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
-  }).catch(() => { });
+  /* admin content: on open, whenever the app comes back to the screen, and every 5 minutes while open */
+  let contentAt = 0;
+  function syncContent() {
+    contentAt = Date.now();
+    fetch("/api/content?t=" + Math.floor(Date.now() / 5000), { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(ct => {
+      if (!ct || (st.content && JSON.stringify(ct) === JSON.stringify(st.content))) return;
+      LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
+    }).catch(() => { });
+  }
+  syncContent();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - contentAt > 20000) syncContent(); });
+  setInterval(() => { if (document.visibilityState === "visible") syncContent(); }, 5 * 6e4);
   try { const d = new Date().toISOString().slice(0, 10); if (LS.get("pingDay", "") !== d) { LS.set("pingDay", d); fetch("/api/ping", { method: "POST", keepalive: true }).catch(() => { }); } } catch (e) { }
   fetch("/api/config").then(r => r.ok ? r.json() : {}).then(cfg => { Object.assign(st.cfg, cfg); if (styleReady) addTrafficLayer(); if (st.tab === "route") { loadTraffic(st.chap); renderRoute(); } }).catch(() => { });
   importShared();

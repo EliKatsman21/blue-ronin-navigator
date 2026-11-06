@@ -197,6 +197,34 @@ body.riding .annc,body.flying .annc{display:none}
 .stat .k{font-size:11.5px;color:var(--muted)}
 .stat .v{font-family:var(--mono);font-size:16px}
 .curvebar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:3px}
+.seg button{flex:1;border:0;background:none;border-radius:8px;padding:7px 6px;font:inherit;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.seg button[aria-selected="true"],.seg button[aria-checked="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button .mono{font-weight:500;opacity:.8;font-size:11.5px}
+.pcat{margin:2px 0}
+.pstrip{width:100%;height:auto;display:block}
+.places .item{align-items:center}
+.place b{display:inline}
+.place .small{display:block}
+.pic{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.pic svg{width:17px;height:17px}
+.fuelplan #bkModel{width:100%;text-align:start}
+.fuelplan label.f{display:grid;gap:3px}
+.fstyle{display:grid;grid-template-columns:repeat(4,1fr)}
+.fgauge{width:100%;height:auto;display:block;margin-top:2px}
+.fsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;text-align:center}
+.fsum>div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 4px;display:grid;gap:0}
+.fsum .k{font-size:11px;color:var(--muted)}
+.fsum b{font-size:17px}
+@media (max-width:380px){.fsum{grid-template-columns:repeat(2,1fr)}}
+.flive{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.ftank{display:grid;gap:4px}
+.fbar{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.fbar i{display:block;height:100%;width:var(--f);background:var(--fc);border-radius:5px;transition:width .6s}
+.fpick{background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid var(--go);border-radius:10px;padding:10px;display:grid;gap:4px}
+.fpick .k{font-size:12px;color:var(--muted);font-weight:700}
+.hfuel{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:14px;font-weight:700}
+.hfuel svg{width:20px;height:20px;color:var(--muted)}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-inline-end:4px}
 .profile{width:100%;height:120px;display:block;direction:ltr}
@@ -456,6 +484,7 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
     <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div></div>
   </div>
+  <div class="hfuel" id="hudFuel" hidden aria-label="דלק במיכל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg><div class="fbar"><i></i></div><span id="hudFuelT" class="mono">--</span></div>
   <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
 </div>
 
@@ -465,6 +494,7 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
 <script src="geo.js"></script>
 <script src="data.js"></script>
+<script src="bikes.js"></script>
 <script src="logic.js"></script>
 <script src="app.js"></script>
 </body>

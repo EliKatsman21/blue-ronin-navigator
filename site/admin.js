@@ -133,7 +133,7 @@
         <div class="bars" role="img" aria-label="פתיחות יומיות ב־30 הימים האחרונים">${vals.map((v, i) => `<i class="${i === 29 ? "today" : ""}" style="height:${Math.max(2, v / mx * 100)}%" title="${last[i]}: ${v}"></i>`).join("")}</div>
         <div class="row small muted" style="justify-content:space-between"><span>${last[0].slice(5)}</span><span>היום</span></div></div>
       <div class="grid2">
-        <div class="card"><h3>מה הרוכבים רואים עכשיו</h3>
+        <div class="card"><h3>מה הרוכבים רואים עכשיו</h3><div id="pubState" class="small muted">בודק את מה שמוגש לאפליקציה…</div>
           ${c.maintenance.on ? `<div class="note alert">מצב תחזוקה פעיל: ${esc(c.maintenance.text || "ללא טקסט")}</div>` : ""}
           ${c.announce.on ? `<div class="note ${c.announce.level}">${esc(c.announce.text)}${c.announce.until ? ` <span class="muted small">עד ${esc(c.announce.until)}</span>` : ""}</div>` : `<div class="small muted">אין הודעה פעילה.</div>`}
           <div class="small">פרקים מוסתרים: <b>${Object.values(c.chapters).filter(x => x.hidden).length}</b> · התראות פרק: <b>${Object.values(c.chapters).filter(x => x.alert).length}</b> · מפגעים: <b>${c.hazards.length}</b> · הערות שנערכו: <b>${Object.keys(c.notes).length}</b></div>
@@ -141,6 +141,8 @@
         <div class="card"><h3>אבטחה</h3><div class="small">כניסה אחרונה: <b>${fmt(st.lastLogin)}</b></div><div class="small">סיסמה הוחלפה: <b>${fmt(st.pwChanged)}</b></div><div class="small muted">סיסמה + קוד מאפליקציית אימות, ניסיונות כושלים נחסמים לרבע שעה, וכל פעולה נרשמת ביומן.</div><div class="row"><button type="button" class="btn sm" data-go="system">יומן ואבטחה</button></div></div>
       </div>`);
     $("views").querySelectorAll("[data-go]").forEach(b => b.onclick = () => show(b.dataset.go));
+    fetch("/api/content?t=" + Date.now(), { cache: "no-store" }).then(r => r.json()).then(p => { const el = $("pubState"); if (!el) return; const a = S.content.announce;
+      el.innerHTML = p.v !== S.content.v ? `<span style="color:var(--caution)">האפליקציה עדיין מקבלת גרסה ${p.v}. רעננו בעוד כמה שניות.</span>` : a.on && !p.announce.on ? `<span style="color:var(--no)">ההודעה פעילה אבל לא מוצגת: תאריך הסיום (${esc(a.until)}) כבר עבר.</span>` : `<span style="color:var(--go)">מוגש לרוכבים: גרסה ${p.v}${p.announce.on ? ", כולל ההודעה" : ""}.</span>`; }).catch(() => { });
   }
 
   /* ---------- notices: announcement, maintenance, push ---------- */
@@ -225,12 +227,16 @@
     V(`<div class="head"><h2>תיבת דיווחים</h2></div><p class="small muted">כל מה שרוכבים שולחים מהאפליקציה. שום דבר מכאן לא מוצג לרוכבים אחרים עד שמאשרים.</p><div class="list"><div class="small muted">טוען…</div></div>`);
     try { S.feedback = (await api("GET", "feedback")).items; } catch (e) { return; }
     const items = S.feedback.filter(x => filter === "all" || (filter === "active" ? x.status !== "done" : x.status === filter));
-    const el = V(`<div class="head"><h2>תיבת דיווחים</h2><div class="row"><select id="fF"><option value="active">פתוחים</option><option value="new">חדשים</option><option value="done">טופלו</option><option value="all">הכול</option></select></div></div>
+    const el = V(`<div class="head"><h2>תיבת דיווחים</h2><div class="row"><button type="button" class="btn sm danger" id="fPurge" hidden></button><select id="fF"><option value="active">פתוחים</option><option value="new">חדשים</option><option value="done">טופלו</option><option value="all">הכול</option></select></div></div>
       <div class="list">${items.length ? items.map(x => `<div class="item"><div class="meta"><span class="tag ${x.kind}">${KIND[x.kind] || x.kind}</span><span class="tag ${x.status === "new" ? "new" : ""}">${STAT[x.status]}</span><span>${fmt(x.t)}</span>${x.chap ? `<span>פרק ${esc(x.chap)}</span>` : ""}${x.ver ? `<span class="mono">v${esc(x.ver)}</span>` : ""}</div>
         <div style="white-space:pre-wrap">${esc(x.text)}</div>${x.lat ? `<div class="meta"><a class="mono" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lon}">${x.lat}, ${x.lon}</a></div>` : ""}
-        <div class="row">${x.status !== "open" ? `<button type="button" class="btn sm" data-s="${x.id}|open">בטיפול</button>` : ""}${x.status !== "done" ? `<button type="button" class="btn sm" data-s="${x.id}|done">טופל</button>` : ""}${x.lat ? `<button type="button" class="btn sm" data-pub="${x.id}">פרסום כמפגע ל־48 ש׳</button>` : ""}<button type="button" class="btn sm danger" data-s="${x.id}|delete">מחיקה</button></div></div>`).join("") : '<div class="card small muted">אין כאן כלום. שקט בכביש.</div>'}</div>`);
+        <div class="row">${x.status !== "open" ? `<button type="button" class="btn sm" data-s="${x.id}|open">בטיפול</button>` : ""}${x.status !== "done" ? `<button type="button" class="btn sm" data-s="${x.id}|done">טופל</button>` : ""}${x.lat ? `<button type="button" class="btn sm" data-pub="${x.id}">פרסום כמפגע ל־48 ש׳</button>` : ""}<button type="button" class="btn sm danger" data-del="${x.id}">מחיקה</button></div><div class="row delask" data-ask="${x.id}" hidden><b class="small" style="color:var(--no)">למחוק לצמיתות?</b><button type="button" class="btn sm danger" data-s="${x.id}|delete">כן, למחוק</button><button type="button" class="btn sm" data-no="${x.id}">ביטול</button></div></div>`).join("") : '<div class="card small muted">אין כאן כלום. שקט בכביש.</div>'}</div>`);
     $("fF").value = filter; $("fF").onchange = e => inbox(e.target.value);
-    el.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => { const [id, s] = b.dataset.s.split("|"); if (s === "delete" && !confirmInline(b, "למחוק?")) return; try { await api("POST", "feedback/status", { id, status: s }); S.stats = await api("GET", "stats"); renderNav(); inbox(filter); } catch (e) { toast(e.message); } });
+    const doneN = S.feedback.filter(x => x.status === "done").length;
+    if ($("fPurge")) { $("fPurge").hidden = !doneN; $("fPurge").textContent = `מחיקת ${doneN} שטופלו`; $("fPurge").onclick = async () => { if (!confirmInline($("fPurge"), `בטוח? ${doneN} פריטים יימחקו`)) return; try { const r = await api("POST", "feedback/purge"); toast(`נמחקו ${r.removed}`); S.stats = await api("GET", "stats"); renderNav(); inbox(filter); } catch (e) { toast(e.message); } }; }
+    el.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { const a = el.querySelector(`[data-ask="${b.dataset.del}"]`); a.hidden = false; b.hidden = true; });
+    el.querySelectorAll("[data-no]").forEach(b => b.onclick = () => { el.querySelector(`[data-ask="${b.dataset.no}"]`).hidden = true; el.querySelector(`[data-del="${b.dataset.no}"]`).hidden = false; });
+    el.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => { const [id, s] = b.dataset.s.split("|"); b.disabled = true; try { await api("POST", "feedback/status", { id, status: s }); if (s === "delete") toast("נמחק"); S.stats = await api("GET", "stats"); renderNav(); inbox(filter); } catch (e) { b.disabled = false; toast(e.message); } });
     el.querySelectorAll("[data-pub]").forEach(b => b.onclick = async () => {
       const x = S.feedback.find(f => f.id === b.dataset.pub); S.draft.hazards.push({ id: "fb" + x.id.slice(0, 8), lat: x.lat, lon: x.lon, text: x.text.slice(0, 140), kind: /חצץ|שמן/.test(x.text) ? "gravel" : /סגור|חסימה/.test(x.text) ? "closure" : /עבודות/.test(x.text) ? "works" : /ניידת|מצלמה|לייזר|ממל/.test(x.text) ? "police" : "info", until: addDays(2) });
       syncSave(); try { await api("POST", "feedback/status", { id: x.id, status: "done" }); } catch (e) { } toast("נוסף לטיוטת המפגעים. לחצו ׳פרסום׳ למטה."); inbox(filter);
@@ -249,7 +255,7 @@
 
   /* ---------- system: feature switches, security, audit ---------- */
   const FLAGS = { fly: ["מעוף ציפור", "כפתור המעוף והאנימציה"], builder: ["בניית מסלול אישי", "יצירה, שמירה ושיתוף של מסלולים"], fuelVotes: ["אימות רוכבים בתחנות", "כפתורי פתוח בשבת / יש 98"], photos: ["תמונות מקומות", "Mapillary ו־Wikimedia בחלונות"], feedback: ["דיווח מהאפליקציה", "טופס התקלות והרעיונות בלשונית כלים"] };
-  const ACT = { login: "כניסה", setup: "הקמה", reset: "שחזור", content: "פרסום תוכן", broadcast: "שידור התראה", password: "החלפת סיסמה", "logout-all": "ניתוק כל ההתחברויות", "fuel-reset": "איפוס תחנה", feedback: "טיפול בדיווח", "fail:login": "כניסה נכשלה", "fail:setup": "הקמה נכשלה", "fail:setup-totp": "קוד אימות שגוי בהקמה", "fail:password": "החלפת סיסמה נכשלה" };
+  const ACT = { login: "כניסה", setup: "הקמה", reset: "שחזור", content: "פרסום תוכן", broadcast: "שידור התראה", password: "החלפת סיסמה", "logout-all": "ניתוק כל ההתחברויות", "fuel-reset": "איפוס תחנה", feedback: "טיפול בדיווח", "feedback-purge": "ניקוי דיווחים שטופלו", "fail:login": "כניסה נכשלה", "fail:setup": "הקמה נכשלה", "fail:setup-totp": "קוד אימות שגוי בהקמה", "fail:password": "החלפת סיסמה נכשלה" };
   async function system() {
     const D = S.draft;
     const el = V(`<div class="head"><h2>מערכת</h2></div>

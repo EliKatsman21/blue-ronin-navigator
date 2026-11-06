@@ -200,6 +200,58 @@
     return { plan, gap: null };
   }
 
+  /* Fuel along a route, litre by litre.
+     Burn per km = the bike's published consumption x riding style x a road factor (straights are ridden
+     faster, tight curves on lower gears with more throttle work), plus the energy to lift bike and rider:
+     about 0.03 L per 100 m of net climb (m·g·h for ~280 kg at ~25% engine efficiency). Descents give
+     nothing back. The planner then walks the route: at each station that suits the ride it refuels only
+     if it can't reach the next suitable station (or the end) above the reserve. */
+  const ROAD_F = [1.04, 1.0, 1.1, 1.18];
+  function burnProfile({ totalKm, segs = [], elev = null, cons, style = 1.08, step = 0.25 }) {
+    const n = Math.max(2, Math.ceil(totalKm / step) + 1), per = new Float64Array(n), cum = new Float64Array(n);
+    let si = 0;
+    const elAt = km => { if (!elev || !elev.el || !elev.el.length) return null; const f = Math.max(0, Math.min(1, km / (elev.km || totalKm))) * (elev.el.length - 1); const i = Math.floor(f), t = f - i; return elev.el[i] + ((elev.el[Math.min(i + 1, elev.el.length - 1)] - elev.el[i]) * t); };
+    let prevEl = elAt(0);
+    for (let i = 1; i < n; i++) {
+      const km = Math.min(totalKm, i * step), mid = km - step / 2, d = km - Math.min(totalKm, (i - 1) * step);
+      while (si < segs.length - 1 && segs[si].startKm + segs[si].km < mid) si++;
+      const cls = segs[si] && segs[si].startKm <= mid ? segs[si].cls : 1;
+      let l = d * cons / 100 * style * ROAD_F[cls] ;
+      const e = elAt(km); if (e != null && prevEl != null && e > prevEl) l += (e - prevEl) * 0.0003; prevEl = e;
+      per[i] = l; cum[i] = cum[i - 1] + l;
+    }
+    const at = km => { const f = Math.max(0, Math.min(n - 1, km / step)), i = Math.floor(f); return i >= n - 1 ? cum[n - 1] : cum[i] + (cum[i + 1] - cum[i]) * (f - i); };
+    return { step, n, cum, at, total: cum[n - 1] };
+  }
+  function fuelSim({ totalKm, segs, elev, tank, cons, style = 1.08, startPct = 1, stations = [], reservePct = 0.15, minReserve = 2.5 }) {
+    const P = burnProfile({ totalKm, segs, elev, cons, style });
+    const reserve = Math.min(tank * 0.4, Math.max(minReserve, tank * reservePct));
+    const ok = stations.filter(s => s.ok && s.km > 0.3 && s.km < totalKm - 0.3).sort((a, b) => a.km - b.km);
+    const refuels = []; let fuel = tank * Math.max(0.05, Math.min(1, startPct)), pos = 0;
+    const lvl = []; // [km, litres] break points for drawing
+    lvl.push([0, fuel]);
+    for (let k = 0; k <= ok.length; k++) {
+      const s = ok[k], nextKm = s ? s.km : totalKm;
+      fuel -= P.at(nextKm) - P.at(pos); pos = nextKm; lvl.push([pos, fuel]);
+      if (!s) break;
+      const nxt = ok[k + 1], needTo = nxt ? nxt.km : totalKm, need = P.at(needTo) - P.at(pos);
+      if (fuel - need < reserve && fuel < tank - 0.5) { refuels.push(Object.assign({ before: fuel, liters: tank - fuel }, s)); fuel = tank; lvl.push([pos, fuel]); }
+    }
+    /* where the level first hits the reserve / runs dry (between break points, burn is monotonic) */
+    const levelAt = km => { let base = lvl[0][1], from = 0; for (const [k, l] of lvl) { if (k > km) break; base = l; from = k; } return base - (P.at(km) - P.at(from)); };
+    let lowAtKm = null, emptyAtKm = null; let minL = Infinity;
+    for (let km = 0; km <= totalKm; km += 0.5) { const l = levelAt(km); minL = Math.min(minL, l); if (lowAtKm == null && l < reserve) lowAtKm = km; if (emptyAtKm == null && l <= 0) { emptyAtKm = km; break; } }
+    const avgPerKm = P.total / Math.max(0.1, totalKm);
+    return { profile: P, reserve, refuels, lowAtKm, emptyAtKm, endLiters: levelAt(totalKm), minLiters: minL, levelAt, burn: P.total, avgL100: avgPerKm * 100, rangeFull: (tank - reserve) / avgPerKm, rangeDry: tank / avgPerKm };
+  }
+  /* Litres left at a given km for a rider who left with startL and refilled to full at the given kms. */
+  function fuelLeftAt(P, km, startL, tank, refillKms = []) {
+    let from = 0, base = startL; refillKms.filter(k => k <= km).sort((a, b) => a - b).forEach(k => { from = k; base = tank; });
+    return base - (P.at(km) - P.at(from));
+  }
+  /* Colour for a fuel fraction: green full → amber half → red near empty (HSL hue 140 → 0). */
+  const fuelHue = f => Math.round(Math.max(0, Math.min(1, f)) ** 0.85 * 140);
+
   /* Route difficulty, 0-100 and five levels, from what the road actually does:
      curve density, climbing per km, steepest sampled grade, length, and a per-chapter road factor
      (narrow, no shoulders, traffic) set in the ride book. Elevation is optional. */
@@ -297,5 +349,5 @@
     return { pts: sm, head, step: st, km: L, n };
   }
 
-  g.BRL = { inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  g.BRL = { burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.1.0";
+  const APP_VER = "2.2.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -76,7 +76,7 @@
   const customChapter = u => ({ id: u.id, title: u.title, short: u.title, custom: true, region: "custom", tech: 0.5, opts: u.opts || {}, sub: u.sub || "מסלול שבניתי", note: "", stops: u.stops.map((p, i, a) => ({ id: u.id + "_" + i, name: p.name, lat: p.lat, lon: p.lon, kind: i === 0 ? "start" : i === a.length - 1 ? "view" : "road", note: p.note || "", roads: [] })) });
   st.myRoutes.forEach(u => CHAPTERS.push(customChapter(u)));
   /* ---------- admin-managed layer (read-only for riders; edited in /admin.html) ---------- */
-  st.flags = { fly: true, builder: true, fuelVotes: true, photos: true, feedback: true }; st.hazards = []; st.content = null;
+  st.flags = { fly: true, builder: true, fuelVotes: true, photos: true, feedback: true, move: false }; st.hazards = []; st.content = null;
   CHAPTERS.slice(0, BUILT_IN).forEach(c => c.stops.forEach(s => { if (s._note0 === undefined) s._note0 = s.note; }));
   function applyContent(ct) {
     if (!ct || typeof ct !== "object") return; st.content = ct;
@@ -164,6 +164,7 @@
     fly: ["רוצים לראות את כל הדרך?", "המעוף המלא עובר על כל הפרק, עיקול אחרי עיקול, לפני שיוצאים."],
     routes: ["עוד מסלול משלך", `בחינם שומרים עד ${FREE_ROUTES} מסלולים. עם Pro בונים כמה שרוצים, ומשתפים כל אחד בקישור.`],
     journal: ["היומן המלא שלך", "כל הרכיבות שהקלטת שמורות במכשיר. Pro פותח את כולן, עם סטטיסטיקה מצטברת וייצוא GPX."],
+    fuel: ["תוכנית הדלק המלאה", "איפה בדיוק לתדלק ובכמה ליטר, מד מיכל לאורך כל הפרק, סגנון רכיבה, כיול מתדלוק אמיתי וצביעת המסלול במפה לפי הדלק שנשאר."],
     gpx: ["ייצוא הרכיבה", "קובץ GPX של המסלול שרכבת בפועל, ל־Strava, ל־OsmAnd או לארכיון שלך."],
     default: ["Blue Ronin Pro", "כלים לרוכב שיוצא כל שבת: תובנות לכל פרק, יומן רכיבות, מעוף מלא ומסלולים בלי הגבלה."]
   };
@@ -179,6 +180,7 @@
     const [h, sub] = PW[reason] || PW.default, pl = personalLine(), used = st.pro && st.pro.trialUsed;
     const f = [
       ["spark", "תובנות לכל פרק", "חלון היציאה הטוב לפי התחזית, קטעים טכניים, טיפוסים וסנוור, בקילומטר המדויק"],
+      ["fuel", "תוכנית דלק מלאה", "תחנות התדלוק בדיוק, מד מיכל לאורך הפרק, סגנון רכיבה וכיול לפי האופנוע שלך"],
       ["book", "יומן רכיבות מלא", "כל רכיבה: ק״מ, זמן תנועה, ממוצע ודלק משוער. סיכום חודשי ו־GPX"],
       ["play", "מעוף ציפור מלא", "כל הפרק במצלמת רדיפה, עם טעינה מראש"],
       ["route", "מסלולים בלי הגבלה", "בונים, שומרים ומשתפים כמה שרוצים"],
@@ -191,7 +193,7 @@
       <div class="pwplans"><button type="button" class="plan best" data-plan="yearly"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly"><b>₪14.90</b><span>לחודש</span></button></div>
       <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום.</p>
       <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
-      <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, מצב רכיבה עם הנחיות קוליות, מצלמות ומפגעים, התראות שטחים, תוכנית דלק ואיתור תחנה, מפות אופליין. בטיחות לא נמכרת.</div>
+      <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, מצב רכיבה עם הנחיות קוליות, התראות עיקולים חדים, מצלמות ומפגעים, התראות שטחים, התשובה אם הדלק מספיק, איתור התחנה הקרובה לפי הדלק שנשאר ונורית דלק במצב רכיבה, מפות אופליין. בטיחות לא נמכרת.</div>
       <div class="err small" id="pwErr"></div></div>`, "pwmodal");
     const err = m => { $("pwErr").textContent = m; };
     if ($("pwTrial")) $("pwTrial").onclick = async () => { $("pwTrial").disabled = true; try { setPro(await proPost("trial", { cid })); closeModal(); toast("Pro פעיל ל־7 ימים. רכיבה טובה!"); if (reason === "fly" && st.fly) { st.fly.cap = Infinity; } } catch (e) { err(e.message); $("pwTrial").disabled = false; if (/נוצלה/.test(e.message)) { st.pro = Object.assign(st.pro || {}, { trialUsed: true }); LS.set("pro", st.pro); $("pwTrial").hidden = true; } } };
@@ -203,6 +205,7 @@
     book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>',
     play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg>',
     route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',
+    fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5A1.5 1.5 0 0 1 17 11v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg>',
     star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
     share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
@@ -315,6 +318,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.2.0", d: "2026-11-07", items: ["מצב רכיבה: ההנחיות הקוליות עובדות מהלחיצה הראשונה", "מצב רכיבה: הכרזה בהגעה לכל עצירה, ק״מ שנותרו ושעת הגעה, אזהרה קולית לפני עיקול חד ותזכורת לפני השקיעה", "אפשר להזיז את המפה בזמן רכיבה ולחזור למעקב בלחיצה", "תוכנית הדלק המלאה עברה ל־Pro. התשובה אם הדלק מספיק, האזהרה על מיכל ריק והתחנה הקרובה נשארים בחינם לכולם", "כשיוצא עדכון, רואים את זה על המסך", "מעבר לכתובת הקבועה blueronin.app עם כל הנתונים"] },
     { v: "2.1.0", d: "2026-11-06", items: ["Blue Ronin Pro: תובנות לכל פרק, יומן רכיבות מלא ו־7 ימי ניסיון", "יומן רכיבות: כל רכיבה נשמרת אוטומטית", "כרטיס ״השבת שלי״ לשיתוף בוואטסאפ", "מרכז הודעות עם היסטוריה", "מצפורים נפתחים עם תמונות, ומיון לפי המרחק ממך"] },
     { v: "2.0.0", d: "2026-11-05", items: ["עצירות, קפה ודלק לאורך הפרק שבחרת", "תוכנית דלק לפי דגם האופנוע, מד מיכל צבעוני ואיתור תחנה", "מעוף ציפור חלק עם טעינה מראש", "פרק 6 על כביש 90 בלבד"] }
   ];
@@ -977,49 +981,58 @@
     return `<option value="">בחירת אופנוע…</option>` + (window.BRB ? window.BRB.brands.map(br => `<optgroup label="${esc(br)}">${BIKES.filter(x => x.brand === br).map(x => `<option value="${x.id}" ${x.id === cur ? "selected" : ""}>${esc(x.model)} · ${x.tank} ל׳</option>`).join("")}</optgroup>`).join("") : "") + `<option value="custom" ${cur === "custom" ? "selected" : ""}>אחר: הזנה ידנית</option>`;
   }
   function fuelPlanCard() {
-    const r = st.routes[st.chap], b = st.bike, be = bikeEff();
-    let h = `<div class="card fuelplan" id="fuelPlan"><div class="row" style="justify-content:space-between"><h3>תוכנית דלק</h3><span class="small muted">${esc(be.name)} · ${be.tank} ל׳ · ${(+be.cons).toFixed(1)} ל׳/100${be.measured ? " (מכויל)" : ""}</span></div>
-      <label class="f small"><span class="muted">האופנוע</span><select id="bkModel" class="btn">${bikeOptions()}</select></label>
-      <div class="seg fstyle" role="radiogroup" aria-label="סגנון רכיבה">${Object.entries(STYLES).map(([k, [, t]]) => `<button type="button" role="radio" data-st="${k}" aria-checked="${b.style === k && !b.measured}">${t}</button>`).join("")}</div>
-      <div class="row small" style="gap:10px"><label for="bkStart">מיכל ביציאה</label><input id="bkStart" type="range" min="10" max="100" step="5" value="${b.start}" style="flex:1;min-width:120px"><b class="mono" id="bkStartV">${b.start}%</b><label for="bkFuel">דלק</label><select id="bkFuel" class="btn sm"><option value="95">95</option><option value="98">98</option></select></div>
-      <details class="small"><summary class="muted">התאמה ידנית וכיול מתדלוק אמיתי</summary><div class="row" style="margin-top:6px;gap:8px"><label>מיכל <input id="bkTank" class="btn sm mono" type="number" inputmode="decimal" min="5" max="40" step="0.1" value="${b.tank}" style="width:70px"> ל׳</label><label>צריכה <input id="bkCons" class="btn sm mono" type="number" inputmode="decimal" min="1.5" max="12" step="0.1" value="${b.cons}" style="width:70px"> ל׳/100</label></div>
+    const r = st.routes[st.chap], b = st.bike, be = bikeEff(), pro = isPro();
+    const styleSeg = `<div class="seg fstyle" role="radiogroup" aria-label="סגנון רכיבה">${Object.entries(STYLES).map(([k, [, t]]) => `<button type="button" role="radio" data-st="${k}" aria-checked="${b.style === k && !b.measured}">${t}</button>`).join("")}</div>`;
+    const calib = `<details class="small"><summary class="muted">התאמה ידנית וכיול מתדלוק אמיתי</summary><div class="row" style="margin-top:6px;gap:8px"><label>מיכל <input id="bkTank" class="btn sm mono" type="number" inputmode="decimal" min="5" max="40" step="0.1" value="${b.tank}" style="width:70px"> ל׳</label><label>צריכה <input id="bkCons" class="btn sm mono" type="number" inputmode="decimal" min="1.5" max="12" step="0.1" value="${b.cons}" style="width:70px"> ל׳/100</label></div>
         <div class="row" style="margin-top:6px;gap:8px"><span class="muted">בתדלוק האחרון:</span><label><input id="calKm" class="btn sm mono" type="number" inputmode="decimal" min="10" max="900" placeholder="ק״מ" style="width:70px"> ק״מ</label><label><input id="calL" class="btn sm mono" type="number" inputmode="decimal" min="1" max="40" step="0.1" placeholder="ליטר" style="width:70px"> ליטר</label><button type="button" class="btn sm" id="calGo">כיול</button>${b.measured ? `<button type="button" class="btn sm" id="calClr">ביטול כיול (${b.measured} ל׳/100)</button>` : ""}</div>
         <p class="muted" style="margin:6px 0 0">הצריכה היא נתון היצרן. סגנון הרכיבה מוסיף עליה, והמסלול מוסיף לפי עיקולים וטיפוס. כיול מתדלוק אמיתי הוא המדויק מכולם.</p></details>`;
+    let h = `<div class="card fuelplan" id="fuelPlan"><div class="row" style="justify-content:space-between"><h3>תוכנית דלק</h3><span class="small muted">${esc(be.name)} · ${be.tank} ל׳ · ${(+be.cons).toFixed(1)} ל׳/100${be.measured ? " (מכויל)" : ""}</span></div>
+      <label class="f small"><span class="muted">האופנוע</span><select id="bkModel" class="btn">${bikeOptions()}</select></label>
+      <div class="row small" style="gap:10px"><label for="bkStart">מיכל ביציאה</label><input id="bkStart" type="range" min="10" max="100" step="5" value="${b.start}" style="flex:1;min-width:120px"><b class="mono" id="bkStartV">${b.start}%</b><label for="bkFuel">דלק</label><select id="bkFuel" class="btn sm"><option value="95">95</option><option value="98">98</option></select></div>`;
+    if (pro) h += styleSeg + calib;
     if (!r) return h + `<p class="small muted" style="margin:0">מחשב…</p></div>`;
     const sim = fuelSimFor(st.chap);
     const pct = l => Math.round(Math.max(0, l) / sim.tank * 100);
-    h += fuelGauge(sim, st.fuelMeKm != null && st.fuelMeChap === st.chap ? st.fuelMeKm : null);
-    h += `<div class="fsum"><div><span class="k">צריכה צפויה</span><b class="mono">${sim.burn.toFixed(1)} ל׳</b></div><div><span class="k">ממוצע במסלול</span><b class="mono">${sim.avgL100.toFixed(1)}</b><span class="k">ל׳/100</span></div><div><span class="k">טווח מלא עד הנורית</span><b class="mono">${Math.round(sim.rangeFull)}</b><span class="k">ק״מ</span></div><div><span class="k">בסוף</span><b class="mono" style="color:${fuelColor(sim.endLiters, sim.tank)}">${pct(sim.endLiters)}%</b></div></div>`;
-    if (!st.osm) h += `<p class="small muted" style="margin:0">טוען תחנות…</p>`;
-    else if (sim.emptyAtKm != null) h += `<div class="alert">אין תחנה מתאימה בזמן: המיכל מתרוקן בערך בק״מ ${Math.round(sim.emptyAtKm)}. ${st.bike.start < 100 ? "צאו עם מיכל מלא, או " : ""}תדלקו לפני היציאה${sim.refuels.length ? " והקפידו על התדלוקים המסומנים" : ""}.</div>`;
-    else if (!sim.refuels.length) h += `<p style="margin:0"><b style="color:var(--go)">אין צורך לתדלק בדרך.</b> <span class="muted">מסיימים עם כ־${Math.max(0, sim.endLiters).toFixed(1)} ל׳${sim.lowAtKm != null ? `, הנורית נדלקת בערך בק״מ ${Math.round(sim.lowAtKm)}` : ""}.</span></p>`;
-    if (sim.refuels.length) h += sim.refuels.map((s, i) => `<div class="item"><div style="min-width:0"><b>${i + 1}. תדלוק: ${esc(s.label)}</b><span class="small muted mono">ק״מ ${Math.round(s.km)} · מגיעים עם ${pct(s.before)}% · נכנסים כ־${s.liters.toFixed(1)} ל׳${s.hours ? " · שבת " + esc(s.hours) : ""}${s.o98 ? " · 98" : ""}</span></div>${navBtn("w", wazeLL(s.lat, s.lon))}</div>`).join("");
-    if (st.osm && sim.stations.filter(x => x.ok).length === 0) h += `<p class="small muted" style="margin:0">אין תחנה מאומתת כפתוחה בשבת${st.bike.fuel === "98" ? " עם 98" : ""} עד 800 מ׳ מהמסלול. התוכנית מניחה שלא מתדלקים בדרך.</p>`;
-    h += `<div class="row"><button type="button" class="btn primary" id="fuelNear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>התחנה הקרובה לפי הדלק שנשאר</button><label class="toggle small"><input type="checkbox" id="fuelLineT" ${st.layers.fuelline ? "checked" : ""}> צביעת המסלול במפה</label></div><div id="fuelLive"></div>`;
-    h += `<div class="legend"><span><i style="background:hsl(140 72% 46%)"></i>מלא</span><span><i style="background:hsl(70 72% 46%)"></i>חצי</span><span><i style="background:hsl(25 72% 46%)"></i>רבע</span><span><i style="background:hsl(0 72% 46%)"></i>ריק</span><span><svg width="10" height="8"><path d="M5 8 0 0h10z" fill="var(--go)"/></svg> תחנה פתוחה בשבת</span></div>`;
+    const mk = v => pro ? v : String(v).replace(/[0-9]/g, "•");
+    /* the answer that matters for safety is free for everyone: enough fuel, or not */
+    let verdict = "";
+    if (!st.osm) verdict = `<p class="small muted" style="margin:0">טוען תחנות…</p>`;
+    else if (sim.emptyAtKm != null) verdict = `<div class="alert">אין תחנה מתאימה בזמן: המיכל מתרוקן בערך בק״מ ${Math.round(sim.emptyAtKm)}. ${st.bike.start < 100 ? "צאו עם מיכל מלא, או " : ""}תדלקו לפני היציאה${sim.refuels.length ? " והקפידו על התדלוקים המסומנים" : ""}.</div>`;
+    else if (!sim.refuels.length) verdict = `<p style="margin:0"><b style="color:var(--go)">אין צורך לתדלק בדרך.</b> <span class="muted">${pro ? `מסיימים עם כ־${Math.max(0, sim.endLiters).toFixed(1)} ל׳${sim.lowAtKm != null ? `, הנורית נדלקת בערך בק״מ ${Math.round(sim.lowAtKm)}` : ""}.` : "לפי הדגם, מצב המיכל ביציאה והמסלול."}</span></p>`;
+    else verdict = `<p style="margin:0"><b style="color:var(--caution)">${sim.refuels.length === 1 ? "צריך לתדלק פעם אחת בדרך." : `צריך לתדלק ${sim.refuels.length} פעמים בדרך.`}</b>${pro ? "" : ` <span class="muted">איפה בדיוק ובכמה ליטר, בתוכנית המלאה.</span>`}</p>`;
+    const detail = fuelGauge(sim, st.fuelMeKm != null && st.fuelMeChap === st.chap ? st.fuelMeKm : null)
+      + `<div class="fsum"><div><span class="k">צריכה צפויה</span><b class="mono">${mk(sim.burn.toFixed(1))} ל׳</b></div><div><span class="k">ממוצע במסלול</span><b class="mono">${mk(sim.avgL100.toFixed(1))}</b><span class="k">ל׳/100</span></div><div><span class="k">טווח מלא עד הנורית</span><b class="mono">${mk(Math.round(sim.rangeFull))}</b><span class="k">ק״מ</span></div><div><span class="k">בסוף</span><b class="mono" style="color:${fuelColor(sim.endLiters, sim.tank)}">${mk(pct(sim.endLiters))}%</b></div></div>`
+      + (sim.refuels.length ? sim.refuels.map((x, i) => `<div class="item"><div style="min-width:0"><b>${i + 1}. תדלוק: ${pro ? esc(x.label) : "••••••"}</b><span class="small muted mono">ק״מ ${mk(Math.round(x.km))} · מגיעים עם ${mk(pct(x.before))}% · נכנסים כ־${mk(x.liters.toFixed(1))} ל׳</span></div>${pro ? navBtn("w", wazeLL(x.lat, x.lon)) : ""}</div>`).join("") : "");
+    h += pro ? detail + verdict : verdict + `<div class="lockwrap"><div class="blur" aria-hidden="true" inert>${detail}</div><button type="button" class="btn primary lockbtn" id="fuelOpen">${PWI.lock}תוכנית הדלק המלאה</button></div>`;
+    if (pro && st.osm && sim.stations.filter(x => x.ok).length === 0) h += `<p class="small muted" style="margin:0">אין תחנה מאומתת כפתוחה בשבת${st.bike.fuel === "98" ? " עם 98" : ""} עד 800 מ׳ מהמסלול. התוכנית מניחה שלא מתדלקים בדרך.</p>`;
+    h += `<div class="row"><button type="button" class="btn primary" id="fuelNear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>התחנה הקרובה לפי הדלק שנשאר</button>${pro ? `<label class="toggle small"><input type="checkbox" id="fuelLineT" ${st.layers.fuelline ? "checked" : ""}> צביעת המסלול במפה</label>` : ""}</div><div id="fuelLive"></div>`;
+    if (pro) h += `<div class="legend"><span><i style="background:hsl(140 72% 46%)"></i>מלא</span><span><i style="background:hsl(70 72% 46%)"></i>חצי</span><span><i style="background:hsl(25 72% 46%)"></i>רבע</span><span><i style="background:hsl(0 72% 46%)"></i>ריק</span><span><svg width="10" height="8"><path d="M5 8 0 0h10z" fill="var(--go)"/></svg> תחנה פתוחה בשבת</span></div>`;
     return h + `</div>`;
   }
+
   function bindFuelPlan() {
     const box = $("fuelPlan"); if (!box) return;
+    const on = (id, f) => { const e = $(id); if (e) f(e); };
+    if ($("fuelOpen")) $("fuelOpen").onclick = () => openPaywall("fuel");
     const save = () => { LS.set("bike", st.bike); renderRoute(); pushSources(); };
     $("bkFuel").value = st.bike.fuel;
     $("bkModel").onchange = e => { const v = e.target.value; if (v === "custom") st.bike.id = "custom"; else { const m = BIKES.find(x => x.id === v); if (!m) return; st.bike.id = m.id; st.bike.tank = m.tank; st.bike.cons = m.cons; st.bike.measured = null; } save(); };
     box.querySelectorAll("[data-st]").forEach(b => b.onclick = () => { st.bike.style = b.dataset.st; st.bike.measured = null; save(); });
     const sv = $("bkStart"); sv.oninput = () => { $("bkStartV").textContent = sv.value + "%"; }; sv.onchange = () => { st.bike.start = +sv.value; save(); };
     $("bkFuel").onchange = e => { st.bike.fuel = e.target.value; save(); };
-    $("bkTank").onchange = e => { st.bike.tank = Math.max(5, Math.min(40, +e.target.value || 15)); st.bike.id = "custom"; save(); };
-    $("bkCons").onchange = e => { st.bike.cons = Math.max(1.5, Math.min(12, +e.target.value || 5)); st.bike.id = "custom"; st.bike.measured = null; save(); };
-    $("calGo").onclick = () => { const km = +$("calKm").value, l = +$("calL").value; if (!(km >= 20 && l >= 1)) return toast("מזינים כמה ק״מ נסעתם ובכמה ליטר מילאתם"); const m = Math.round(l / km * 1000) / 10; if (m < 1.5 || m > 15) return toast("המספרים לא נראים הגיוניים. בודקים שוב"); st.bike.measured = m; toast(`מכויל: ${m} ל׳/100 ק״מ`); save(); };
+    on("bkTank", x => x.onchange = e => { st.bike.tank = Math.max(5, Math.min(40, +e.target.value || 15)); st.bike.id = "custom"; save(); });
+    on("bkCons", x => x.onchange = e => { st.bike.cons = Math.max(1.5, Math.min(12, +e.target.value || 5)); st.bike.id = "custom"; st.bike.measured = null; save(); });
+    if ($("calGo")) $("calGo").onclick = () => { const km = +$("calKm").value, l = +$("calL").value; if (!(km >= 20 && l >= 1)) return toast("מזינים כמה ק״מ נסעתם ובכמה ליטר מילאתם"); const m = Math.round(l / km * 1000) / 10; if (m < 1.5 || m > 15) return toast("המספרים לא נראים הגיוניים. בודקים שוב"); st.bike.measured = m; toast(`מכויל: ${m} ל׳/100 ק״מ`); save(); };
     if ($("calClr")) $("calClr").onclick = () => { st.bike.measured = null; save(); };
-    if (!$("fuelLineT")) return; /* route still loading: the rest of the card isn't drawn yet */
-    $("fuelLineT").onchange = e => { st.layers.fuelline = e.target.checked; LS.set("layers", st.layers); paintFuelLine(); applyLayerVis(); };
+    if (!$("fuelNear")) return; /* route still loading: the rest of the card isn't drawn yet */
+    if ($("fuelLineT")) $("fuelLineT").onchange = e => { st.layers.fuelline = e.target.checked; LS.set("layers", st.layers); paintFuelLine(); applyLayerVis(); };
     $("fuelNear").onclick = fuelNearMe;
     if (st.fuelLiveHtml && st.fuelLiveChap === st.chap) { $("fuelLive").innerHTML = st.fuelLiveHtml; bindFuelLive(); }
   }
   /* The same colours on the map, along the route line itself. */
   function paintFuelLine() {
     if (!styleReady || !map.getLayer("br-fuelline")) return;
-    const r = st.routes[st.chap]; if (!st.layers.fuelline || !r) { setSrc("br-fuelline", FC()); return; }
+    const r = st.routes[st.chap]; if (!st.layers.fuelline || !r || !isPro()) { setSrc("br-fuelline", FC()); return; }
     const sim = fuelSimFor(st.chap); if (!sim) return;
     setSrc("br-fuelline", FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: r.coords } }]));
     const stops = []; for (let i = 0; i <= 60; i++) { const p = i / 60; stops.push(p, fuelColor(sim.levelAt(p * sim.total), sim.tank)); }
@@ -1352,9 +1365,16 @@
   let heVoice = null;
   const pickVoice = () => { try { heVoice = speechSynthesis.getVoices().find(v => /^he|iw/i.test(v.lang)) || null; } catch (e) { } };
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  /* Phones only let a page talk once a tap has started speech, so the first sentence must be spoken inside
+     the tap itself (startRide does that before any await). Chrome also drops an utterance queued in the same
+     tick as cancel(), and pauses the engine after long silence: both handled here. */
   function say(text) {
     if (!st.voice || !("speechSynthesis" in window)) return;
-    try { const u = new SpeechSynthesisUtterance(text); u.lang = "he-IL"; if (heVoice) u.voice = heVoice; u.rate = 1.02; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { }
+    try {
+      const S = speechSynthesis; if (!heVoice) pickVoice(); if (S.paused) S.resume();
+      const u = new SpeechSynthesisUtterance(text); u.lang = "he-IL"; if (heVoice) u.voice = heVoice; u.rate = 1.02;
+      if (S.speaking || S.pending) { S.cancel(); setTimeout(() => S.speak(u), 90); } else S.speak(u);
+    } catch (e) { }
   }
   const distTxt = km => km >= 1 ? `${km.toFixed(km >= 10 ? 0 : 1)} ק״מ` : `${Math.max(10, Math.round(km * 1000 / 10) * 10)} מ׳`;
   const distSpeak = km => km >= 1 ? `${km >= 10 ? Math.round(km) : km.toFixed(1)} קילומטר` : `${Math.round(km * 1000 / 50) * 50} מטר`;
@@ -1380,13 +1400,13 @@
     ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button><span class="small muted" id="fbRes"></span></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
-    <div class="small muted">מפה: OpenFreeMap ו־OpenStreetMap (ODbL) · מזג אוויר וגבהים: Open-Meteo (CC BY 4.0) · מכ״ם: RainViewer · ניתוב: OSRM · תבליט: Mapzen/AWS · שקיעה וזריחה: SunCalc. בתי קפה: טיולי, mako, מעריב. אכיפה: וואלה (2012), ynetnews (2026).</div>
-    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <a href="admin.html" rel="nofollow">כניסת מנהל</a> · גרסה ${APP_VER}</div>`;
+    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
     $("p-tools").innerHTML = h;
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
     if ($("fbGo")) $("fbGo").onclick = sendFeedback;
     $("proMore").onclick = () => openPaywall(); bindJournal();
+    $("creditsGo").onclick = () => openModal(`<h2>מקורות המידע</h2><p class="small" style="margin:0">מפה: OpenFreeMap ו־© OpenStreetMap contributors (ODbL). מזג אוויר וגבהים: Open-Meteo (CC BY 4.0). מכ״ם: RainViewer. ניתוב: OSRM. תבליט: Mapzen/AWS Terrain Tiles. שקיעה וזריחה: SunCalc. תמונות: Mapillary ו־Wikimedia Commons, עם קרדיט לכל צילום. בתי קפה מומלצים: טיולי, mako, מעריב. אכיפה: וואלה (2012), ynetnews (2026).</p>`);
     $("icsGo").onclick = ics; $("shareGo").onclick = share; $("repGo").onclick = report; renderPush();
     $("themeSel").value = st.theme; $("themeSel").onchange = e => { st.theme = e.target.value; LS.set("theme", st.theme); applyTheme(); const want = isDark() ? "dark" : "liberty"; if (want !== styleName) { styleName = want; styleReady = false; map.setStyle(OFM + styleName, { diff: false }); } };
     $("introSnd").onchange = e => { LS.set("introSound", e.target.checked); toast(e.target.checked ? "הצליל יתנגן בפתיחה הבאה" : "הפתיחה תהיה שקטה"); };
@@ -1625,12 +1645,13 @@
     if (st.ride) return stopRide();
     if (!navigator.geolocation) return toast("מצב רכיבה צריך גישה למיקום");
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
+    say("מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
     st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, off: 0, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
     loadSteps(c, r).then(s => { if (st.ride && st.ride.c === c) st.ride.G.steps = s; });
     try { st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { }
+    if (!st.ride) return;
     document.body.classList.add("riding"); $("hud").hidden = false; $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
     if (!st.terrain) toggle3d(true);
-    say("מצב רכיבה פעיל. " + c.title);
     st.ride.watch = navigator.geolocation.watchPosition(onPos, () => toast("אין אות GPS"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
   }
   function stopRide() {
@@ -1638,7 +1659,8 @@
     try { speechSynthesis.cancel(); } catch (e) { }
     let done = null; try { done = saveRide(st.ride); } catch (e) { } LS.set("rideLive", null);
     if (done) setTimeout(() => rideSummary(done), 500);
-    st.ride = null; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
+    if (st.updWaiting) setTimeout(() => updBar("גרסה חדשה מוכנה", { btn: "עדכון עכשיו", go: () => location.reload() }), done ? 1200 : 300);
+    st.ride = null; $("hudCenter").hidden = true; $("hudEta").textContent = ""; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
   }
   function nearestOn(G, me) {
     const n = G.coords.length; let lo = Math.max(0, G.idx - 150), hi = Math.min(n - 1, G.idx + 2500), bi = G.idx, bd = 1e9;
@@ -1662,6 +1684,21 @@
       say("מחשב מסלול מחדש"); toast("המסלול חושב מחדש מהמיקום שלך");
     } catch (e) { } finally { if (st.ride) st.ride.rerouting = false; }
   }
+  /* Ride extras: arrival call-outs, remaining distance and ETA, spoken sharp-curve warnings, sunset race. */
+  function rideExtras(R, G, me, myKm, near, spd) {
+    const name = s => s.name.split(" · ")[0];
+    if (near.d < 0.3) G.stopKm.forEach((k, i) => { if (i === 0 || R.alerted.has("st" + i) || myKm < k - 0.06) return; R.alerted.add("st" + i); if (myKm - k > 1) return; const nx = G.stops[i + 1]; say(nx ? `הגעתם ל${name(G.stops[i])}. הבא: ${name(nx)}, בעוד ${distSpeak(G.stopKm[i + 1] - k)}` : `הגעתם ל${name(G.stops[i])}. סוף הפרק. רכיבה טובה`); });
+    const total = G.cum[G.cum.length - 1], left = Math.max(0, total - myKm), r = st.routes[R.c.id];
+    const pace = r && r.km > 0 ? r.min / r.km : 1.2, avg = R.moving > 300 && R.odo > 3 ? 60 * R.moving / 3600 / R.odo : pace;
+    const mins = left * Math.max(pace * 0.8, Math.min(pace * 1.6, avg)), eta = new Date(Date.now() + mins * 6e4);
+    $("hudEta").textContent = left > 0.2 ? `נותרו ${left < 10 ? left.toFixed(1) : Math.round(left)} ק״מ · הגעה ${fmtT(eta)}` : "";
+    if (G.coords === r.coords) { const seg = (st.curves[R.c.id] || []).find(x => x.cls >= 3 && x.startKm > myKm && x.startKm - myKm < (spd && spd > 70 ? 0.45 : 0.32)); if (seg && !R.alerted.has("cv" + seg.startKm.toFixed(2))) { R.alerted.add("cv" + seg.startKm.toFixed(2)); say(`עיקול חד בעוד ${distSpeak(seg.startKm - myKm)}`); } }
+    if (!R.sunChk || Date.now() - R.sunChk > 6e4) { R.sunChk = Date.now(); const ss = SunCalc.getTimes(new Date(), me[1], me[0]).sunset, toSet = (ss - Date.now()) / 6e4; if (toSet > 0 && toSet < 45 && mins > toSet && !R.alerted.has("sun")) { R.alerted.add("sun"); say(`השקיעה בעוד ${Math.round(toSet)} דקות, ונשארו ${Math.round(left)} קילומטר. שימו לב לראות ולהיראות`); } }
+  }
+  map.on("dragstart", e => { if (!st.ride || !e.originalEvent) return; st.ride.free = Date.now(); $("hudCenter").hidden = false; });
+  $("hudCenter").onclick = () => { if (st.ride) { st.ride.free = 0; $("hudCenter").hidden = true; if (st.me) map.easeTo({ center: [st.me.lon, st.me.lat], zoom: 15, pitch: 55, duration: 600, padding: { top: 150, bottom: 230, left: 20, right: 20 } }); } };
+  /* the screen lock is dropped whenever the app goes to the background; take it again on return */
+  document.addEventListener("visibilitychange", async () => { if (document.visibilityState !== "visible" || !st.ride) return; try { if (!st.ride.lock || st.ride.lock.released) st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { } try { speechSynthesis.paused && speechSynthesis.resume(); } catch (e) { } });
   function onPos(p) {
     const R = st.ride; if (!R) return; const me = [p.coords.longitude, p.coords.latitude]; st.me = { lat: me[1], lon: me[0] };
     let spd = p.coords.speed != null && p.coords.speed >= 0 ? p.coords.speed * 3.6 : null;
@@ -1674,6 +1711,7 @@
     const G = R.G; const near = nearestOn(G, me); const myKm = near.km;
     const ni = G.stopKm.findIndex(k => k > myKm + 0.08);
     if (ni >= 0) { $("hudNext").textContent = G.stops[ni].name.split(" · ")[0]; $("hudDist").textContent = distTxt(G.stopKm[ni] - myKm); } else { $("hudNext").textContent = "סוף המסלול"; $("hudDist").textContent = ""; }
+    try { rideExtras(R, G, me, myKm, near, spd); } catch (e) { }
     /* next maneuver */
     const steps = G.steps; const turn = $("turn");
     if (steps && steps.length) {
@@ -1720,6 +1758,7 @@
     if (!msg && near.d > 0.25) msg = `מחוץ למסלול, ${near.d.toFixed(1)} ק״מ`;
     if (!msg) { const seg = (st.curves[st.chap] || []).find(s => s.cls >= 2 && s.startKm > myKm && s.startKm - myKm < 1.6); if (seg && G.coords === st.routes[R.c.id].coords) { msg = `${L.CURVE_LABEL[seg.cls]} בעוד ${(seg.startKm - myKm).toFixed(1)} ק״מ`; cls = "curve"; } }
     const m = $("hudMsg"); m.hidden = !msg; if (msg) { m.textContent = msg; m.className = "hudmsg " + cls; }
+    if (R.free && Date.now() - R.free < 15000) return; if (R.free) { R.free = 0; $("hudCenter").hidden = true; }
     map.easeTo({ center: me, bearing: head != null && !isNaN(head) ? head : map.getBearing(), pitch: 55, zoom: spd && spd > 80 ? 14.3 : 15, duration: 900, padding: { top: 150, bottom: 230, left: 20, right: 20 } });
   }
 
@@ -1813,7 +1852,7 @@
     contentAt = Date.now();
     fetch("/api/content?t=" + Math.floor(Date.now() / 5000), { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(ct => {
       if (!ct || (st.content && JSON.stringify(ct) === JSON.stringify(st.content))) return;
-      LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); renderBell(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
+      LS.set("content", ct); const was = st.chap; applyContent(ct); renderNotice(); renderBell(); offerMove(); pushSources(); renderAll(); if (was !== st.chap) fitChapter();
     }).catch(() => { });
   }
   syncContent();
@@ -1824,13 +1863,69 @@
   importShared();
   loadRoutes(); loadWeather(); loadOSM(); loadCrowd();
   if (location.hash === "#brief") setTab("brief"); else if (location.hash === "#route") setTab("route");
+  /* ---------- transparent updates: what's happening is always on screen ---------- */
+  function updBar(text, opt = {}) {
+    const b = $("updbar"); b.className = "updbar" + (opt.cls ? " " + opt.cls : ""); $("updT").innerHTML = (opt.spin ? '<span class="spin" style="display:inline-block;vertical-align:-2px;margin-inline-end:8px"></span>' : "") + esc(text);
+    const g = $("updGo"); g.hidden = !opt.btn; if (opt.btn) { g.textContent = opt.btn; g.onclick = opt.go; }
+    $("updX").hidden = !!opt.sticky; $("updX").onclick = () => { b.hidden = true; if (opt.onClose) opt.onClose(); }; b.hidden = false;
+    clearTimeout(updBar.t); if (opt.ms) updBar.t = setTimeout(() => b.hidden = true, opt.ms);
+  }
+  (() => { const last = LS.get("lastVer", null); if (last && last !== APP_VER) setTimeout(() => updBar(`האפליקציה עודכנה לגרסה ${APP_VER}`, { btn: "מה חדש", go: () => { $("updbar").hidden = true; openInbox(); }, ms: 12000 }), 2500); LS.set("lastVer", APP_VER); })();
+  const busy = () => !!(st.ride || st.build || !$("modal").hidden);
+
+  /* ---------- moving to blueronin.app: each rider carries their own data across (it never touches our server) ---------- */
+  const NEW_HOME = "https://blueronin.app";
+  const MOVE_KEYS = ["cid", "pro", "myRoutes", "rides", "bike", "myVotes", "fuelRide", "chap", "layers", "shabbat", "theme", "stopsCat", "fuelFilter", "buildPrefs", "voice", "pushPrefs", "introSound", "inboxSeen", "seenVer", "anncSeen", "flyRate"];
+  const mvEnc = bytes => { let s = ""; for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const mvDec = t => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+  async function movePayload() {
+    const d = {}; MOVE_KEYS.forEach(k => { const v = LS.get(k, undefined); if (v !== undefined && v !== null) d[k] = v; });
+    if (d.rides) d.rides = d.rides.map(r => Object.assign({}, r, { trk: r.trk.length > 150 ? r.trk.filter((_, i) => i % Math.ceil(r.trk.length / 150) === 0 || i === r.trk.length - 1) : r.trk }));
+    const raw = new TextEncoder().encode(JSON.stringify({ v: 1, t: Date.now(), d }));
+    if ("CompressionStream" in window) { try { const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()); return "z" + mvEnc(z); } catch (e) { } }
+    return "j" + mvEnc(raw);
+  }
+  async function readPayload(p) {
+    const bytes = mvDec(p.slice(1)); const txt = p[0] === "z" ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text() : new TextDecoder().decode(bytes);
+    const o = JSON.parse(txt); if (!o || o.v !== 1 || typeof o.d !== "object") throw new Error("bad"); return o.d;
+  }
+  async function importMove(p) {
+    let d; try { d = await readPayload(p); } catch (e) { history.replaceState(null, "", location.pathname); return toast("הקישור לא תקין. נסו שוב מהכתובת הקודמת"); }
+    const n = { routes: (d.myRoutes || []).length, rides: (d.rides || []).length, pro: d.pro && d.pro.exp > Date.now() };
+    const box = openModal(`<div class="ridesum"><h2>ברוכים הבאים לכתובת החדשה</h2><p style="margin:0">הנתונים שלך מהכתובת הקודמת מוכנים להעברה:</p>
+      <ul style="margin:0">${n.routes ? `<li>${n.routes} מסלולים שבנית</li>` : ""}${n.rides ? `<li>${n.rides} רכיבות ביומן</li>` : ""}${d.bike && d.bike.id ? "<li>האופנוע וההגדרות שלך</li>" : "<li>ההגדרות שלך</li>"}${n.pro ? "<li>מנוי Pro פעיל</li>" : ""}</ul>
+      <p class="small muted" style="margin:0">ההעברה קורית רק בטלפון שלך. שום דבר לא עובר דרך השרת.</p><div class="row"><button type="button" class="btn primary" id="mvGo">העברה</button><button type="button" class="btn" id="mvNo">לא עכשיו</button></div></div>`);
+    $("mvNo").onclick = () => { history.replaceState(null, "", location.pathname); closeModal(); };
+    $("mvGo").onclick = () => {
+      const cur = { routes: LS.get("myRoutes", []), rides: LS.get("rides", []) };
+      Object.entries(d).forEach(([k, v]) => LS.set(k, v));
+      if (cur.routes.length) LS.set("myRoutes", cur.routes.concat((d.myRoutes || []).filter(r => !cur.routes.some(x => x.id === r.id))));
+      if (cur.rides.length) LS.set("rides", cur.rides.concat((d.rides || []).filter(r => !cur.rides.some(x => x.id === r.id))).sort((a, b) => b.start - a.start).slice(0, 60));
+      LS.set("moved", Date.now()); history.replaceState(null, "", location.pathname); location.reload();
+    };
+  }
+  const mvHash = location.hash.match(/^#move=([zj][A-Za-z0-9_-]+)$/); if (mvHash) setTimeout(() => importMove(mvHash[1]), 600);
+  if (LS.get("moved", 0) && !LS.get("movedSeen", false)) { LS.set("movedSeen", true); setTimeout(() => updBar("הנתונים הועברו. כדי לקבל שוב התראות לטלפון, מפעילים אותן בלשונית כלים", { btn: "לכלים", go: () => { $("updbar").hidden = true; setTab("tools"); }, ms: 15000 }), 1500); }
+  function offerMove() {
+    if (!st.flags.move || location.origin === NEW_HOME || sessionStorage.getItem("brn:moveX")) return;
+    const pwa = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    updBar(`Blue Ronin עברה לכתובת קבועה: blueronin.app${pwa ? ". אחרי המעבר מתקינים שוב למסך הבית" : ""}`, { cls: "move", btn: "מעבר עם הנתונים", go: async () => { if (st.ride) return toast("אפשר לעבור בסוף הרכיבה"); location.href = NEW_HOME + "/#move=" + (await movePayload()); }, onClose: () => { try { sessionStorage.setItem("brn:moveX", "1"); } catch (e) { } } });
+  }
+  setTimeout(offerMove, 3000);
+
   /* live updates: network-first app shell + reload once when a new version takes over */
   if ("serviceWorker" in navigator) addEventListener("load", async () => {
     try {
       const reg = await navigator.serviceWorker.register("sw.js"); st.swReg = reg;
       document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => { }); });
       let reloading = false; const had = !!navigator.serviceWorker.controller;
-      navigator.serviceWorker.addEventListener("controllerchange", () => { if (!had || reloading || st.ride) return; reloading = true; toast("גרסה חדשה הותקנה"); setTimeout(() => location.reload(), 600); });
+      reg.addEventListener("updatefound", () => { if (had) updBar("מורידים עדכון לאפליקציה. אפשר להמשיך כרגיל", { spin: true, ms: 20000 }); });
+      const apply = () => { reloading = true; updBar("מעדכנים לגרסה החדשה…", { spin: true, sticky: true }); setTimeout(() => location.reload(), 900); };
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!had || reloading) return;
+        if (busy()) { st.updWaiting = true; updBar(st.ride ? "גרסה חדשה מוכנה. היא תותקן כשתסיימו לרכוב" : "גרסה חדשה מוכנה", { btn: st.ride ? "" : "עדכון עכשיו", go: apply }); return; }
+        apply();
+      });
     } catch (e) { }
   });
 })();

@@ -115,7 +115,7 @@ export const CONTENT_DEFAULT = {
   maintenance: { on: false, text: "" },
   chapters: {},
   notes: {},
-  flags: { fly: true, builder: true, fuelVotes: true, photos: true, feedback: true },
+  flags: { fly: true, builder: true, fuelVotes: true, photos: true, feedback: true, move: false },
   featured: "",
   hazards: []
 };

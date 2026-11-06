@@ -452,6 +452,18 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
 .inbox .imsg span.small{display:block;margin-top:2px}
 .chlog ul{margin:4px 0 0;padding-inline-start:18px;font-size:13.5px;display:grid;gap:3px}
 .ridesum{display:grid;gap:12px}
+.hud .eta{font-size:13px;color:var(--muted);margin-top:2px}
+.updbar{position:fixed;z-index:24;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(520px,calc(100% - 24px));display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--ink);color:var(--bg);box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:14px}
+.updbar .t{flex:1;min-width:0}
+.updbar.move{background:linear-gradient(120deg,var(--accent),color-mix(in srgb,var(--accent) 60%,var(--sun)));color:#fff}
+.updbar .ux{border:0;background:none;color:inherit;opacity:.7;font-size:20px;line-height:1;cursor:pointer}
+.updbar .spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:spin 0.9s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+body.riding .updbar{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
+.linkbtn{border:0;background:none;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}
+.now{white-space:nowrap;flex:none}
+@media (max-width:430px){.brand{font-size:26px}.bar .now .small{display:none}}
+@media (max-width:370px){.brand>span:not(.probadge){display:none}}
 </style>
 </head>
 <body>
@@ -555,12 +567,13 @@ body.flying .fabs .hide-ride,body.flying .sheet{opacity:.0;pointer-events:none}
   <div id="hudMsg" class="hudmsg" hidden></div>
   <div class="top">
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
-    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div></div>
+    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div></div>
   </div>
   <div class="hfuel" id="hudFuel" hidden aria-label="דלק במיכל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg><div class="fbar"><i></i></div><span id="hudFuelT" class="mono">--</span></div>
-  <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
+  <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn primary" id="hudCenter" hidden>חזרה למעקב</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
 </div>
 
+<div class="updbar" id="updbar" role="status" hidden><span class="t" id="updT"></span><button type="button" class="btn sm primary" id="updGo" hidden></button><button type="button" class="ux" id="updX" aria-label="סגירה">×</button></div>
 <div class="modal" id="modal" role="dialog" aria-modal="true" hidden><div class="msheet"><button type="button" class="mx" id="mx" aria-label="סגירה">×</button><div id="mbody"></div></div></div>
 <div class="toast" id="toast" hidden></div>
 

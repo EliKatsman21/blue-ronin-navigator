@@ -1,10 +1,11 @@
 /* GET /api/osm — cached north layers. Served from Netlify's CDN; refreshed daily by osm-refresh. */
-import { getCached, refresh } from "./lib/osm.mjs";
+import { getCached, refresh, addCafes } from "./lib/osm.mjs";
 const MAX_AGE = 3 * 864e5;
 const headers = { "content-type": "application/json", "cache-control": "public, max-age=900", "netlify-cdn-cache-control": "public, durable, s-maxage=3600, stale-while-revalidate=86400" };
 
 export default async (req, context) => {
   let data = await getCached();
+  if (data && !data.cafes) { try { data = await addCafes(data); } catch (e) { console.log("cafes upgrade failed", e.message); } }
   if (data && (Date.now() - data.ts > MAX_AGE || !data.cafes)) context.waitUntil(refresh().catch(e => console.log("osm bg refresh failed", e.message)));
   if (!data) {
     try { data = await refresh(); }

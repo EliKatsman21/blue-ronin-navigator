@@ -404,7 +404,7 @@
   let osmBusy = false, cafeRetry = 0;
   async function loadOSM(force, quiet) {
     const age = st.osm ? Date.now() - st.osm.ts : 1e12;
-    if (!force && age < 20 * 3600e3 && st.osm.cafes) { pushSources(); return; }
+    if (!force && age < 20 * 3600e3 && st.osm.cafes && st.osm.cafes.length) { pushSources(); return; }
     if (osmBusy) return; osmBusy = true;
     try {
       let d = null; try { d = await fromServer(); } catch (e) { }

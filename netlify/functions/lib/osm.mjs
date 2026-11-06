@@ -47,6 +47,17 @@ export async function fetchOverpass(timeoutMs = 45000) {
   } finally { clearTimeout(timer); ctl.abort(); }
 }
 
+/* Cafes alone: a small, fast query used to upgrade older cached data without waiting for the full refresh. */
+export async function addCafes(data, timeoutMs = 8000) {
+  const q = "[out:json][timeout:25];(" + BBOXES.map(b => `nwr["amenity"="cafe"](${b});nwr["shop"="coffee"](${b});`).join("") + ");out center tags;";
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const j = await Promise.any(MIRRORS.map(async u => { const r = await fetch(u, { method: "POST", body: "data=" + encodeURIComponent(q), signal: ctl.signal, headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "BlueRoninNavigator/1.1 (northern Israel motorcycle navigator)" } }); if (!r.ok) throw new Error(u + " " + r.status); const d = await r.json(); if (!d.elements) throw new Error("bad"); return d; }));
+    const out = Object.assign({}, data, { cafes: normalize(j).cafes });
+    await store().setJSON("v4", out); return out;
+  } finally { clearTimeout(timer); ctl.abort(); }
+}
+
 export async function refresh() {
   const data = await fetchOverpass();
   await store().setJSON("v4", data);

@@ -394,7 +394,7 @@
     const els = j.elements.filter(n => n.lat != null || n.center);
     return { ts: Date.now(), cams: els.filter(n => t(n).highway === "speed_camera").map(pick), fuel: els.filter(n => t(n).amenity === "fuel").map(pick), views: els.filter(n => t(n).tourism === "viewpoint").map(pick), cafes: els.filter(n => t(n).amenity === "cafe" || t(n).shop === "coffee").map(pick) };
   }
-  async function fromServer() { const r = await withTimeout(fetch("/api/osm"), 9000); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.fuel) throw new Error("bad"); return j; }
+  async function fromServer() { const r = await withTimeout(fetch("/api/osm?v=4"), 9000); if (!r.ok) throw new Error(r.status); const j = await r.json(); if (!j.fuel) throw new Error("bad"); return j; }
   async function fromOverpass() {
     const q = "[out:json][timeout:40];(" + Object.values(REGIONS).map(B => { const bb = `${B[0][1]},${B[0][0]},${B[1][1]},${B[1][0]}`; return `node["highway"="speed_camera"](${bb});nwr["amenity"="fuel"](${bb});node["tourism"="viewpoint"](${bb});nwr["amenity"="cafe"](${bb});nwr["shop"="coffee"](${bb});`; }).join("") + ");out center tags;";
     const ctl = new AbortController();

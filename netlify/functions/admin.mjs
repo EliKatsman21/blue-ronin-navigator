@@ -91,6 +91,8 @@ export default async req => {
     const all = (await fuelStore().get("all", { type: "json" })) || {}; delete all[b.id]; await fuelStore().setJSON("all", all); await audit("fuel-reset", { id: b.id });
     return json({ ok: true });
   }
+  if (route === "GET errors") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); const keys = blobs.map(b => b.key).sort().reverse().slice(0, 100); const items = []; for (const k of keys) { const v = await es.get(k, { type: "json" }); if (v) items.push(v); } return json({ items }); }
+  if (route === "POST errors/clear") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); for (const b of blobs) await es.delete(b.key); await audit("errors.clear"); return json({ ok: true }); }
   if (route === "GET feedback/media") {
     const q = new URL(req.url).searchParams, id = q.get("id") || "", k = q.get("k"); if (!/^[a-f0-9]{12}$/.test(id) || !["p", "a"].includes(k)) return json({ error: "bad" }, 400);
     const r = await fbMedia().getWithMetadata(id + "-" + k, { type: "arrayBuffer" }); if (!r) return json({ error: "not found" }, 404);

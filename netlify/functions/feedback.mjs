@@ -31,6 +31,6 @@ export default async req => {
   inbox.push(it);
   for (const old of inbox.slice(0, Math.max(0, inbox.length - 500))) for (const k of old.media || []) await media().delete(old.id + "-" + k).catch(() => { });
   await s.setJSON("inbox", inbox.slice(-500));
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, ref: it.id.slice(0, 5).toUpperCase() });
 };
 export const config = { path: "/api/feedback" };

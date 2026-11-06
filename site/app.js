@@ -4,13 +4,21 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.2.0";
+  const APP_VER = "2.3.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  /* Device storage. When the phone's quota is full, cached map data (routes, elevation, weather, places)
+     is dropped first so the rider's own data (routes, rides, bike, safety, Pro) is never the thing lost. */
+  const CACHE_KEY = /^(route:|elev:|steps:|osm|wx|crowd|rideLive)/;
   const LS = {
     get(k, d) { try { const v = localStorage.getItem("brn:" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem("brn:" + k, JSON.stringify(v)); } catch (e) { } }
+    set(k, v) {
+      let s; try { s = JSON.stringify(v); } catch (e) { return false; }
+      try { localStorage.setItem("brn:" + k, s); return true; } catch (e) { }
+      try { const drop = []; for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.startsWith("brn:") && CACHE_KEY.test(key.slice(4)) && key !== "brn:" + k) drop.push(key); } drop.forEach(x => localStorage.removeItem(x)); localStorage.setItem("brn:" + k, s); return true; }
+      catch (e) { if (!CACHE_KEY.test(k) && !LS.warned) { LS.warned = true; setTimeout(() => { try { toast("אין מספיק מקום בטלפון לשמירה. כדאי לשמור גיבוי בלשונית שלי", 6000); } catch (x) { } }, 50); window.BRG && BRG.report("storage", "quota " + k, "", 0, ""); } return false; }
+    }
   };
   const toast = (m, ms = 2600) => { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, ms); };
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -101,11 +109,12 @@
     const sh = $("sheet").getBoundingClientRect().height || 300;
     return { top: 90, bottom: Math.min(sh + 20, innerHeight * 0.6), left: 70, right: 30 };
   };
-  const map = new maplibregl.Map({
+  window.BRG && BRG.crumb("map");
+  let map; try { map = new maplibregl.Map({
     container: "map", style: OFM + styleName, center: [35.0, 31.6], zoom: 6.2,
     maxPitch: 80, attributionControl: { compact: true }, dragRotate: true, cooperativeGestures: false,
     pixelRatio: Math.min(2, window.devicePixelRatio || 1), fadeDuration: 160, maxTileCacheSize: 360, refreshExpiredTiles: false
-  });
+  }); } catch (e) { window.BRG && (BRG.report("map", e.message, "", 0, e.stack), BRG.fatal("map")); throw e; }
   map.on("error", e => {
     const msg = String(e && e.error && (e.error.message || e.error.status) || "");
     if (!styleReady && styleName === "dark" && /style|404|Failed|fetch/i.test(msg)) { styleName = "liberty"; map.setStyle(OFM + styleName, { diff: false }); }
@@ -165,6 +174,8 @@
     routes: ["עוד מסלול משלך", `בחינם שומרים עד ${FREE_ROUTES} מסלולים. עם Pro בונים כמה שרוצים, ומשתפים כל אחד בקישור.`],
     journal: ["היומן המלא שלך", "כל הרכיבות שהקלטת שמורות במכשיר. Pro פותח את כולן, עם סטטיסטיקה מצטברת וייצוא GPX."],
     fuel: ["תוכנית הדלק המלאה", "איפה בדיוק לתדלק ובכמה ליטר, מד מיכל לאורך כל הפרק, סגנון רכיבה, כיול מתדלוק אמיתי וצביעת המסלול במפה לפי הדלק שנשאר."],
+    replay: ["השחזור המלא של הרכיבה", "כל הדרך שרכבת, בתלת־ממד, עם השעון של אותו בוקר והתמונות שצילמת בדיוק במקום שבו צילמת."],
+    group: ["רכיבה קבוצתית", "פותחים קבוצה, וכל הרוכבים רואים זה את זה על מפה אחת, עם נקודת מפגש וקריאת חירום לכולם. ההצטרפות חינם לכל חברי הקבוצה."],
     memories: ["הזיכרונות שלך מהדרך", `בחינם שומרים עד ${FREE_MEM} תמונות והקלטות. עם Pro בלי הגבלה, כולל אלבום לכל רכיבה בסיכום שלה.`],
     gpx: ["ייצוא הרכיבה", "קובץ GPX של המסלול שרכבת בפועל, ל־Strava, ל־OsmAnd או לארכיון שלך."],
     default: ["Blue Ronin Pro", "כלים לרוכב שיוצא כל שבת: תובנות לכל פרק, יומן רכיבות, מעוף מלא ומסלולים בלי הגבלה."]
@@ -184,6 +195,8 @@
       ["fuel", "תוכנית דלק מלאה", "תחנות התדלוק בדיוק, מד מיכל לאורך הפרק, סגנון רכיבה וכיול לפי האופנוע שלך"],
       ["book", "יומן רכיבות מלא", "כל רכיבה: ק״מ, זמן תנועה, ממוצע ודלק משוער. סיכום חודשי ו־GPX"],
       ["cam", "זיכרונות בלי הגבלה", "תמונות והקלטות מכל עצירה, מסודרות לפי תאריך ופרק, ואלבום לכל רכיבה"],
+      ["route", "רכיבה קבוצתית", "כולם על מפה אחת, נקודת מפגש, וחירום שמגיע לכל הקבוצה. מצטרפים בחינם"],
+      ["play", "שחזור 3D של כל רכיבה", "הרכיבה שלך בתלת־ממד עם השעון האמיתי והתמונות מהדרך"],
       ["play", "מעוף ציפור מלא", "כל הפרק במצלמת רדיפה, עם טעינה מראש"],
       ["route", "מסלולים בלי הגבלה", "בונים, שומרים ומשתפים כמה שרוצים"],
       ["star", "פרקים חדשים קודם", "מנויי Pro מקבלים כל פרק חדש לפני כולם"]
@@ -208,6 +221,7 @@
     play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg>',
     route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',
     fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5A1.5 1.5 0 0 1 17 11v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>',
     star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
     share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
@@ -287,7 +301,8 @@
     openModal(`<div class="ridesum"><div class="small muted">${esc(fmtD(new Date(ride.start)))} · ${esc(ride.title)}</div><h2>רכיבה טובה!</h2>
       <div class="fsum"><div><span class="k">מרחק</span><b class="mono">${ride.km}</b><span class="k">ק״מ</span></div><div><span class="k">זמן תנועה</span><b class="mono">${dur(ride.moving)}</b></div><div><span class="k">ממוצע</span><b class="mono">${Math.round(avg)}</b><span class="k">קמ״ש</span></div><div><span class="k">דלק משוער</span><b class="mono">${ride.fuel}</b><span class="k">ל׳</span></div></div>
       <p class="small muted" style="margin:0">נשמר ביומן הרכיבות בלשונית ״שלי״. המהירות המרבית לא מוצגת כאן בכוונה.</p>
-      <div class="row"><button type="button" class="btn primary" id="rsShow">הצגה במפה</button><button type="button" class="btn" id="rsClose">סגירה</button></div></div>`);
+      <div class="row"><button type="button" class="btn primary" id="rsPlay">${PWI.play}שחזור 3D</button><button type="button" class="btn" id="rsShow">במפה</button><button type="button" class="btn" id="rsShare">שיתוף</button><button type="button" class="btn" id="rsClose">סגירה</button></div></div>`);
+    $("rsPlay").onclick = () => { closeModal(); if (innerWidth < 900) setSheet("peek"); replayRide(ride); }; $("rsShare").onclick = () => shareRideCard(ride);
     $("rsShow").onclick = () => { closeModal(); showRide(ride); }; $("rsClose").onclick = closeModal;
     memAll().then(ms => { const mine = ms.filter(m => m.kind === "photo" && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4).slice(0, 8); const box = document.querySelector(".ridesum"); if (!mine.length || !box) return; const g = document.createElement("div"); g.className = "memgrid"; g.innerHTML = mine.map(m => `<button type="button" class="memt" data-mem="${m.id}"><img src="${blobUrl(m.id + "t", m.thumb)}" alt=""></button>`).join(""); box.insertBefore(g, box.querySelector(".row")); g.querySelectorAll("[data-mem]").forEach(b => b.onclick = () => memViewer(b.dataset.mem)); });
   }
@@ -306,7 +321,7 @@
     if (!rides.length) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3><span class="probadge soft">יומן</span></div><p class="small muted" style="margin:0">כל רכיבה במצב רכיבה נרשמת כאן אוטומטית: מרחק, זמן תנועה, ממוצע ודלק משוער. הכול נשמר רק במכשיר שלך.</p></div>`;
     const month = new Date().toISOString().slice(0, 7), mrides = rides.filter(r => new Date(r.start).toISOString().slice(0, 7) === month);
     const tot = (list, f) => list.reduce((a, r) => a + (r[f] || 0), 0);
-    const row = (r, i) => `<div class="item"><div style="min-width:0"><b>${esc(r.title)}</b><span class="small muted mono">${esc(fmtD(new Date(r.start)))} · ${r.km} ק״מ · ${dur(r.moving)} · ${r.fuel} ל׳</span></div><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm" data-rshow="${i}">במפה</button><button type="button" class="btn sm" data-rgpx="${i}">GPX</button></div></div>`;
+    const row = (r, i) => `<div class="item"><div style="min-width:0"><b>${esc(r.title)}</b><span class="small muted mono">${esc(fmtD(new Date(r.start)))} · ${r.km} ק״מ · ${dur(r.moving)} · ${r.fuel} ל׳</span></div><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm primary" data-rplay="${i}" aria-label="שחזור תלת־ממד">${PWI.play}3D</button><button type="button" class="btn sm" data-rshow="${i}">במפה</button><button type="button" class="btn sm" data-rgpx="${i}">GPX</button></div></div>`;
     const visible = pro ? rides : rides.slice(0, 1), hiddenN = rides.length - visible.length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3>${pro ? '<span class="probadge">PRO</span>' : ""}</div>
       ${pro ? `<div class="fsum"><div><span class="k">החודש</span><b class="mono">${Math.round(tot(mrides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">רכיבות</span><b class="mono">${mrides.length}</b></div><div><span class="k">סה״כ</span><b class="mono">${Math.round(tot(rides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">דלק</span><b class="mono">${Math.round(tot(rides, "fuel"))}</b><span class="k">ל׳</span></div></div>` : ""}
@@ -317,6 +332,7 @@
     const rides = LS.get("rides", []);
     document.querySelectorAll("[data-rshow]").forEach(b => b.onclick = () => showRide(rides[+b.dataset.rshow]));
     document.querySelectorAll("[data-rgpx]").forEach(b => b.onclick = () => rideGpx(rides[+b.dataset.rgpx]));
+    document.querySelectorAll("[data-rplay]").forEach(b => b.onclick = () => { if (innerWidth < 900) setSheet("peek"); replayRide(rides[+b.dataset.rplay]); });
     if ($("jMore")) $("jMore").onclick = () => openPaywall("journal");
   }
   function proCard() {
@@ -326,6 +342,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.3.0", d: "2026-11-06", items: ["שחזור 3D של רכיבה שרכבת: השעון האמיתי, צבע השמיים של אותה שעה, ועצירה על כל תמונה במקום שבו צילמת", "רכיבה קבוצתית: כל הרוכבים על מפה אחת, נקודת מפגש, וקריאת חירום שמגיעה לכל הקבוצה", "העברת נתונים בקוד מוצפן (גם באייפון), וגיבוי ושחזור לקובץ", "צילום מהמצלמה נשמר כבר מהפעם הראשונה, ועיבוד תמונות מהיר יותר", "חיפוש קולי עם מסך האזנה שתמיד אפשר לסגור, ומעבר להכתבה מהמקלדת כשצריך", "אישור ברור אחרי שליחת דיווח, עם מספר פנייה", "מנגנון שמונע היתקעות בפתיחה, ודיווח תקלות אוטומטי לצוות", "שמירת הנתונים שלך קודמת לכל מטמון כשהזיכרון בטלפון מתמלא"] },
     { v: "2.2.0", d: "2026-11-06", items: ["לשונית חדשה ״שלי״: בטיחות, מיקום חי, האופנוע והזיכרונות שלך", "איש קשר לחירום: כפתור SOS במצב רכיבה (לחיצה ארוכה), התקשרות ו־וואטסאפ עם המיקום בלחיצה, והתראה דחופה לטלפון של איש הקשר", "זיהוי נפילה במצב רכיבה (בטא): ספירה של 30 שניות, ואם אין תשובה יוצאת התראה", "שיתוף מיקום חי בקישור, עד 12 שעות", "איפה חניתי: המיקום נשמר לבד כשעוצרים, וחץ שמוביל ברגל חזרה לאופנוע", "זיכרונות: צילום והקלטה מהדרך, מסודרים לפי תאריך ופרק, ותמונות הרכיבה בסיכום שלה", "חיפוש קולי בבניית מסלול", "משוב לצוות עם תמונה או הקלטה, ודיווח לקבוצה עם תמונה", "מצב רכיבה: ההנחיות הקוליות עובדות מהלחיצה הראשונה, הכרזה בהגעה לעצירה, ק״מ ושעת הגעה, אזהרה לפני עיקול חד ותזכורת שקיעה", "תוכנית הדלק המלאה עברה ל־Pro. התשובה אם הדלק מספיק, האזהרה ואיתור התחנה נשארים חינם", "מעבר לכתובת הקבועה blueronin.app עם כל הנתונים"] },
     { v: "2.1.0", d: "2026-11-06", items: ["Blue Ronin Pro: תובנות לכל פרק, יומן רכיבות מלא ו־7 ימי ניסיון", "יומן רכיבות: כל רכיבה נשמרת אוטומטית", "כרטיס ״השבת שלי״ לשיתוף בוואטסאפ", "מרכז הודעות עם היסטוריה", "מצפורים נפתחים עם תמונות, ומיון לפי המרחק ממך"] },
     { v: "2.0.0", d: "2026-11-05", items: ["עצירות, קפה ודלק לאורך הפרק שבחרת", "תוכנית דלק לפי דגם האופנוע, מד מיכל צבעוני ואיתור תחנה", "מעוף ציפור חלק עם טעינה מראש", "פרק 6 על כביש 90 בלבד"] }
@@ -779,9 +796,9 @@
   const stars = n => "●".repeat(n) + "○".repeat(5 - n);
   function renderRoute() {
     const c = chap(), r = st.routes[c.id], cs = st.cstats[c.id], e = st.elev[c.id];
-    let h = `<div class="chapsel">${CHAPTERS.filter(x => x.id !== DRAFT && !x.hidden).map(x => `<button type="button" data-c="${x.id}" aria-pressed="${x.id === st.chap && !st.build}"><span>${x.custom ? "★ " + esc(x.short) : `פרק ${CHAPTERS.indexOf(x) + 1} · ${esc(x.short)}`}</span>${leds(diffOf(x.id), true)}</button>`).join("")}${st.flags.builder ? `<button type="button" class="newroute" id="bNew" aria-pressed="${!!st.build}">＋ מסלול משלי</button>` : ""}</div>`;
+    let h = `<div class="chapsel">${CHAPTERS.filter(x => x.id !== DRAFT && !x.hidden).map(x => `<button type="button" data-c="${x.id}" aria-pressed="${x.id === st.chap && !st.build}"><span>${x.custom ? "★ " + esc(x.short) : `פרק ${CHAPTERS.indexOf(x) + 1} · ${esc(x.short)}`}</span>${leds(diffOf(x.id), true)}</button>`).join("")}${st.flags.builder ? `<button type="button" class="newroute" id="bNew" aria-pressed="${!!st.build}">＋ מסלול משלי</button><button type="button" class="newroute" id="bImp">⤓ מסלול מקישור</button>` : ""}</div>`;
     if (st.build) h += builderPanel();
-    if (st.build && st.chap !== DRAFT) { $("p-route").innerHTML = h; if ($("bNew")) $("bNew").onclick = () => startBuild(); bindBuilder(); return; }
+    if (st.build && st.chap !== DRAFT) { $("p-route").innerHTML = h; if ($("bNew")) $("bNew").onclick = () => startBuild(); if ($("bImp")) $("bImp").onclick = importLink; bindBuilder(); return; }
     else h += `<div><div class="row" style="justify-content:space-between;align-items:flex-start"><h2>${esc(c.title)}</h2>${c.custom ? `<div class="row"><button type="button" class="btn sm" id="bEdit">עריכה</button><button type="button" class="btn sm" id="bShareR">שיתוף</button></div>` : ""}</div><p class="muted" style="margin:4px 0 0">${esc(c.sub)}</p></div>${c.alertMsg ? `<div class="alert">${esc(c.alertMsg)}</div>` : ""}`;
     h += `
       <div class="stats"><div class="stat"><div class="k">מרחק</div><div class="v">${r ? Math.round(r.km) : "--"}<span class="small"> ק״מ</span></div></div><div class="stat"><div class="k">זמן נטו</div><div class="v">${r ? `${Math.floor(r.min / 60)}:${String(Math.round(r.min % 60)).padStart(2, "0")}` : "--"}</div></div><div class="stat"><div class="k">מפותל</div><div class="v">${cs ? Math.round(cs.twisty) : "--"}<span class="small"> ק״מ</span></div></div><div class="stat"><div class="k">טיפוס</div><div class="v">${e && e.climb != null ? e.climb : "--"}<span class="small"> מ׳</span></div></div></div>`;
@@ -795,7 +812,7 @@
     h += `<ol class="stops">` + c.stops.map((s, i) => { const nav = stopNav(s); const cafe = s.cafe && CAFES.find(x => x.id === s.cafe); return `<li class="stop"><span class="num ${s.kind === "view" ? "view" : s.kind === "cafe" ? "cafe" : ""}">${i + 1}</span><div><h3><button type="button" data-s="${s.id}">${esc(s.name)}</button></h3><p>${esc(s.note)}</p><div class="chips" style="margin-bottom:6px">${(s.roads || []).map(x => `<span class="chip road">${x}</span>`).join("")}${r && r.stopKm ? `<span class="chip road">ק״מ ${Math.round(r.stopKm[i])}</span>` : ""}${cafe && cafe.shabbat ? '<span class="chip sun">פתוח בשבת</span>' : ""}${s.score ? `<span class="score">עיקולים <b>${stars(s.score[0])}</b> נוף <b>${stars(s.score[1])}</b></span>` : ""}</div><div class="row">${navBtn("w", nav.w)}${navBtn("g", nav.g)}</div></div></li>`; }).join("") + `</ol>`;
     $("p-route").innerHTML = h;
     $("p-route").querySelectorAll("[data-c]").forEach(b => b.onclick = () => { st.build = null; setPick(false); setChap(b.dataset.c); });
-    if ($("bNew")) $("bNew").onclick = () => startBuild(); if ($("bEdit")) $("bEdit").onclick = () => startBuild(c); if ($("bShareR")) $("bShareR").onclick = () => shareRoute(c);
+    if ($("bNew")) $("bNew").onclick = () => startBuild(); if ($("bImp")) $("bImp").onclick = importLink; if ($("bEdit")) $("bEdit").onclick = () => startBuild(c); if ($("bShareR")) $("bShareR").onclick = () => shareRoute(c);
     if (st.build) bindBuilder(); bindTraffic(c.id);
     $("p-route").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { const s = c.stops.find(x => x.id === b.dataset.s); map.flyTo({ center: lonlat(s), zoom: 13, padding: sheetPad(), duration: 1100 }); stopPopup(s, c.stops.indexOf(s) + 1); if (innerWidth < 900) setSheet("peek"); });
     if ($("bFly")) $("bFly").onclick = () => startFly(); $("bGpx").onclick = gpx; bindFuelPlan(); bindInsights(c.id);
@@ -1346,13 +1363,21 @@
     const url = `${location.origin}${location.pathname}?r=${toB64u(JSON.stringify(data))}`;
     try { if (navigator.share) await navigator.share({ title: "Blue Ronin · " + c.title, text: "מסלול רכיבה: " + c.title, url }); else { await navigator.clipboard.writeText(url); toast("הקישור למסלול הועתק"); } } catch (e) { }
   }
-  function importShared() {
-    const q = new URLSearchParams(location.search).get("r"); if (!q) return;
+  /* iPhone opens every link in Safari (home-screen apps can't catch links), so a friend's route can be
+     pasted into the installed app here. */
+  function importLink() {
+    openModal(`<div class="xsheet"><h2>מסלול מקישור</h2><p class="small muted" style="margin:0">קיבלתם קישור למסלול בוואטסאפ? העתיקו אותו והדביקו כאן.</p><input id="ilIn" class="xin" dir="ltr" placeholder="https://blueronin.app/?r=…" style="font-size:15px;letter-spacing:0"><div class="row"><button type="button" class="btn" id="ilPaste">הדבקה</button><button type="button" class="btn primary" id="ilGo">פתיחה</button></div><div class="err small" id="ilErr"></div></div>`);
+    $("ilPaste").onclick = async () => { try { $("ilIn").value = await navigator.clipboard.readText(); } catch (e) { $("ilIn").focus(); toast("לחיצה ארוכה בשדה ← הדבקה"); } };
+    $("ilGo").onclick = () => { const v = $("ilIn").value.trim(); let q = null; try { q = new URL(v).searchParams.get("r"); } catch (e) { const m = v.match(/[?&]r=([A-Za-z0-9_-]+)/); q = m && m[1]; } if (!q) { $("ilErr").textContent = "זה לא קישור למסלול של Blue Ronin"; return; } closeModal(); importShared(q); };
+  }
+  function importShared(fromLink) {
+    const q = fromLink || new URLSearchParams(location.search).get("r"); if (!q) return;
     try {
       const d = JSON.parse(unb64u(q)); history.replaceState(null, "", location.pathname + location.hash);
       if (!Array.isArray(d.p) || d.p.length < 2) return;
       st.build = { editing: null, title: String(d.t || "").slice(0, 40), pts: d.p.slice(0, 25).map(([name, lat, lon]) => ({ name: String(name).slice(0, 60), lat: +lat, lon: +lon })).filter(p => isFinite(p.lat) && isFinite(p.lon)), opts: { noHighway: !!(d.o && d.o.noHighway), loop: !!(d.o && d.o.loop) }, results: [], q: "" };
       st.prevChap = st.chap; syncDraft(); setTab("route"); toast("קיבלתם מסלול מחבר. שמרו אותו כדי שיישאר.");
+      if (!fromLink && isIOS && !standalone()) setTimeout(() => updBar("האפליקציה מותקנת אצלכם? באייפון קישורים נפתחים בספארי. העתיקו את הקישור, ובאפליקציה: מסלול ← ״מסלול מקישור״", { ms: 14000 }), 3500);
     } catch (e) { }
   }
 
@@ -1407,7 +1432,7 @@
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
     <div class="card"><h3>שיתוף ודיווח לחבר׳ה</h3><div class="row"><button type="button" class="btn" id="shareGo">שיתוף האפליקציה</button><a class="btn" target="_blank" rel="noopener" href="${LIVE_BOARD}">לוח הדיווחים החי</a></div>
       <label for="repType" class="small muted">דיווח מהיר מהמיקום שלך לוואטסאפ</label><div class="row"><select id="repType" class="btn"><option>ניידת / ממל״ז</option><option>מצלמה ניידת / לייזר</option><option>חצץ או שמן על הכביש</option><option>עבודות / חסימה</option><option>כביש סגור</option><option>נקודת עצירה מומלצת</option></select><button type="button" class="btn primary" id="repGo">שליחה</button><button type="button" class="btn" id="repPhoto">${PWI.cam}עם תמונה</button></div></div>
-    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונה</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button><span class="small muted" id="fbRes"></span></div></div>` : ""}
+    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונה</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
     <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
@@ -1415,7 +1440,7 @@
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
     if ($("fbGo")) { $("fbGo").onclick = sendFeedback; st.fbAtt = st.fbAtt || {}; paintFbAtt();
-      $("fbPhoto").onclick = () => { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = async () => { if (!i.files[0]) return; try { let q = 0.8, b = await shrink(i.files[0], 1400, q); while (b.size > 560 * 1024 && q > 0.4) { q -= 0.15; b = await shrink(i.files[0], 1100, q); } st.fbAtt.photo = b; paintFbAtt(); } catch (e) { toast(e.message); } }; i.click(); };
+      $("fbPhoto").onclick = async () => { const [f] = await pickFile({}); if (!f) return; try { const im = await decodeImg(f); let q = 0.8, b = await toJpeg(im, 1400, q); while (b.size > 560 * 1024 && q > 0.4) { q -= 0.15; b = await toJpeg(im, 1100, q); } try { im.close && im.close(); } catch (e) { } st.fbAtt.photo = b; paintFbAtt(); } catch (e) { toast(e.message); } };
       $("fbVoice").onclick = async () => { const b = await recordVoice(60); if (b) { if (b.size > 680 * 1024) return toast("ההקלטה ארוכה מדי"); st.fbAtt.voice = b; paintFbAtt(); } }; }
     $("repPhoto").onclick = reportPhoto;
     $("creditsGo").onclick = () => openModal(`<h2>מקורות המידע</h2><p class="small" style="margin:0">מפה: OpenFreeMap ו־© OpenStreetMap contributors (ODbL). מזג אוויר וגבהים: Open-Meteo (CC BY 4.0). מכ״ם: RainViewer. ניתוב: OSRM. תבליט: Mapzen/AWS Terrain Tiles. שקיעה וזריחה: SunCalc. תמונות: Mapillary ו־Wikimedia Commons, עם קרדיט לכל צילום. בתי קפה מומלצים: טיולי, mako, מעריב. אכיפה: וואלה (2012), ynetnews (2026).</p>`);
@@ -1429,7 +1454,10 @@
   async function sendFeedback() {
     const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return toast("כתבו כמה מילים");
     const a = st.fbAtt || {}, photo = a.photo ? await b64of(a.photo) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
-    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; st.fbAtt = {}; paintFbAtt(); $("fbRes").textContent = "התקבל. תודה!"; } catch (e) { $("fbRes").textContent = e.message || "אין חיבור"; } $("fbGo").disabled = false; };
+    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; st.fbAtt = {}; paintFbAtt();
+        $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span></div></div>`;
+        try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } $("fbRes").scrollIntoView({ block: "nearest", behavior: "smooth" }); toast("הדיווח נשלח ✓");
+      } catch (e) { $("fbRes").innerHTML = `<div class="fberr" role="alert">${esc(e.message || "אין חיבור")}. הטקסט נשמר, אפשר לנסות שוב.</div>`; } $("fbGo").disabled = false; };
     if (kind === "hazard" && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => post(p.coords.latitude, p.coords.longitude), () => { const c = map.getCenter(); post(c.lat, c.lng); }, { timeout: 6000, enableHighAccuracy: true });
     else post(undefined, undefined);
   }
@@ -1458,13 +1486,12 @@
 
   /* quick report to the group, with a photo straight from the camera */
   function reportPhoto() {
-    const type = $("repType").value, i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.capture = "environment";
-    i.onchange = async () => { if (!i.files[0]) return; let pos = null; try { pos = await getPosFresh(6000); } catch (e) { }
-      const img = await shrink(i.files[0], 1600, 0.82).catch(() => null); if (!img) return toast("התמונה לא נתמכת");
+    const type = $("repType").value;
+    pickFile({ capture: true }).then(async ([f]) => { if (!f) return; let pos = null; try { pos = await getPosFresh(6000); } catch (e) { }
+      const img = await shrink(f, 1600, 0.82).catch(() => null); if (!img) return toast("התמונה לא נתמכת");
       const txt = `Blue Ronin · ${type}${pos ? `\nWaze: https://waze.com/ul?ll=${pos[1].toFixed(5)},${pos[0].toFixed(5)}` : ""}\n${fmtT(new Date())}`, file = new File([img], "blue-ronin-report.jpg", { type: "image/jpeg" });
       try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: txt }); return; } } catch (e) { if (e.name === "AbortError") return; }
-      saveBlob(file.name, img); const u = "https://wa.me/?text=" + encodeURIComponent(txt); const w = window.open(u, "_blank"); if (!w) location.href = u; toast("התמונה נשמרה. צרפו אותה בוואטסאפ"); };
-    i.click();
+      saveBlob(file.name, img); const u = "https://wa.me/?text=" + encodeURIComponent(txt); const w = window.open(u, "_blank"); if (!w) location.href = u; toast("התמונה נשמרה. צרפו אותה בוואטסאפ"); });
   }
 
   /* ---------- offline download ---------- */
@@ -1541,20 +1568,23 @@
   }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  function startFly() {
+  function startFly(opts) {
     if (st.fly) return stopFly();
-    const c = chap(), r = st.routes[st.chap]; if (!r) return;
-    const P = L.flyPath(r.coords, r.km > 250 ? 0.025 : 0.015);
-    const segs = st.curves[st.chap] || []; const cls = new Uint8Array(P.n);
+    const o = opts && opts.coords ? opts : null;
+    const c = o ? { id: "replay", title: "שחזור · " + o.title } : chap(), r = o ? null : st.routes[st.chap]; if (!o && !r) return;
+    const coords = o ? o.coords : r.coords, km0 = o ? o.replay.cum[o.replay.cum.length - 1] : r.km;
+    const P = L.flyPath(coords, km0 > 250 ? 0.025 : 0.015);
+    const segs = o ? L.curveSegments(coords) : (st.curves[st.chap] || []); const cls = new Uint8Array(P.n);
     for (let i = 0, si = 0; i < P.n; i++) { const km = i * P.step; while (si < segs.length - 1 && segs[si].startKm + segs[si].km < km) si++; cls[i] = segs[si] ? segs[si].cls : 0; }
     const base = Math.min(2.4, Math.max(0.5, P.km / 85));
     const el = document.createElement("div"); el.className = "bike"; el.innerHTML = BIKE_SVG;
     const cam = map.getCenter();
-    st.fly = { c, P, cls, E: st.elev[st.chap], km: 0, cap: isPro() ? Infinity : FLY_FREE, rate: LS.get("flyRate", 1), playing: false, loading: true, last: null, base, v: 0, uiT: 0, trT: 0, pfKm: -99, tpl: tileTemplates(),
+    st.fly = { c, P, cls, E: o ? null : st.elev[st.chap], km: 0, cap: isPro() ? Infinity : FLY_FREE, replay: o ? Object.assign(o.replay, { scale: km0 / P.km }) : null, rate: LS.get("flyRate", 1), playing: false, loading: true, last: null, base, v: 0, uiT: 0, trT: 0, pfKm: -99, tpl: tileTemplates(),
       brg: { x: map.getBearing(), v: 0 }, bh: { x: P.head[0], v: 0 }, zoom: { x: map.getZoom(), v: 0 }, pitch: { x: map.getPitch(), v: 0 },
       from: [cam.lng, cam.lat], blend: 0, prevExag: st.terrain ? 1.5 : null,
       marker: new maplibregl.Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(P.pts[0]).addTo(map) };
     const F = st.fly;
+    if (o && map.setSky) try { F.prevSky = map.getSky ? map.getSky() : null; map.setSky(skyFor(o.replay.ride.start)); } catch (e) { }
     /* A touch less relief while flying: the camera rides the ground, so less bounce on steep roads. */
     st.terrain = true; $("f3d").setAttribute("aria-pressed", "true"); map.setTerrain({ source: "dem", exaggeration: 1.2 });
     if (innerWidth < 900) setSheet("peek"); document.body.classList.add("flying"); closeLayers(); renderMarkers();
@@ -1595,8 +1625,8 @@
         const target = F.base * F.rate * [1.35, 1.0, 0.62, 0.44][mx] * endEase;
         F.v += (target - F.v) * (1 - Math.exp(-dt * 1.4));
         F.km = Math.min(P.km, F.km + F.v * dt);
-        if (F.km >= P.km * F.cap) { F.km = P.km * F.cap; F.playing = false; F.v = 0; flyUI(); setTimeout(() => openPaywall("fly"), 350); }
-        if (F.km >= P.km - 0.002) { F.km = P.km; F.playing = false; F.v = 0; flyUI(); }
+        if (F.km >= P.km * F.cap) { F.km = P.km * F.cap; F.playing = false; F.v = 0; flyUI(); setTimeout(() => openPaywall(F.replay ? "replay" : "fly"), 350); }
+        if (F.km >= P.km - 0.002) { F.km = P.km; F.playing = false; F.v = 0; flyUI(); if (F.replay && !F.replay.endShown) { F.replay.endShown = true; setTimeout(() => st.fly === F && replayEnd(F), 900); } }
       } else F.v *= Math.exp(-dt * 4);
       const at = flyAt(P, F.km); pos = at.p; i0 = at.i;
       /* camera heading: the chord from just behind the bike to a point ahead that grows with speed,
@@ -1620,14 +1650,15 @@
     }
     if (F.playing && F.km - F.pfKm > 1.2) { F.pfKm = F.km; warmAhead(F, F.km, F.km + 36); }
     if (ts - F.trT > 500) { F.trT = ts; const step = Math.max(1, Math.round(i0 / 500)); const line = []; for (let k = 0; k <= i0; k += step) line.push(P.pts[k]); line.push(pos); setSrc("br-fly", FC(line.length > 1 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } }] : [])); }
-    if (ts - F.uiT > 200) { F.uiT = ts; flyInfo(i0); }
+    if (ts - F.uiT > 200) { F.uiT = ts; flyInfo(i0); if (F.replay) replayPop(F); }
     F.raf = requestAnimationFrame(flyStep);
   }
   function flyInfo(i0) {
     const F = st.fly; if (!F) return; const P = F.P;
     let elv = ""; if (F.E && F.E.el) { const j = Math.min(F.E.el.length - 1, Math.round(F.km / F.E.km * (F.E.el.length - 1))); elv = ` · ${Math.round(F.E.el[j])} מ׳`; }
     if (F.loading) { $("flInfo").textContent = "טוען את הדרך מראש…"; return; }
-    const dk = P.km < 40 ? 1 : 0; $("flInfo").textContent = `ק״מ ${F.km.toFixed(dk)} / ${P.km.toFixed(dk)}${elv} · ${L.CURVE_LABEL[F.cls[i0]]}`;
+    const dk = P.km < 40 ? 1 : 0, clock = F.replay ? ` · ${fmtT(new Date(replayClock(F)))}` : "";
+    $("flInfo").textContent = `ק״מ ${F.km.toFixed(dk)} / ${P.km.toFixed(dk)}${clock}${elv} · ${L.CURVE_LABEL[F.cls[i0]]}`;
     if (!flySeeking) $("flSeek").value = Math.round(F.km / P.km * 1000);
   }
   let flySeeking = false;
@@ -1638,7 +1669,7 @@
     document.querySelectorAll("#flyui [data-rate]").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.rate === F.rate)));
   }
   $("flPlay").onclick = () => { const F = st.fly; if (!F || F.loading) return; if (F.km >= F.P.km) { F.km = 0; F.snap = true; }
-    if (!F.playing && F.km >= F.P.km * F.cap - 0.01) return openPaywall("fly");
+    if (!F.playing && F.km >= F.P.km * F.cap - 0.01) return openPaywall(F.replay ? "replay" : "fly");
     if (!F.playing) { const cm = map.getCenter(); F.from = [cm.lng, cm.lat]; F.blend = 0; F.brg.x = map.getBearing(); F.brg.v = 0; F.zoom.x = map.getZoom(); F.zoom.v = 0; F.pitch.x = map.getPitch(); F.pfKm = -99; }
     F.hold = false; F.playing = !F.playing; flyUI(); };
   $("flClose").onclick = () => stopFly(true);
@@ -1648,10 +1679,11 @@
   function stopFly(done) {
     const F = st.fly; if (!F) return;
     cancelAnimationFrame(F.raf); F.marker.remove(); st.fly = null; setSrc("br-fly", FC()); dropTileQueue(); renderMarkers();
+    if (F.replay) { try { map.setSky && map.setSky(F.prevSky || {}); } catch (e) { } clearTimeout(F.replay.resume); $("rpPop").hidden = true; }
     map.setTerrain({ source: "dem", exaggeration: 1.5 });
     map.getCanvas().removeEventListener("pointerdown", flyTouch); document.body.classList.remove("flying");
     $("fFly").setAttribute("aria-pressed", "false"); flyUI(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
-    if (done) fitChapter(1400);
+    if (done) { if (F.replay) showRide(F.replay.ride); else fitChapter(1400); }
   }
 
   /* ---------- 3D ---------- */
@@ -1875,9 +1907,9 @@
   }
   /* The alert itself: push to contacts + live location on, then a sheet with one-tap call / WhatsApp / SMS. */
   async function sosAlert(kind = "sos") {
-    st.sosOn = kind !== "test"; let pos = null; try { pos = await getPosFresh(8000); } catch (e) { }
+    st.sosOn = kind !== "test"; if (kind !== "test") toast("שולח קריאת חירום…", 6000); let pos = null; try { pos = await getPosFresh(3500); } catch (e) { }
     const lat = pos ? pos[1] : st.me ? st.me.lat : null, lon = pos ? pos[0] : st.me ? st.me.lon : null;
-    if (kind !== "test") try { await liveStart(true); await liveFlush("sos"); } catch (e) { }
+    if (kind !== "test") { try { await liveStart(true); await liveFlush("sos"); } catch (e) { } if (st.group) gTick(); }
     let res = null, err = "";
     if (st.sos.circle) try { res = await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind, lat, lon, live: st.live ? st.live.id : "", phone: IL(st.sos.phone), name: st.sos.name }); } catch (e) { err = e.message; }
     if (kind === "test") { toast(res ? (res.sent ? `התראת בדיקה נשלחה ל־${res.sent} אנשי קשר` : "אין עדיין אנשי קשר מחוברים לקבלת התראות") : err || "לא נשלח"); return; }
@@ -1891,9 +1923,15 @@
       <div class="row"><a class="btn sm" href="tel:100">משטרה 100</a><a class="btn sm" href="tel:112">חירום 112</a></div>
       <button type="button" class="btn" id="sosOk">אני בסדר, ביטול מצב חירום</button></div>`, "sosm");
     if ($("sosSetup")) $("sosSetup").onclick = () => { closeModal(); setTab("me"); };
-    $("sosOk").onclick = async () => { st.sosOn = false; closeModal(); if (res && res.sent && st.sos.circle) { try { await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind: "test", lat, lon, name: st.sos.name }); } catch (e) { } } liveFlush(st.ride ? "riding" : "stopped"); toast("מצב החירום בוטל"); };
+    $("sosOk").onclick = async () => { st.sosOn = false; closeModal(); if (st.group) gTick(); if (res && res.sent && st.sos.circle) { try { await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind: "test", lat, lon, name: st.sos.name }); } catch (e) { } } liveFlush(st.ride ? "riding" : "stopped"); toast("מצב החירום בוטל"); };
   }
-  function getPosFresh(ms = 8000) { return new Promise((res, rej) => { if (st.me && st.meTs && Date.now() - st.meTs < 15000) return res([st.me.lon, st.me.lat]); if (!navigator.geolocation) return rej(new Error("no geo")); navigator.geolocation.getCurrentPosition(p => { feed(p); res([p.coords.longitude, p.coords.latitude]); }, rej, { enableHighAccuracy: true, timeout: ms, maximumAge: 10000 }); }); }
+  /* A phone that stands still often stops sending position updates, so "old" is not "wrong": ask for a
+     fresh fix, and if none comes in time, fall back to the last known one (up to 30 min). */
+  function getPosFresh(ms = 8000) { return new Promise((res, rej) => {
+    const last = st.me && st.meTs && Date.now() - st.meTs < 30 * 6e4 ? [st.me.lon, st.me.lat] : null;
+    if (last && Date.now() - st.meTs < 15000) return res(last); if (!navigator.geolocation) return last ? res(last) : rej(new Error("no geo"));
+    let done = false; const t = setTimeout(() => { if (done) return; done = true; last ? res(last) : rej(new Error("timeout")); }, ms + 500);
+    navigator.geolocation.getCurrentPosition(p => { if (done) return; done = true; clearTimeout(t); feed(p); res([p.coords.longitude, p.coords.latitude]); }, e => { if (done) return; done = true; clearTimeout(t); last ? res(last) : rej(e); }, { enableHighAccuracy: true, timeout: ms, maximumAge: 30000 }); }); }
 
   /* ---------- fall detection (ride mode only, opt-in) ----------
      A hard hit alone is not enough (phones get dropped). We need: riding (> 25 km/h in the last 10 s),
@@ -1970,17 +2008,17 @@
     const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("items", mode), s = t.objectStore("items"); const out = fn(s); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => rej(t.error); }); };
     return { put: v => tx("readwrite", s => s.put(v)), del: id => tx("readwrite", s => s.delete(id)), get: id => tx("readonly", s => s.get(id)), all: () => tx("readonly", s => s.getAll()) }; })();
   let memCache = null; const memAll = async () => memCache || (memCache = (await idb.all().catch(() => [])).sort((a, b) => b.t - a.t));
-  async function shrink(file, max, q) { const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => null); if (!bmp) throw new Error("התמונה לא נתמכת"); const k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height); return await new Promise(r => c.toBlob(r, "image/jpeg", q)); }
   const memCtx = () => ({ chap: st.ride ? st.ride.c.id : st.chap, title: st.ride ? st.ride.c.title : chap().title, ride: st.ride ? "live" : "" });
   async function memLimit() { if (isPro()) return true; const n = (await memAll()).length; if (n < FREE_MEM) return true; openPaywall("memories"); return false; }
   async function memAddPhotos(files, fromCamera) {
     if (!files || !files.length) return; if (!(await memLimit())) return; let pos = null; if (fromCamera) try { pos = await getPosFresh(5000); } catch (e) { }
-    let n = 0; for (const f of [...files].slice(0, 20)) { try { const full = await shrink(f, 1800, 0.84), th = await shrink(f, 420, 0.72); const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
+    const list = [...files].slice(0, 20); if (list.length > 1) toast(`שומר ${list.length} תמונות…`, 8000);
+    let n = 0; for (const f of list) { try { const im = await decodeImg(f); let full, th; try { full = await toJpeg(im, 1800, 0.84); th = await toJpeg(im, 420, 0.72); } finally { try { im.close && im.close(); } catch (e) { } } const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
       await idb.put(Object.assign({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t, kind: "photo", blob: full, thumb: th, lat: pos ? pos[1] : null, lon: pos ? pos[0] : null, note: "" }, memCtx())); n++; } catch (e) { toast(e.message); } }
     memCache = null; try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
     if (n) toast(n === 1 ? "התמונה נשמרה בזיכרונות" : `${n} תמונות נשמרו בזיכרונות`); renderMeIf();
   }
-  function pickPhotos(camera) { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; if (camera) i.capture = "environment"; else i.multiple = true; i.onchange = () => memAddPhotos(i.files, camera); i.click(); }
+  function pickPhotos(camera) { pickFile({ capture: camera, multiple: !camera }).then(fs => { if (fs.length) memAddPhotos(fs, camera); }); }
   /* voice recorder sheet, shared by memories and team reports */
   async function recordVoice(maxSec = 60) {
     if (!navigator.mediaDevices || !window.MediaRecorder) { toast("ההקלטה לא נתמכת בדפדפן הזה"); return null; }
@@ -1989,9 +2027,10 @@
     const rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 48000 } : undefined), chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     return new Promise(res => {
       let sec = 0, done = false; const box = openModal(`<div class="recsheet"><h2>הקלטה</h2><div class="recdot"></div><b class="mono" id="recT">0:00</b><p class="small muted" style="margin:0">עד ${maxSec} שניות</p><div class="row"><button type="button" class="btn primary" id="recStop">סיום ושמירה</button><button type="button" class="btn" id="recX">ביטול</button></div></div>`);
-      const end = keep => { if (done) return; done = true; clearInterval(tm); rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); closeModal(); res(keep && chunks.length ? new Blob(chunks, { type: rec.mimeType || type || "audio/webm" }) : null); }; try { rec.stop(); } catch (e) { rec.onstop(); } };
+      let fin = false; const finish = keep => { if (fin) return; fin = true; try { stream.getTracks().forEach(t => t.stop()); } catch (e) { } if (!$("modal").hidden) closeModal(); res(keep && chunks.length ? new Blob(chunks, { type: rec.mimeType || type || "audio/webm" }) : null); };
+      const end = keep => { if (done) return; done = true; clearInterval(tm); rec.onstop = () => finish(keep); try { if (rec.state !== "inactive") { rec.requestData && rec.requestData(); rec.stop(); } else finish(keep); } catch (e) { finish(keep); } setTimeout(() => finish(keep), 1500); };
       const tm = setInterval(() => { sec++; const e = $("recT"); if (e) e.textContent = `0:${String(sec).padStart(2, "0")}`; if (sec >= maxSec) end(true); }, 1000);
-      $("recStop").onclick = () => end(true); $("recX").onclick = () => end(false); rec.start(250);
+      $("recStop").onclick = () => end(true); $("recX").onclick = () => end(false); try { rec.start(250); } catch (e) { done = true; clearInterval(tm); finish(false); toast("ההקלטה לא התחילה"); }
       const mo = new MutationObserver(() => { if ($("modal").hidden || !$("recStop")) { end(false); mo.disconnect(); } }); mo.observe($("modal"), { attributes: true, attributeFilter: ["hidden", "class"] });
     });
   }
@@ -2033,6 +2072,7 @@
       <label class="toggle small"><input type="checkbox" id="sCrash" ${c.crash ? "checked" : ""}> זיהוי נפילה במצב רכיבה (בטא): מכה חזקה ואחריה עצירה, ספירה של 30 שניות, ואם אין תשובה נשלחת התראה</label>
       <div class="row"><button type="button" class="btn sm" id="sFallTest">ניסיון של מסך הנפילה</button><button type="button" class="btn sm danger" id="sSos">קריאת חירום עכשיו</button></div>
       <p class="small muted" style="margin:0">עובד כשהאפליקציה פתוחה על המסך (מצב רכיבה משאיר אותו דולק). האפליקציה לא יכולה לחייג או לשלוח SMS לבד, ולכן ההתראה האוטומטית מגיעה כהודעה דחופה באפליקציה של איש הקשר.</p></div>`;
+    h += groupCard();
     h += `<div class="card"><div class="row" style="justify-content:space-between"><h3>שיתוף מיקום חי</h3>${st.live ? '<span class="probadge" style="background:var(--go)">פעיל</span>' : ""}</div>
       <p class="small" style="margin:0">${st.live ? `פעיל עד ${fmtT(new Date(st.live.exp))}. מי שיש לו את הקישור רואה איפה אתם ומתי עודכן לאחרונה.` : "קישור שמראה למשפחה או לחברים איפה אתם בזמן אמת, עד 12 שעות או עד שתפסיקו. במצב חירום נפתח לבד."}</p>
       <div class="row">${st.live ? `<button type="button" class="btn primary" id="lvShare">שליחת הקישור</button><button type="button" class="btn" id="lvStop">הפסקה</button>` : `<button type="button" class="btn primary" id="lvShare">${PWI.share}התחלת שיתוף</button>`}</div></div>`;
@@ -2042,6 +2082,9 @@
       <div class="row"><button type="button" class="btn primary" id="memCam">${PWI.cam}צילום</button><button type="button" class="btn" id="memVoice">${PWI.mic}הקלטה</button><button type="button" class="btn" id="memPick">מהגלריה</button></div>
       ${days.length ? days.slice(0, pro ? 60 : 12).map(d => `<div class="memday"><div class="small"><b>${esc(fmtD(new Date(d.t)))}</b> <span class="muted">${esc(d.title || "")}</span></div><div class="memgrid">${d.items.map(m => `<button type="button" class="memt${m.kind === "voice" ? " v" : ""}" data-mem="${m.id}" aria-label="${m.kind === "voice" ? "הקלטה" : "תמונה"}">${m.kind === "photo" ? `<img src="${blobUrl(m.id + "t", m.thumb)}" alt="" loading="lazy">` : PWI.mic}</button>`).join("")}</div></div>`).join("") : `<div class="memempty small muted">עוד אין. צילום בעצירה הבאה, והוא יחכה פה עם התאריך, הפרק והמיקום.</div>`}</div>`;
     h += proCard() + journalCard();
+    h += `<div class="card"><h3>גיבוי והעברה</h3><p class="small muted" style="margin:0">טלפון חדש, או מעבר מהכתובת הקודמת: הכול עובר בקוד מוצפן. גיבוי לקובץ כולל גם את הזיכרונות.</p>
+      <div class="row"><button type="button" class="btn primary" id="xSend">שליחה למכשיר אחר</button><button type="button" class="btn" id="xRecv">קבלת נתונים בקוד</button></div>
+      <div class="row"><button type="button" class="btn sm" id="xBackup">שמירת גיבוי לקובץ</button><button type="button" class="btn sm" id="xRestore">שחזור מקובץ</button></div></div>`;
     h += `<div class="card"><h3>אני איש קשר של רוכב</h3><p class="small muted" style="margin:0">קיבלתם קוד הזמנה? הזינו אותו כאן כדי לקבל התראות חירום בטלפון הזה.</p><div class="row"><input id="gCode" class="btn mono" dir="ltr" maxlength="9" placeholder="XXXX-XXXX" style="flex:1;min-width:0"><button type="button" class="btn" id="gGo">הצטרפות</button></div></div>`;
     p.innerHTML = h; bindMe();
   }
@@ -2064,6 +2107,8 @@
     $("memCam").onclick = () => pickPhotos(true); $("memPick").onclick = () => pickPhotos(false); $("memVoice").onclick = memAddVoice;
     document.querySelectorAll("[data-mem]").forEach(b => b.onclick = () => memViewer(b.dataset.mem));
     $("gGo").onclick = () => guardJoin($("gCode").value);
+    bindGroup();
+    $("xSend").onclick = () => sendSheet(false); $("xRecv").onclick = () => recvSheet(); $("xBackup").onclick = backupFile; $("xRestore").onclick = restoreFile;
     $("proMore").onclick = () => openPaywall(); bindJournal();
     if (c.circle && Date.now() - (st.sosListT || 0) > 6e4) { st.sosListT = Date.now(); const before = JSON.stringify(c.guards); sosGuards().then(g => { if (JSON.stringify(g) !== before) renderMeIf(); }); }
   }
@@ -2093,15 +2138,33 @@
 
   /* ---------- voice search (builder) ---------- */
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  /* Voice search: a listening sheet you can always close, with watchdogs so a speech service that never
+     answers can't freeze anything. Where the browser has no speech service (or refuses), the keyboard's
+     own dictation is the fallback. */
   function micFor(input, onFinal) {
-    if (!SR) return null; const b = document.createElement("button"); b.type = "button"; b.className = "micbtn"; b.setAttribute("aria-label", "חיפוש קולי"); b.innerHTML = PWI.mic;
-    b.onclick = () => { if (b.rec) { b.rec.stop(); return; } const r = new SR(); r.lang = "he-IL"; r.interimResults = true; r.maxAlternatives = 1; b.rec = r; b.classList.add("on"); input.placeholder = "מדברים…";
-      r.onresult = e => { const t = [...e.results].map(x => x[0].transcript).join(""); input.value = t; if (e.results[e.results.length - 1].isFinal) onFinal(t); };
-      r.onerror = e => { if (e.error === "not-allowed") toast("צריך לאשר גישה למיקרופון"); else if (e.error !== "aborted" && e.error !== "no-speech") toast("לא הצלחתי לשמוע"); };
-      r.onend = () => { b.rec = null; b.classList.remove("on"); input.placeholder = "חיפוש מקום, צומת, בית קפה או תחנה"; };
-      try { r.start(); } catch (e) { b.rec = null; b.classList.remove("on"); } };
-    return b;
+    const b = document.createElement("button"); b.type = "button"; b.className = "micbtn"; b.setAttribute("aria-label", "חיפוש קולי"); b.innerHTML = PWI.mic;
+    b.onclick = () => listen(input, onFinal); return b;
   }
+  function listen(input, onFinal) {
+    const dictate = m => { toast(m || "לחצו על המיקרופון שבמקלדת כדי להכתיב", 4500); try { input.focus(); } catch (e) { } };
+    if (!SR) return dictate();
+    let r; try { r = new SR(); } catch (e) { return dictate(); }
+    let text = "", ended = false, started = false; const timers = [];
+    openModal(`<div class="listen"><div class="recdot"></div><b id="lsT">מקשיב… אמרו לאן</b><div id="lsTxt" class="lstxt"></div><div class="row"><button type="button" class="btn primary" id="lsDone">סיום</button><button type="button" class="btn" id="lsX">ביטול</button></div></div>`, "lsm");
+    const finish = use => { if (ended) return; ended = true; timers.forEach(clearTimeout); mo.disconnect(); try { r.onresult = r.onend = r.onerror = r.onstart = null; r.abort(); } catch (e) { } if (!$("modal").hidden) closeModal(); if (use && text.trim()) { input.value = text.trim(); try { onFinal(text.trim()); } catch (e) { } } };
+    const mo = new MutationObserver(() => { if ($("modal").hidden || !$("lsDone")) finish(false); }); mo.observe($("modal"), { attributes: true, attributeFilter: ["hidden", "class"] });
+    r.lang = "he-IL"; r.interimResults = !isIOS; r.continuous = false; r.maxAlternatives = 1;
+    r.onstart = () => { started = true; };
+    r.onresult = e => { text = [...e.results].map(x => x[0].transcript).join(""); const t = $("lsTxt"); if (t) t.textContent = text; if (e.results[e.results.length - 1].isFinal) finish(true); };
+    r.onerror = e => { const er = e.error; finish(false); if (er === "aborted") return; dictate(er === "not-allowed" || er === "service-not-allowed" ? "אין הרשאה לזיהוי דיבור. אפשר להכתיב דרך המיקרופון שבמקלדת" : er === "no-speech" ? "לא נשמע דיבור. נסו שוב, או הכתיבו דרך המקלדת" : "הזיהוי הקולי לא זמין כרגע. אפשר להכתיב דרך המקלדת"); };
+    r.onend = () => finish(true);
+    timers.push(setTimeout(() => { if (!started && !ended) { finish(false); dictate("הזיהוי הקולי לא התחיל. אפשר להכתיב דרך המיקרופון שבמקלדת"); } }, 6000));
+    timers.push(setTimeout(() => finish(true), 15000));
+    $("lsDone").onclick = () => { try { r.stop(); } catch (e) { } timers.push(setTimeout(() => finish(true), 1200)); };
+    $("lsX").onclick = () => finish(false);
+    try { r.start(); } catch (e) { finish(false); dictate(); }
+  }
+
   function geoResume() { if (geoSubs.size && geoW == null && navigator.geolocation) geoW = navigator.geolocation.watchPosition(feed, () => { }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 }); }
   function geoPause() { if (geoW != null) { navigator.geolocation.clearWatch(geoW); geoW = null; } }
   setTimeout(drawPark, 1500);
@@ -2116,6 +2179,286 @@
     b.addEventListener("pointerup", cancel); b.addEventListener("pointerleave", cancel); b.addEventListener("pointercancel", cancel);
     b.addEventListener("contextmenu", e => e.preventDefault()); })();
   setInterval(() => { const on = !!st.live; $("hudLive").classList.toggle("on", on); }, 2000);
+
+  /* =====================================================================================
+     Transfer and backup. On iPhone every home-screen app keeps its own storage (separate from Safari),
+     so data can't ride in a link. Instead the phone encrypts its data with a key that stays in the code
+     the rider types: our server only ever holds ciphertext, for 24 hours. A backup file works offline.
+     ===================================================================================== */
+  const XCH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const standalone = () => { try { return matchMedia("(display-mode: standalone)").matches || !!navigator.standalone; } catch (e) { return false; } };
+  const fmtCode = c => c.replace(/(.{4})(?=.)/g, "$1-");
+  const normCode = c => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  async function xKey(part) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("brn-xfer|" + part)); return crypto.subtle.importKey("raw", h, "AES-GCM", false, ["encrypt", "decrypt"]); }
+  async function gz(bytes, dir) { const S = dir ? window.CompressionStream : window.DecompressionStream; if (!S) return null; return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new S("gzip"))).arrayBuffer()); }
+  const b64ofBytes = bytes => { let s = ""; for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const bytesOfB64 = t => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+  const blob2url = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+  const url2blob = async u => (await fetch(u)).blob();
+  async function collectData(withMem) {
+    const d = {}; MOVE_KEYS.forEach(k => { const v = LS.get(k, undefined); if (v !== undefined && v !== null) d[k] = v; });
+    if (withMem) { const ms = await memAll(); d.__mem = []; for (const m of ms) d.__mem.push(Object.assign({}, m, { blob: await blob2url(m.blob), thumb: m.thumb ? await blob2url(m.thumb) : null })); }
+    return { v: 2, t: Date.now(), from: location.host, d };
+  }
+  const summary = d => { const n = []; const nr = (d.myRoutes || []).length, nd = (d.rides || []).length; if (nr) n.push(nr === 1 ? "מסלול אחד שבנית" : `${nr} מסלולים שבנית`); if (nd) n.push(nd === 1 ? "רכיבה אחת ביומן" : `${nd} רכיבות ביומן`); if (d.bike && d.bike.id) n.push("האופנוע וההגדרות"); if (d.sos && (d.sos.cPhone || d.sos.circle)) n.push("פרטי החירום ואנשי הקשר"); if (d.pro && d.pro.exp > Date.now()) n.push("מנוי Pro פעיל"); if ((d.__mem || []).length) n.push(d.__mem.length === 1 ? "זיכרון אחד" : `${d.__mem.length} זיכרונות`); return n.length ? n : ["ההגדרות שלך"]; };
+  async function applyData(d) {
+    const cur = { routes: LS.get("myRoutes", []) || [], rides: LS.get("rides", []) || [] };
+    const keep = { ...d }; delete keep.__mem;
+    /* never replace an active Pro or an emergency circle with an older/empty one */
+    if (keep.pro && st.pro && st.pro.exp > (keep.pro.exp || 0)) delete keep.pro;
+    if (keep.sos && st.sos && st.sos.circle && !keep.sos.circle) delete keep.sos;
+    Object.entries(keep).forEach(([k, v]) => LS.set(k, v));
+    if (cur.routes.length) LS.set("myRoutes", cur.routes.concat((d.myRoutes || []).filter(r => !cur.routes.some(x => x.id === r.id))));
+    if (cur.rides.length) LS.set("rides", cur.rides.concat((d.rides || []).filter(r => !cur.rides.some(x => x.id === r.id))).sort((a, b) => b.start - a.start).slice(0, 60));
+    if (Array.isArray(d.__mem)) for (const m of d.__mem) { try { await idb.put(Object.assign({}, m, { blob: await url2blob(m.blob), thumb: m.thumb ? await url2blob(m.thumb) : null })); } catch (e) { } }
+    LS.set("moved", Date.now()); LS.set("movedSeen", false); LS.set("xferAsked", true);
+  }
+  async function xferSend() {
+    const pack = await collectData(false), raw = new TextEncoder().encode(JSON.stringify(pack)), z = await gz(raw, true);
+    const body = new Uint8Array((z || raw).length + 1); body[0] = z ? 1 : 0; body.set(z || raw, 1);
+    const part = Array.from(crypto.getRandomValues(new Uint8Array(10)), x => XCH[x % XCH.length]).join(""), iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await xKey(part), body));
+    const j = await post("/api/xfer", { ct: b64ofBytes(ct), iv: b64ofBytes(iv) });
+    return { code: j.id + part, n: summary(pack.d), exp: j.exp };
+  }
+  async function xferFetch(code) {
+    const c = normCode(code); if (c.length !== 16) throw new Error("הקוד צריך 16 תווים");
+    const r = await fetch("/api/xfer/" + c.slice(0, 6), { cache: "no-store" }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "אין חיבור");
+    let plain; try { plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytesOfB64(j.iv) }, await xKey(c.slice(6)), bytesOfB64(j.ct))); } catch (e) { throw new Error("הקוד לא נכון. בדקו את 16 התווים"); }
+    const data = plain[0] === 1 ? await gz(plain.subarray(1), false) : plain.subarray(1); if (!data) throw new Error("הדפדפן הזה ישן מדי לפתיחת ההעברה. עדכנו את מערכת ההפעלה");
+    const o = JSON.parse(new TextDecoder().decode(data)); if (!o || typeof o.d !== "object") throw new Error("ההעברה לא תקינה"); return o.d;
+  }
+  /* sending side: one sheet for every case, with the right steps for the phone in hand */
+  async function sendSheet(moving) {
+    const box = openModal(`<div class="xsheet"><h2>${moving ? "מעבר לכתובת החדשה" : "העברה למכשיר אחר"}</h2><p class="small muted" style="margin:0">מכינים קוד העברה מוצפן…</p><div class="spin" style="margin:10px auto;width:28px;height:28px"></div></div>`, "xm");
+    let r; try { r = await xferSend(); } catch (e) { box.innerHTML = `<div class="xsheet"><h2>לא הצלחנו להכין קוד</h2><p class="small">${esc(e.message)}</p><button type="button" class="btn primary" id="xRetry">ניסיון חוזר</button><button type="button" class="btn" id="xFile">שמירת גיבוי לקובץ במקום</button></div>`; $("xRetry").onclick = () => sendSheet(moving); $("xFile").onclick = backupFile; return; }
+    const code = fmtCode(r.code), link = `${NEW_HOME}/#xfer=${r.code}`, ios = isIOS;
+    try { await navigator.clipboard.writeText(r.code); } catch (e) { }
+    if (!$("mbody") || $("modal").hidden) return;
+    $("mbody").innerHTML = `<div class="xsheet"><h2>${moving ? "מעבר לכתובת החדשה" : "קוד העברה"}</h2>
+      <div class="xcode mono" dir="ltr" id="xCode">${code}</div><button type="button" class="btn" id="xCopy">העתקת הקוד</button>
+      <p class="small" style="margin:0">יעבור: ${r.n.map(esc).join(" · ")}. הקוד בתוקף 24 שעות. ההעברה מוצפנת, ואנחנו לא יכולים לקרוא אותה.</p>
+      ${moving && ios && standalone() ? `<ol class="xsteps"><li>הקוד כבר הועתק.</li><li>פתחו את <b>Safari</b>, היכנסו ל־<b dir="ltr">blueronin.app</b>, ולחצו שיתוף ← <b>״הוספה למסך הבית״</b>.</li><li>פתחו את האפליקציה החדשה מהמסך הבית, ובהודעה שתופיע לחצו <b>״קבלת הנתונים״</b> ← הדבקה.</li><li><b>אל תמחקו את האייקון הישן</b> עד שתראו שהכול עבר.</li></ol>`
+        : moving ? `<a class="btn primary big" href="${link}">פתיחה ב־blueronin.app עם הנתונים</a><p class="small muted" style="margin:0">באייפון: אם האפליקציה מותקנת במסך הבית, פתחו אותה, לחצו ״קבלת הנתונים״ והדביקו את הקוד.</p>`
+        : `<p class="small" style="margin:0">במכשיר השני: לשונית ״שלי״ ← ״גיבוי והעברה״ ← ״קבלת נתונים בקוד״.</p>`}</div>`;
+    $("xCopy").onclick = () => navigator.clipboard.writeText(r.code).then(() => toast("הקוד הועתק")).catch(() => { const rg = document.createRange(); rg.selectNodeContents($("xCode")); getSelection().removeAllRanges(); getSelection().addRange(rg); });
+  }
+  /* receiving side */
+  function recvSheet(prefill) {
+    openModal(`<div class="xsheet"><h2>קבלת הנתונים שלך</h2><p class="small muted" style="margin:0">הקוד מופיע באפליקציה הישנה (או במכשיר השני), 16 תווים.</p>
+      <input id="xIn" class="xin mono" dir="ltr" maxlength="19" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" value="${esc(prefill ? fmtCode(normCode(prefill)) : "")}">
+      <div class="row"><button type="button" class="btn" id="xPaste">הדבקה</button><button type="button" class="btn primary" id="xGo">קבלה</button></div><div class="err small" id="xErr"></div></div>`, "xm");
+    const inp = $("xIn"); inp.oninput = () => { const v = normCode(inp.value).slice(0, 16); const f = fmtCode(v); if (inp.value !== f) inp.value = f; };
+    $("xPaste").onclick = async () => { try { inp.value = fmtCode(normCode(await navigator.clipboard.readText()).slice(0, 16)); } catch (e) { inp.focus(); toast("לחצו לחיצה ארוכה בשדה ← הדבקה"); } };
+    $("xGo").onclick = async () => {
+      const b = $("xGo"); b.disabled = true; $("xErr").textContent = "";
+      try { const d = await xferFetch(inp.value); const items = summary(d);
+        $("mbody").innerHTML = `<div class="xsheet"><h2>נמצאו הנתונים שלך</h2><ul class="xsteps">${items.map(i => `<li>${esc(i)}</li>`).join("")}</ul><button type="button" class="btn primary big" id="xApply">שמירה במכשיר הזה</button></div>`;
+        $("xApply").onclick = async () => { $("xApply").disabled = true; await applyData(d); history.replaceState(null, "", location.pathname); location.reload(); };
+      } catch (e) { $("xErr").textContent = e.message; b.disabled = false; }
+    };
+  }
+  async function backupFile() {
+    toast("מכין גיבוי…"); const pack = await collectData(true), name = `blue-ronin-backup-${new Date().toISOString().slice(0, 10)}.json`, blob = new Blob([JSON.stringify(pack)], { type: "application/json" });
+    const file = new File([blob], name, { type: "application/json" });
+    try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "גיבוי Blue Ronin" }); return; } } catch (e) { if (e.name === "AbortError") return; }
+    saveBlob(name, blob); toast("הגיבוי נשמר בהורדות");
+  }
+  async function restoreFile() {
+    const [f] = await pickFile({ accept: ".json,application/json" }); if (!f) return;
+    let o; try { o = JSON.parse(await f.text()); if (!o || typeof o.d !== "object") throw 0; } catch (e) { return toast("זה לא קובץ גיבוי של Blue Ronin"); }
+    openModal(`<div class="xsheet"><h2>שחזור מגיבוי</h2><p class="small muted" style="margin:0">מ־${esc(fmtD(new Date(o.t || Date.now())))}</p><ul class="xsteps">${summary(o.d).map(i => `<li>${esc(i)}</li>`).join("")}</ul><p class="small" style="margin:0">מה שכבר יש במכשיר נשמר. מסלולים ורכיבות מתמזגים.</p><button type="button" class="btn primary big" id="rsGo">שחזור</button></div>`, "xm");
+    $("rsGo").onclick = async () => { $("rsGo").disabled = true; await applyData(o.d); location.reload(); };
+  }
+  const xHash = location.hash.match(/^#xfer=([A-Za-z0-9-]{16,19})$/); if (xHash) setTimeout(() => recvSheet(xHash[1]), 900);
+  /* a fresh install on the new address, with nothing on it yet: offer the transfer once */
+  setTimeout(() => { try {
+    const empty = !(LS.get("rides", []) || []).length && !(LS.get("myRoutes", []) || []).length && !(LS.get("sos", {}) || {}).cPhone && !(LS.get("bike", {}) || {}).id;
+    if (location.origin === NEW_HOME && empty && !LS.get("xferAsked", false) && !xHash && Date.now() < Date.UTC(2027, 1, 1)) { LS.set("xferAsked", true); updBar("השתמשתם באפליקציה בכתובת הקודמת? מעבירים את הנתונים בקוד", { btn: "קבלת הנתונים", go: () => { $("updbar").hidden = true; recvSheet(); }, ms: 25000 }); }
+  } catch (e) { } }, 3500);
+
+  /* ---------- reliable file pickers ----------
+     iOS drops a detached <input type=file> while the camera is open, so the first photo was lost.
+     The input lives in the page until the choice comes back (or the picker is cancelled). */
+  function pickFile({ accept = "image/*", capture = false, multiple = false } = {}) {
+    return new Promise(res => {
+      const i = document.createElement("input"); i.type = "file"; i.accept = accept; if (capture) i.setAttribute("capture", "environment"); if (multiple) i.multiple = true;
+      i.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0"; document.body.appendChild(i);
+      let done = false; const fin = files => { if (done) return; done = true; setTimeout(() => i.remove(), 1000); res(files); };
+      i.addEventListener("change", () => fin([...(i.files || [])]));
+      i.addEventListener("cancel", () => fin([]));
+      /* no 'cancel' event on older iOS: when the page regains focus and nothing came back within a while, give up */
+      const onFocus = () => setTimeout(() => { if (!done && !(i.files && i.files.length)) fin([]); }, 4000);
+      setTimeout(() => window.addEventListener("focus", onFocus, { once: true }), 300);
+      i.click();
+    });
+  }
+  /* decode once, make both sizes; falls back to <img> when createImageBitmap can't read the file */
+  async function decodeImg(file) {
+    try { if (window.createImageBitmap) return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { }
+    try { if (window.createImageBitmap) return await createImageBitmap(file); } catch (e) { }
+    return await new Promise((res, rej) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { res(im); setTimeout(() => URL.revokeObjectURL(u), 1000); }; im.onerror = () => { URL.revokeObjectURL(u); rej(new Error("התמונה לא נתמכת")); }; im.src = u; });
+  }
+  function toJpeg(src, max, q) { const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight, k = Math.min(1, max / Math.max(w, h)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, c.width, c.height); return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("לא הצלחנו לעבד את התמונה")), "image/jpeg", q)); }
+  async function shrink(file, max, q) { const im = await decodeImg(file); try { return await toJpeg(im, max, q); } finally { try { im.close && im.close(); } catch (e) { } } }
+
+  /* =====================================================================================
+     3D ride replay — the ride you actually rode, through the fly-through camera. Our touches: the real
+     clock of the ride runs with it, the sky takes the colour of that hour, and the replay pauses on every
+     photo you took, right where you took it.
+     ===================================================================================== */
+  function rideCoords(ride) {
+    const raw = []; ride.trk.forEach(p => { const q = raw[raw.length - 1]; if (!q || L.hav([q[0], q[1]], [p[0], p[1]]) > 0.004) raw.push(p); });
+    if (raw.length < 3) return null;
+    /* light smoothing that keeps one point per fix, so time stays attached to place */
+    const c = raw.map((p, i) => { if (i === 0 || i === raw.length - 1) return [p[0], p[1]]; const a = raw[i - 1], b = raw[i + 1]; return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4]; });
+    return { coords: c, times: raw.map(p => p[2]) };
+  }
+  function skyFor(t) {
+    const h = +new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(new Date(t));
+    if (h < 7) return { "sky-color": "#F6B27A", "horizon-color": "#FCD9B0", "fog-color": "#F3C9A0", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.6 };
+    if (h < 16) return { "sky-color": "#7FB4F0", "horizon-color": "#DCEBFA", "fog-color": "#E6EEF7", "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.5 };
+    if (h < 18) return { "sky-color": "#F08A5D", "horizon-color": "#FFC48C", "fog-color": "#F4B183", "sky-horizon-blend": 0.7, "horizon-fog-blend": 0.6 };
+    return { "sky-color": "#1D2B53", "horizon-color": "#5B4B8A", "fog-color": "#3A3F66", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5 };
+  }
+  async function replayRide(ride) {
+    if (!ride || !ride.trk) return; const rc = rideCoords(ride); if (!rc) return toast("הרכיבה קצרה מדי לשחזור");
+    closeModal(); if (st.ride) return toast("אפשר לצפות בשחזור בסוף הרכיבה");
+    const cum = L.cumulative(rc.coords), mems = (await memAll()).filter(m => m.lat != null && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4);
+    const pops = mems.map(m => { let bi = 0, bd = 1e9; for (let i = 0; i < rc.coords.length; i += 1) { const d = L.hav(rc.coords[i], [m.lon, m.lat]); if (d < bd) { bd = d; bi = i; } } return bd < 0.4 ? { km: cum[bi], m } : null; }).filter(Boolean).sort((a, b) => a.km - b.km);
+    startFly({ coords: rc.coords, title: ride.title, replay: { ride, cum, times: rc.times, pops, next: 0 } });
+  }
+  function replayClock(F) { const R = F.replay, km = F.km * R.scale; let lo = 0, hi = R.cum.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (R.cum[mid] < km) lo = mid; else hi = mid; } const f = R.cum[hi] > R.cum[lo] ? (km - R.cum[lo]) / (R.cum[hi] - R.cum[lo]) : 0; return R.times[lo] + (R.times[hi] - R.times[lo]) * Math.max(0, Math.min(1, f)); }
+  function replayPop(F) {
+    const R = F.replay; if (!R || R.next >= R.pops.length) return; const p = R.pops[R.next]; if (F.km * R.scale < p.km) return; R.next++;
+    const el = $("rpPop"); el.innerHTML = `<img src="${blobUrl(p.m.id + "t", p.m.thumb)}" alt=""><span>${esc(p.m.note || fmtT(new Date(p.m.t)))}</span>`; el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+    el.onclick = () => memViewer(p.m.id);
+    if (F.playing) { F.playing = false; flyUI(); clearTimeout(R.resume); R.resume = setTimeout(() => { if (st.fly === F && !F.hold) { F.playing = true; flyUI(); } }, 2600); }
+    clearTimeout(R.hide); R.hide = setTimeout(() => { el.classList.remove("in"); setTimeout(() => el.hidden = true, 300); }, 3200);
+  }
+  function replayEnd(F) {
+    const ride = F.replay.ride, avg = ride.moving > 60 ? ride.km / (ride.moving / 3600) : 0;
+    openModal(`<div class="ridesum"><div class="small muted">${esc(fmtD(new Date(ride.start)))}</div><h2>${esc(ride.title)}</h2>
+      <div class="fsum"><div><span class="k">מרחק</span><b class="mono">${ride.km}</b><span class="k">ק״מ</span></div><div><span class="k">זמן תנועה</span><b class="mono">${dur(ride.moving)}</b></div><div><span class="k">ממוצע</span><b class="mono">${Math.round(avg)}</b><span class="k">קמ״ש</span></div><div><span class="k">רגעים</span><b class="mono">${F.replay.pops.length}</b><span class="k">תמונות</span></div></div>
+      <div class="row"><button type="button" class="btn primary" id="rpShare">${PWI.share}שיתוף הרכיבה</button><button type="button" class="btn" id="rpAgain">צפייה שוב</button></div></div>`);
+    $("rpAgain").onclick = () => { closeModal(); const R = F.replay; if (st.fly === F) { F.km = 0; F.snap = true; R.next = 0; F.playing = true; flyUI(); } else replayRide(ride); };
+    $("rpShare").onclick = () => shareRideCard(ride);
+  }
+  async function shareRideCard(ride) {
+    const rc = rideCoords(ride); if (!rc) return; try { await Promise.all(["700 70px Assistant", "500 34px Assistant", "700 44px Karantina"].map(f => document.fonts.load(f))); } catch (e) { }
+    const W = 1080, H = 1350, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 0, H); grd.addColorStop(0, "#0B1424"); grd.addColorStop(1, "#1A2742"); g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    let w0 = 180, e0 = -180, s0 = 90, n0 = -90; rc.coords.forEach(p => { w0 = Math.min(w0, p[0]); e0 = Math.max(e0, p[0]); s0 = Math.min(s0, p[1]); n0 = Math.max(n0, p[1]); });
+    const kx = Math.cos((s0 + n0) / 2 * Math.PI / 180), bw = Math.max(1e-6, (e0 - w0) * kx), bh = Math.max(1e-6, n0 - s0), sc = Math.min(860 / bw, 620 / bh), ox = (W - bw * sc) / 2, oy = 300 + (620 - bh * sc) / 2;
+    const X = p => ox + (p[0] - w0) * kx * sc, Y = p => oy + (n0 - p[1]) * sc;
+    g.lineJoin = g.lineCap = "round"; g.strokeStyle = "rgba(255,162,74,.25)"; g.lineWidth = 28; g.beginPath(); rc.coords.forEach((p, i) => i ? g.lineTo(X(p), Y(p)) : g.moveTo(X(p), Y(p))); g.stroke();
+    g.strokeStyle = "#FFA24A"; g.lineWidth = 9; g.stroke(); g.fillStyle = "#5C8DFF"; g.beginPath(); g.arc(X(rc.coords[0]), Y(rc.coords[0]), 15, 0, 7); g.fill();
+    g.direction = "rtl"; g.textAlign = "right"; const R0 = W - 72;
+    g.fillStyle = "#FFA24A"; g.font = "700 44px Karantina, Assistant, sans-serif"; g.fillText("BLUE RONIN · רכבתי היום", R0, 96);
+    g.fillStyle = "#E6ECF4"; g.font = "700 70px Assistant, system-ui, sans-serif"; g.fillText(ride.title, R0, 190);
+    g.fillStyle = "#8C9DB3"; g.font = "500 36px Assistant, system-ui, sans-serif"; g.fillText(fmtD(new Date(ride.start)), R0, 248);
+    const avg = ride.moving > 60 ? Math.round(ride.km / (ride.moving / 3600)) : 0;
+    [["מרחק", ride.km + " ק״מ"], ["זמן תנועה", dur(ride.moving)], ["ממוצע", avg + " קמ״ש"]].forEach(([k, v], i) => { const x = R0 - i * 315, y = 990; g.fillStyle = "rgba(255,255,255,.06)"; g.beginPath(); if (g.roundRect) g.roundRect(x - 295, y, 295, 160, 24); else g.rect(x - 295, y, 295, 160); g.fill(); g.fillStyle = "#8C9DB3"; g.font = "500 32px Assistant, system-ui, sans-serif"; g.fillText(k, x - 24, y + 52); g.fillStyle = "#E6ECF4"; g.font = "700 50px Assistant, system-ui, sans-serif"; g.fillText(v, x - 24, y + 122); });
+    g.fillStyle = "#8C9DB3"; g.font = "500 30px Assistant, system-ui, sans-serif"; g.fillText("blueronin.app", R0, H - 56);
+    const blob = await new Promise(r => cv.toBlob(r, "image/png")), file = new File([blob], "blue-ronin-ride.png", { type: "image/png" }), text = `${ride.title} · ${ride.km} ק״מ · Blue Ronin`;
+    try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; } } catch (e) { if (e.name === "AbortError") return; }
+    saveBlob("blue-ronin-ride.png", blob); toast("התמונה נשמרה");
+  }
+
+  /* =====================================================================================
+     Group rides — everyone in the group on one map, a meeting point the leader sets, and an SOS that
+     reaches the whole group. Opening a group is Pro; joining is free.
+     ===================================================================================== */
+  st.group = LS.get("group", null); if (st.group && st.group.exp < Date.now()) { st.group = null; LS.set("group", null); }
+  let gTimer = null, gMk = new Map(), gMeetMk = null, gPrev = null, gPick = false;
+  const gTxt = d => d < 1 ? Math.round(d * 1000) + " מ׳" : d.toFixed(1) + " ק״מ";
+  const gAgo = t => { const s = Math.round((Date.now() - t) / 1000); return !t ? "עוד אין מיקום" : s < 60 ? "עכשיו" : s < 3600 ? `לפני ${Math.round(s / 60)} דק׳` : `לפני ${Math.round(s / 3600)} שע׳`; };
+  const gFeed = () => { };
+  function gStart() { if (!st.group) return; geoOn(gFeed); clearInterval(gTimer); gTimer = setInterval(gTick, 15000); gTick(); }
+  function gStop(msg) { clearInterval(gTimer); gTimer = null; geoOff(gFeed); st.group = null; st.gsnap = null; gPrev = null; LS.set("group", null); gMk.forEach(m => m.remove()); gMk.clear(); if (gMeetMk) { gMeetMk.remove(); gMeetMk = null; } $("hudGroup").textContent = ""; if (msg) toast(msg); renderMeIf(); }
+  async function gTick() {
+    const G = st.group; if (!G || document.hidden) return;
+    const me = st.me && Date.now() - (st.meTs || 0) < 30 * 6e4 ? st.me : null;
+    try { const snap = await post("/api/group/pos", { gid: G.gid, mid: G.mid, key: G.key, lat: me ? me.lat : null, lon: me ? me.lon : null, spd: st.ride && st.ride.spd != null ? st.ride.spd : null, state: st.sosOn ? "sos" : st.ride ? "ride" : "stop" }); gApply(snap); }
+    catch (e) { if (e.status === 410 || e.status === 404 || e.status === 403) gStop("הרכיבה הקבוצתית הסתיימה"); }
+  }
+  function gApply(snap) {
+    const G = st.group; if (!G) return; st.gsnap = snap; const me = st.me ? [st.me.lon, st.me.lat] : null;
+    /* what changed since last time */
+    if (gPrev) {
+      snap.members.forEach(m => { if (m.mid === G.mid) return; const o = gPrev.members.find(x => x.mid === m.mid);
+        if (!o) toast(`${m.name} הצטרף לקבוצה`);
+        if (m.state === "sos" && (!o || o.state !== "sos")) { say(`קריאת חירום מ${m.name}`); try { navigator.vibrate && navigator.vibrate([500, 200, 500, 200, 800]); } catch (e) { } updBar(`🆘 ${m.name} שלח קריאת חירום`, { cls: "sosbar", btn: "למיקום", go: () => { $("updbar").hidden = true; if (m.lat != null) map.flyTo({ center: [m.lon, m.lat], zoom: 15 }); }, sticky: false }); } });
+      const om = gPrev.meet, nm = snap.meet; if (nm && (!om || om.t !== nm.t)) { const d = me ? gTxt(L.hav(me, [nm.lon, nm.lat])) : ""; toast(`נקודת מפגש: ${nm.label || "במפה"}${d ? " · " + d : ""}`, 4000); say(`נקבעה נקודת מפגש${nm.label ? ": " + nm.label : ""}${d ? ", " + d.replace("ק״מ", "קילומטר").replace("מ׳", "מטר") : ""}`); }
+    }
+    gPrev = snap;
+    /* markers */
+    const seen = new Set();
+    snap.members.forEach(m => { if (m.mid === G.mid || m.lat == null) return; seen.add(m.mid); let mk = gMk.get(m.mid);
+      if (!mk) { const el = document.createElement("button"); el.type = "button"; el.className = "gmk"; el.onclick = e => { e.stopPropagation(); gPopup(m.mid); }; mk = new maplibregl.Marker({ element: el }).setLngLat([m.lon, m.lat]).addTo(map); gMk.set(m.mid, mk); }
+      const el = mk.getElement(); el.style.background = m.color; el.textContent = (m.name || "?").trim().slice(0, 1); el.title = m.name; el.classList.toggle("old", snap.now - m.t > 180000); el.classList.toggle("sos", m.state === "sos"); el.classList.toggle("lead", !!m.leader); mk.setLngLat([m.lon, m.lat]); });
+    gMk.forEach((mk, id) => { if (!seen.has(id)) { mk.remove(); gMk.delete(id); } });
+    if (snap.meet) { if (!gMeetMk) { const el = document.createElement("div"); el.className = "gmeet"; el.innerHTML = "🏁"; gMeetMk = new maplibregl.Marker({ element: el, anchor: "bottom" }).addTo(map); } gMeetMk.setLngLat([snap.meet.lon, snap.meet.lat]); gMeetMk.getElement().title = snap.meet.label || "נקודת מפגש"; } else if (gMeetMk) { gMeetMk.remove(); gMeetMk = null; }
+    /* ride HUD line: how spread out the group is */
+    const others = snap.members.filter(m => m.mid !== G.mid && m.lat != null && snap.now - m.t < 600000);
+    if (me && others.length) { const far = others.map(m => [m, L.hav(me, [m.lon, m.lat])]).sort((a, b) => b[1] - a[1])[0]; $("hudGroup").textContent = `קבוצה · ${others.length + 1} רוכבים · הרחוק: ${far[0].name}, ${gTxt(far[1])}`; } else $("hudGroup").textContent = st.group ? `קבוצה · ממתינים לרוכבים` : "";
+    renderMeIf();
+  }
+  function gPopup(mid) {
+    const m = st.gsnap && st.gsnap.members.find(x => x.mid === mid); if (!m) return; const me = st.me ? [st.me.lon, st.me.lat] : null;
+    new maplibregl.Popup({ closeButton: false, maxWidth: "250px", offset: 18 }).setLngLat([m.lon, m.lat]).setHTML(`<b>${esc(m.name)}${m.leader ? " · מוביל" : ""}</b><div class="small muted">${m.state === "sos" ? "🆘 קריאת חירום · " : ""}${gAgo(m.t)}${me ? " · " + gTxt(L.hav(me, [m.lon, m.lat])) + " ממך" : ""}</div><div class="row" style="margin-top:6px">${navBtn("w", wazeLL(m.lat, m.lon))}${navBtn("g", gmLL(m.lat, m.lon))}</div>`).addTo(map);
+  }
+  async function gCreate(title) {
+    if (!isPro()) return openPaywall("group");
+    if (!st.sos.name) { const n = await askName(); if (!n) return; }
+    try { const j = await post("/api/group/create", { title, name: st.sos.name, pro: st.pro.token }); st.group = Object.assign(j, { code: j.gid }); LS.set("group", st.group); gStart(); gInvite(); }
+    catch (e) { if (e.status === 402) openPaywall("group"); else toast(e.message); }
+  }
+  async function gJoin(code) {
+    if (st.group) return toast("אתם כבר בקבוצה. צאו ממנה קודם");
+    if (!st.sos.name) { const n = await askName(); if (!n) return; }
+    try { const j = await post("/api/group/join", { code, name: st.sos.name }); st.group = Object.assign(j, { code: j.gid }); LS.set("group", st.group); history.replaceState(null, "", location.pathname); toast(`הצטרפתם ל״${j.title}״`); gStart(); setTab("me"); }
+    catch (e) { toast(e.message); }
+  }
+  function askName() { return new Promise(res => { openModal(`<div class="ridesum"><h2>איך לקרוא לך?</h2><label class="f small">השם שיופיע לשאר הרוכבים<input id="nmIn" maxlength="24" autofocus></label><button type="button" class="btn primary" id="nmOk">המשך</button></div>`); $("nmOk").onclick = () => { const v = $("nmIn").value.trim(); if (!v) return; st.sos.name = v; saveSos(); closeModal(); res(v); }; }); }
+  function gInvite() {
+    const G = st.group; if (!G) return; const link = `${NEW_HOME}/#group=${G.code}`, text = `מצטרפים לרכיבה ״${G.title}״ ב־Blue Ronin: כל הקבוצה על מפה אחת.\n${link}\n(קוד: ${G.code})`;
+    if (navigator.share) { navigator.share({ text }).catch(() => { }); return; }
+    openModal(`<div class="xsheet"><h2>הזמנה לקבוצה</h2><div class="xcode mono" dir="ltr">${G.code}</div><div class="row"><button type="button" class="btn primary" id="gCp">העתקת קישור</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text)}">וואטסאפ</a></div></div>`);
+    $("gCp").onclick = () => navigator.clipboard.writeText(link).then(() => toast("הועתק")).catch(() => { });
+  }
+  async function gMeet(lat, lon, label) { const G = st.group; try { gApply(await post("/api/group/meet", { gid: G.gid, mid: G.mid, key: G.key, lat, lon, label })); toast("נקודת המפגש נשלחה לכולם"); } catch (e) { toast(e.message); } }
+  map.on("click", e => { if (!gPick || !st.group) return; gPick = false; document.body.classList.remove("gpicking"); gMeet(e.lngLat.lat, e.lngLat.lng, ""); });
+  function groupCard() {
+    const G = st.group, S = st.gsnap, me = st.me ? [st.me.lon, st.me.lat] : null;
+    if (!G) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>רכיבה קבוצתית</h3><span class="probadge">PRO</span></div><p class="small" style="margin:0">כל הקבוצה על מפה אחת, נקודת מפגש שכולם רואים, וקריאת חירום שמגיעה לכולם. פתיחת קבוצה ב־Pro, הצטרפות בחינם.</p>
+      <div class="row"><input id="gTitle" class="gin" maxlength="40" placeholder="שם הרכיבה, למשל: שבת בגליל" style="flex:1;min-width:0"><button type="button" class="btn primary" id="gNew">פתיחת קבוצה</button></div>
+      <div class="row"><input id="gCodeIn" class="gin mono" dir="ltr" maxlength="7" placeholder="קוד, 6 תווים" style="flex:1;min-width:0"><button type="button" class="btn" id="gJoinB">הצטרפות</button></div></div>`;
+    const ms = S ? S.members.slice().sort((a, b) => (b.mid === G.mid) - (a.mid === G.mid) || (me && a.lat != null && b.lat != null ? L.hav(me, [a.lon, a.lat]) - L.hav(me, [b.lon, b.lat]) : 0)) : [];
+    return `<div class="card gcard"><div class="row" style="justify-content:space-between"><h3>${esc(G.title)}</h3><span class="mono gcode" dir="ltr">${esc(G.code)}</span></div>
+      ${S && S.meet ? `<div class="small">🏁 נקודת מפגש${S.meet.label ? ": " + esc(S.meet.label) : ""}${me ? " · " + gTxt(L.hav(me, [S.meet.lon, S.meet.lat])) : ""} <button type="button" class="linkbtn" id="gGoMeet">ניווט</button></div>` : ""}
+      <div class="glist2">${ms.length ? ms.map(m => `<button type="button" class="gm-row" data-gm="${esc(m.mid)}"><i style="background:${esc(m.color)}">${esc((m.name || "?").slice(0, 1))}</i><span><b>${esc(m.name)}${m.mid === G.mid ? " (אני)" : ""}${m.leader ? " · מוביל" : ""}</b><span class="small muted">${m.state === "sos" ? "🆘 חירום · " : ""}${gAgo(m.t)}${me && m.lat != null && m.mid !== G.mid ? " · " + gTxt(L.hav(me, [m.lon, m.lat])) : ""}</span></span></button>`).join("") : `<div class="small muted">מתחברים…</div>`}</div>
+      <div class="row"><button type="button" class="btn primary" id="gInv">${PWI.share}הזמנת רוכבים</button><button type="button" class="btn" id="gFit">כולם במפה</button></div>
+      ${G.leader ? `<div class="row"><button type="button" class="btn sm" id="gMeetHere">נקודת מפגש כאן</button><button type="button" class="btn sm" id="gMeetMap">בחירה במפה</button>${S && S.meet ? `<button type="button" class="btn sm" id="gMeetClr">ביטול הנקודה</button>` : ""}<button type="button" class="btn sm danger" id="gEnd">סיום הקבוצה</button></div>` : `<div class="row"><button type="button" class="btn sm" id="gLeave">יציאה מהקבוצה</button></div>`}
+      <p class="small muted" style="margin:0">המיקום מתעדכן כל 15 שניות כשהאפליקציה פתוחה. הקבוצה נמחקת אחרי 12 שעות.</p></div>`;
+  }
+  function bindGroup() {
+    if ($("gNew")) $("gNew").onclick = () => gCreate($("gTitle").value.trim());
+    if ($("gJoinB")) $("gJoinB").onclick = () => gJoin($("gCodeIn").value);
+    if ($("gInv")) $("gInv").onclick = gInvite;
+    if ($("gFit")) $("gFit").onclick = () => { const S = st.gsnap; if (!S) return; const b = new maplibregl.LngLatBounds(); S.members.forEach(m => m.lat != null && b.extend([m.lon, m.lat])); if (st.me) b.extend([st.me.lon, st.me.lat]); if (!b.isEmpty()) { map.fitBounds(b, { padding: 70, maxZoom: 15 }); if (innerWidth < 900) setSheet("peek"); } };
+    document.querySelectorAll("[data-gm]").forEach(b => b.onclick = () => { const m = st.gsnap && st.gsnap.members.find(x => x.mid === b.dataset.gm); if (m && m.lat != null) { map.flyTo({ center: [m.lon, m.lat], zoom: 15 }); if (innerWidth < 900) setSheet("peek"); setTimeout(() => gPopup(m.mid), 900); } });
+    if ($("gGoMeet")) $("gGoMeet").onclick = () => { const mt = st.gsnap.meet; window.open(wazeLL(mt.lat, mt.lon), "_blank"); };
+    if ($("gMeetHere")) $("gMeetHere").onclick = async () => { toast("קובע נקודת מפגש…"); try { const p = await getPosFresh(4000); gMeet(p[1], p[0], ""); } catch (e) { toast("אין מיקום. אפשר לבחור במפה"); } };
+    if ($("gMeetMap")) $("gMeetMap").onclick = () => { gPick = true; document.body.classList.add("gpicking"); if (innerWidth < 900) setSheet("peek"); toast("לחצו על המפה במקום המפגש", 4000); };
+    if ($("gMeetClr")) $("gMeetClr").onclick = async () => { const G = st.group; try { gApply(await post("/api/group/meet", { gid: G.gid, mid: G.mid, key: G.key, clear: true })); } catch (e) { toast(e.message); } };
+    if ($("gEnd")) $("gEnd").onclick = async () => { if (!confirmTap($("gEnd"), "לסיים לכולם?")) return; const G = st.group; try { await post("/api/group/end", { gid: G.gid, mid: G.mid, key: G.key }); } catch (e) { } gStop("הקבוצה הסתיימה"); };
+    if ($("gLeave")) $("gLeave").onclick = async () => { if (!confirmTap($("gLeave"), "לצאת?")) return; const G = st.group; try { await post("/api/group/leave", { gid: G.gid, mid: G.mid, key: G.key }); } catch (e) { } gStop("יצאתם מהקבוצה"); };
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && st.group) gTick(); });
+  const grHash = location.hash.match(/^#group=([A-Za-z0-9]{6})$/); if (grHash) setTimeout(() => gJoin(grHash[1]), 1200);
+  if (st.group) setTimeout(gStart, 2000);
 
   function setTab(t) {
     st.tab = t; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.t === t)));
@@ -2156,23 +2499,26 @@
   setInterval(() => { st.sat = L.nextSaturday(); loadWeather(); }, 30 * 6e4);
 
   /* ---------- boot ---------- */
+  window.BRG && BRG.crumb("boot");
+  const safe = (name, f) => { try { f(); } catch (e) { window.BRG && BRG.report("boot:" + name, e.message, "", 0, e.stack); } };
   if (innerWidth < 900) setSheet("half"); else st.sheet = "half";
-  renderBrief();
+  safe("brief", renderBrief);
   let introDone = false;
   const endIntro = () => { if (introDone) return; const wait = (window.BR_introHold || 0) - performance.now(); if (wait > 0) return void setTimeout(endIntro, wait); introDone = true; $("intro").classList.add("out"); setTimeout(() => home(2600), 250); };
   map.on("load", () => setTimeout(endIntro, 900));
   setTimeout(endIntro, 4500);
+  if (window.BRG) BRG.booted = true;
   /* admin layer: announcement banner, maintenance notice, flags; once-a-day anonymous ping */
   function renderNotice() {
     const ct = st.content || {}, a = ct.announce || {}, el = $("annc"), seen = LS.get("anncSeen", "");
     const key = (ct.v || 0) + ":" + (a.text || "");
     el.hidden = !(a.on && a.text) || seen === key;
     if (!el.hidden) { el.className = "annc " + (a.level || "info"); $("anncT").textContent = a.text; const l = $("anncL"); l.hidden = !a.link; if (a.link) l.href = a.link; $("anncX").onclick = () => { LS.set("anncSeen", key); el.hidden = true; }; }
-    const m = ct.maintenance || {}; $("maint").hidden = !(m.on && !sessionStorage.getItem("brn:maintSeen")); $("maintT").textContent = m.text || "מתבצעות עבודות תחזוקה. חלק מהנתונים עשויים לא להתעדכן.";
+    const m = ct.maintenance || {}; let mSeen = false; try { mSeen = !!sessionStorage.getItem("brn:maintSeen"); } catch (e) { } $("maint").hidden = !(m.on && !mSeen); $("maintT").textContent = m.text || "מתבצעות עבודות תחזוקה. חלק מהנתונים עשויים לא להתעדכן.";
     $("maintX").onclick = () => { try { sessionStorage.setItem("brn:maintSeen", "1"); } catch (e) { } $("maint").hidden = true; };
     $("fFly").hidden = !st.flags.fly;
   }
-  renderNotice(); renderBell(); proBadge(); proCheck();
+  safe("notice", renderNotice); safe("bell", renderBell); safe("pro", proBadge); proCheck();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") proCheck(); });
   /* a ride the phone cut short (app killed, battery) is still saved to the journal */
   (() => { const lv = LS.get("rideLive", null); if (lv && lv.trk && lv.trk.length > 2) { LS.set("rideLive", null); const d = saveRide({ cid: lv.cid, title: lv.title, odo: lv.odo, moving: lv.moving, vmax: lv.vmax, trk: lv.trk }); if (d) toast("הרכיבה הקודמת נשמרה ביומן"); } })();
@@ -2237,9 +2583,10 @@
   const mvHash = location.hash.match(/^#move=([zj][A-Za-z0-9_-]+)$/); if (mvHash) setTimeout(() => importMove(mvHash[1]), 600);
   if (LS.get("moved", 0) && !LS.get("movedSeen", false)) { LS.set("movedSeen", true); setTimeout(() => updBar("הנתונים הועברו. כדי לקבל שוב התראות לטלפון, מפעילים אותן בלשונית כלים", { btn: "לכלים", go: () => { $("updbar").hidden = true; setTab("tools"); }, ms: 15000 }), 1500); }
   function offerMove() {
-    if (!st.flags.move || location.origin === NEW_HOME || sessionStorage.getItem("brn:moveX")) return;
+    let x = false; try { x = !!sessionStorage.getItem("brn:moveX"); } catch (e) { }
+    if (!st.flags.move || location.origin === NEW_HOME || x) return;
     const pwa = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-    updBar(`Blue Ronin עברה לכתובת קבועה: blueronin.app${pwa ? ". אחרי המעבר מתקינים שוב למסך הבית" : ""}`, { cls: "move", btn: "מעבר עם הנתונים", go: async () => { if (st.ride) return toast("אפשר לעבור בסוף הרכיבה"); location.href = NEW_HOME + "/#move=" + (await movePayload()); }, onClose: () => { try { sessionStorage.setItem("brn:moveX", "1"); } catch (e) { } } });
+    updBar(`Blue Ronin עברה לכתובת קבועה: blueronin.app${pwa ? ". מעבירים את הנתונים בקוד ומתקינים מחדש" : ""}`, { cls: "move", btn: "מעבר עם הנתונים", go: () => { if (st.ride) return toast("אפשר לעבור בסוף הרכיבה"); sendSheet(true); }, onClose: () => { try { sessionStorage.setItem("brn:moveX", "1"); } catch (e) { } } });
   }
   setTimeout(offerMove, 3000);
 

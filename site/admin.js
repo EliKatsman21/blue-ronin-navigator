@@ -290,9 +290,19 @@
   /* ---------- system: feature switches, security, audit ---------- */
   const FLAGS = { move: ["מעבר לכתובת blueronin.app", "באנר בכתובת הישנה שמעביר כל רוכב לכתובת החדשה יחד עם הנתונים שלו. מדליקים רק כשהדומיין החדש עובד"], fly: ["מעוף ציפור", "כפתור המעוף והאנימציה"], builder: ["בניית מסלול אישי", "יצירה, שמירה ושיתוף של מסלולים"], fuelVotes: ["אימות רוכבים בתחנות", "כפתורי פתוח בשבת / יש 98"], photos: ["תמונות מקומות", "Mapillary ו־Wikimedia בחלונות"], feedback: ["דיווח מהאפליקציה", "טופס התקלות והרעיונות בלשונית כלים"] };
   const ACT = { login: "כניסה", setup: "הקמה", reset: "שחזור", content: "פרסום תוכן", broadcast: "שידור התראה", password: "החלפת סיסמה", "logout-all": "ניתוק כל ההתחברויות", "fuel-reset": "איפוס תחנה", feedback: "טיפול בדיווח", "feedback-purge": "ניקוי דיווחים שטופלו", "fail:login": "כניסה נכשלה", "fail:setup": "הקמה נכשלה", "fail:setup-totp": "קוד אימות שגוי בהקמה", "fail:password": "החלפת סיסמה נכשלה" };
+  async function loadErrors() {
+    const box = $("errList"); if (!box) return; let items = [];
+    try { items = (await api("GET", "errors")).items; } catch (e) { box.innerHTML = `<div class="small muted">${esc(e.message)}</div>`; return; }
+    const dev = ua => /iPhone|iPad/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "אחר";
+    box.innerHTML = items.length ? items.slice(0, 80).map(x => `<details class="item"><summary><span class="tag">${esc(x.kind || "error")}</span> ${esc(x.msg)} <span class="small muted">· ${fmt(x.t)} · ${esc(x.ver)} · ${dev(x.ua)}${x.sa ? " (מותקן)" : ""}${x.boot ? " · בזמן עלייה" : ""}</span></summary><pre class="small mono" style="white-space:pre-wrap;margin:6px 0 0">${esc(x.src)}:${x.line}
+${esc(x.stack)}
+${esc((x.crumbs || []).join(" → "))}
+${esc(x.ua)}</pre></details>`).join("") : `<div class="small muted">אין תקלות מדווחות. מצוין.</div>`;
+  }
   async function system() {
     const D = S.draft;
     const el = V(`<div class="head"><h2>מערכת</h2></div>
+      <div class="card scroll"><div class="head"><h3>תקלות מהשטח</h3><button type="button" class="btn sm" id="errClr">ניקוי</button></div><p class="small muted" style="margin:0">דיווחים אוטומטיים מהטלפונים של הרוכבים: מה נשבר, באיזו גרסה ובאיזה מכשיר. בלי פרטים אישיים.</p><div id="errList" class="list"><div class="small muted">טוען…</div></div></div>
       <div class="card"><h3>מתגי פיצ׳רים</h3><p class="small muted" style="margin:0">מכבים פיצ׳ר לכולם בלי לגעת בקוד, למשל אם משהו שבור. נכנס לתוקף אחרי פרסום.</p>
         ${Object.entries(FLAGS).map(([k, [t, d]]) => `<label class="sw"><input type="checkbox" data-flag="${k}" ${D.flags[k] ? "checked" : ""}><span>${t}<br><span class="small muted" style="font-weight:400">${d}</span></span></label>`).join("")}</div>
       <div class="grid2">
@@ -303,6 +313,7 @@
       <div class="card"><h3>יומן פעולות</h3><div class="scroll"><table class="tbl"><thead><tr><th>מתי</th><th>פעולה</th><th>פרטים</th></tr></thead><tbody id="aud"><tr><td colspan="3" class="muted">טוען…</td></tr></tbody></table></div></div>`);
     el.querySelectorAll("[data-flag]").forEach(x => x.onchange = () => { D.flags[x.dataset.flag] = x.checked; syncSave(); });
     $("fp").onsubmit = async e => { e.preventDefault(); try { await api("POST", "password", { current: $("cp").value, next: $("np").value, totp: $("ct").value.trim() }); toast("הסיסמה עודכנה. התחברויות אחרות נותקו."); system(); } catch (err) { $("perr").textContent = err.message; } };
+    loadErrors(); if ($("errClr")) $("errClr").onclick = async () => { if (!confirmInline($("errClr"), "לנקות?")) return; await api("POST", "errors/clear", {}); loadErrors(); };
     $("la").onclick = async () => { if (!confirmInline($("la"), "בטוח? גם אתה תנותק")) return; try { await api("POST", "logout-all"); } catch (e) { } S.authed = false; showLogin(); };
     try { const a = (await api("GET", "audit")).items; $("aud").innerHTML = a.map(x => `<tr><td>${fmt(x.t)}</td><td>${x.a.startsWith("fail") ? `<b style="color:var(--no)">${ACT[x.a] || x.a}</b>` : ACT[x.a] || esc(x.a)}</td><td class="small muted">${esc(Object.entries(x.d || {}).filter(([k]) => k !== "ip").map(([k, v]) => `${k}: ${v}`).join(" · "))}${x.d && x.d.ip ? ` <span class="mono">#${esc(x.d.ip.slice(0, 6))}</span>` : ""}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">ריק</td></tr>'; } catch (e) { }
   }

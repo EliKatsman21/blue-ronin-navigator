@@ -505,6 +505,31 @@ body.riding .updbar{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
 #p-me .f input,.ridesum .f input,#gCode,#mvNote{width:100%;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--ink)}
 #p-me .f input:focus,.ridesum .f input:focus{outline:2px solid var(--accent);outline-offset:0}
 @media (max-width:360px){#p-me .grid2{grid-template-columns:1fr}}
+.bootfail{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg);padding:24px max(24px,env(safe-area-inset-left,0px))}
+.bootfail .bf{max-width:360px;display:grid;gap:12px;text-align:center}.bootfail b{font-size:22px}.bootfail p{margin:0;color:var(--muted)}.bootfail .s{font-size:14px;color:var(--go)}
+.bootfail button{height:52px;border-radius:14px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:17px;font-weight:700;cursor:pointer}.bootfail button.sec{background:var(--raised);color:var(--ink);border:1px solid var(--line)}
+.spin{border-radius:50%;border:3px solid var(--accent);border-top-color:transparent;animation:spin .9s linear infinite}
+.xsheet{display:grid;gap:12px}.xcode{font-size:24px;font-weight:800;letter-spacing:2px;text-align:center;padding:14px;border-radius:14px;background:var(--raised);border:1px dashed var(--accent);user-select:all;-webkit-user-select:all}
+.xin{width:100%;font-size:20px;letter-spacing:2px;text-align:center;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--ink)}
+.xsteps{margin:0;padding-inline-start:20px;display:grid;gap:6px;font-size:14.5px}
+.listen{display:grid;gap:12px;justify-items:center;text-align:center;padding-top:18px}.listen b{font-size:20px}.lstxt{min-height:1.4em;font-size:18px;color:var(--accent)}
+.fbok{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--go) 16%,var(--surface));border:1px solid var(--go);animation:pop .35s cubic-bezier(.2,.9,.3,1.3)}
+.fbok .ck{flex:none;width:40px;height:40px;border-radius:50%;background:var(--go);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:800}
+.fbok b{display:block;font-size:16px}.fbok .small{color:var(--ink)}
+.fberr{padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#D7263D 14%,var(--surface));border:1px solid #D7263D;font-size:14px}
+@keyframes pop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.fbok,.spin{animation:none}}
+.gmk{width:34px;height:34px;border-radius:50%;border:3px solid #fff;color:#fff;font:800 15px/1 var(--body,inherit);display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer;padding:0;transition:opacity .3s}
+.gmk.lead{box-shadow:0 0 0 3px var(--sun),0 3px 10px rgba(0,0,0,.4)}.gmk.old{opacity:.5}.gmk.sos{animation:pulse 1s infinite;border-color:#D7263D;box-shadow:0 0 0 6px rgba(215,38,61,.45)}
+.gmeet{font-size:30px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.gcard .gcode{font-size:18px;font-weight:800;letter-spacing:2px;color:var(--accent)}
+.glist2{display:grid;gap:4px}.gm-row{display:flex;gap:10px;align-items:center;width:100%;text-align:start;font:inherit;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);padding:6px 0;cursor:pointer}
+.gm-row i{flex:none;width:30px;height:30px;border-radius:50%;color:#fff;font-style:normal;font-weight:800;display:grid;place-items:center}.gm-row b{display:block;font-size:14.5px}.gm-row .small{display:block}
+.gin{font:inherit;font-size:16px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--ink)}
+body.gpicking #map{cursor:crosshair}
+.updbar.sosbar{background:#D7263D;color:#fff}
+.rppop{position:fixed;z-index:13;top:calc(80px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-12px) rotate(-2deg);opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1.3),opacity .3s;width:min(220px,60vw);padding:8px 8px 10px;background:#fff;color:#1a1a1a;border:0;border-radius:6px;box-shadow:0 12px 30px rgba(0,0,0,.45);display:grid;gap:6px;cursor:pointer;font:600 14px/1.3 inherit}
+.rppop.in{transform:translate(-50%,0) rotate(-2deg);opacity:1}.rppop img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:3px}
 </style>
 </head>
 <body>
@@ -529,6 +554,7 @@ body.riding .updbar{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
     <button type="button" class="ign" id="ignBtn" hidden aria-label="הנעה עם צליל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.5a8 8 0 1 0 11.4 0"/></svg>הקישו להנעה</button>
   </div>
 </div>
+<script src="guard.js"></script>
 <script src="intro.js"></script>
 
 <div id="map" aria-label="מפת הצפון"></div>
@@ -597,6 +623,7 @@ body.riding .updbar{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
 </section>
 
 <div class="turn" id="turn" hidden><div class="turn-ic" id="turnIc"></div><div class="turn-txt"><div class="turn-d" id="turnD"></div><div class="turn-t" id="turnT"></div></div></div>
+<button type="button" class="rppop" id="rpPop" hidden></button>
 <div class="flyui" id="flyui" hidden>
   <div class="fl-top"><b id="flTitle"></b><span id="flInfo" class="mono small"></span></div>
   <div class="fl-row">
@@ -610,7 +637,7 @@ body.riding .updbar{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
   <div id="hudMsg" class="hudmsg" hidden></div>
   <div class="top">
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
-    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div></div>
+    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div><div class="eta" id="hudGroup"></div></div>
   </div>
   <div class="hfuel" id="hudFuel" hidden aria-label="דלק במיכל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg><div class="fbar"><i></i></div><span id="hudFuelT" class="mono">--</span></div>
   <div class="hacts"><button type="button" class="hsos" id="hudSos" aria-label="חירום: לחיצה ארוכה"><i></i><span>SOS</span></button><button type="button" class="hact" id="hudCam" aria-label="צילום לזיכרונות"></button><button type="button" class="hact" id="hudPark" aria-label="חניתי כאן"></button><button type="button" class="hact" id="hudLive" aria-label="שיתוף מיקום חי"></button></div>

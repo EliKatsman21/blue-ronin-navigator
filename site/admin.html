@@ -122,6 +122,24 @@ input.code{font-family:var(--mono);font-size:24px;letter-spacing:.35em;text-alig
 .qr{background:#fff;border-radius:12px;padding:10px;width:max-content;margin:0 auto}
 .qr svg{display:block;width:200px;height:200px}
 .secret{font-family:var(--mono);direction:ltr;text-align:center;word-break:break-all;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:8px;font-size:13px;user-select:all}
+
+/* monitoring */
+.mstat{border-inline-start:5px solid var(--line)}.mstat.go{border-inline-start-color:var(--go)}.mstat.caution{border-inline-start-color:var(--caution)}.mstat.no{border-inline-start-color:var(--no)}
+.mbig{font:800 22px/1.2 var(--body);display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none;background:var(--muted)}
+.checks{display:grid;gap:2px}
+.chk summary{display:grid;grid-template-columns:12px 130px minmax(0,1fr) auto 52px;gap:10px;align-items:center;padding:8px 4px;cursor:pointer;list-style:none;border-bottom:1px solid var(--line)}
+.chk summary::-webkit-details-marker{display:none}
+.chk .dot{background:var(--go)}.chk.critical .dot{background:var(--no)}.chk.high .dot,.chk.normal .dot{background:var(--caution)}
+.chk .cdet{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk .hint{padding:6px 26px 10px}
+.ubar{display:flex;gap:1px;height:14px;width:min(190px,24vw);direction:ltr}.ubar i{flex:1;border-radius:1px;background:var(--line)}.ubar i.u1{background:var(--go)}.ubar i.u0{background:var(--no)}
+.hint{color:var(--ink);opacity:.85}
+.inc{border-inline-start:4px solid var(--caution);padding-inline-start:10px}.inc.critical{border-inline-start-color:var(--no)}
+.meter{height:8px;border-radius:5px;background:var(--line);overflow:hidden;margin:4px 0}.meter i{display:block;height:100%}
+.grp pre{white-space:pre-wrap;margin:6px 0 0;max-height:220px;overflow:auto}
+tr.lv-error td,tr.lv-critical td{color:var(--no)}tr.lv-warn td .tag{color:var(--caution)}
+@media (max-width:700px){.chk summary{grid-template-columns:12px minmax(0,1fr) 46px}.chk .cdet,.chk .ubar{display:none}}
 </style>
 </head>
 <body>

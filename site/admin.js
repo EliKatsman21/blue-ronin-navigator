@@ -27,9 +27,10 @@
     fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5A1.5 1.5 0 0 1 17 11v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg>',
     shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg>',
     star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
+    pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
   };
-  const VIEWS = [["overview", "סקירה", I.gauge], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["pro", "Pro", I.star], ["system", "מערכת", I.shield]];
+  const VIEWS = [["overview", "סקירה", I.gauge], ["monitor", "בקרה", I.pulse], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["pro", "Pro", I.star], ["system", "מערכת", I.shield]];
   const S = { authed: false, view: location.hash.slice(1) || "overview", content: null, draft: null, stats: null, feedback: null, fuel: null, audit: null, map: null };
   if (!VIEWS.some(v => v[0] === S.view)) S.view = "overview";
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -95,7 +96,7 @@
   function show(v) {
     S.view = v; history.replaceState(null, "", "#" + v);
     $("nav").querySelectorAll("[data-v]").forEach(b => { if (b.dataset.v !== v) b.removeAttribute("aria-current"); else b.setAttribute("aria-current", "page"); });
-    ({ overview, notice, chapters, hazards, inbox, fuel, pro, system })[v]();
+    ({ overview, monitor, notice, chapters, hazards, inbox, fuel, pro, system })[v]();
     scrollTo({ top: 0 });
   }
   const V = html => { $("views").innerHTML = `<section class="view">${html}</section>`; return $("views"); };
@@ -287,9 +288,67 @@
     el.querySelectorAll("[data-rv]").forEach(b => b.onclick = async () => { if (!confirmInline(b, "לבטל?")) return; try { await api("POST", "pro/revoke", { code: b.dataset.rv }); toast("הקוד בוטל"); pro(); } catch (e) { toast(e.message); } });
   }
 
+
+  /* ---------- monitoring center: live health, incidents, top issues, server log, usage ---------- */
+  const OV = { ok: ["הכל תקין", "go"], warn: ["תקין עם הערות", "caution"], degraded: ["שירות חלקי", "caution"], critical: ["תקלה קריטית", "no"] };
+  const LV = { info: "מידע", warn: "אזהרה", error: "שגיאה", critical: "קריטי" };
+  const ago = t => { const m = Math.round((Date.now() - t) / 6e4); return m < 1 ? "עכשיו" : m < 60 ? `לפני ${m} דק׳` : m < 1440 ? `לפני ${Math.round(m / 60)} שע׳` : `לפני ${Math.round(m / 1440)} ימים`; };
+  async function monitor() {
+    V(`<div class="head"><h2>בקרה</h2><div class="row"><button type="button" class="btn sm" id="mScan">סריקה עכשיו</button><button type="button" class="btn sm" id="mAlerts">התראות לטלפון שלי</button><button type="button" class="btn sm" id="mCopy">דוח מצב להעתקה</button></div></div><div id="mBody"><div class="card small muted">טוען את מצב המערכת…</div></div>`);
+    $("mScan").onclick = async () => { $("mScan").disabled = true; $("mScan").textContent = "סורק…"; try { await api("POST", "ops/scan", {}); toast("הסריקה הסתיימה"); } catch (e) { toast(e.message); } monitor(); };
+    $("mAlerts").onclick = adminAlerts;
+    let D; try { D = await api("GET", "ops"); } catch (e) { $("mBody").innerHTML = `<div class="card"><b>לא הצלחתי לטעון</b><div class="small muted">${esc(e.message)}</div></div>`; return; }
+    S.ops = D; $("mCopy").onclick = () => copyReport(D);
+    const L = D.latest, ov = OV[(D.state && D.state.overall) || (L && L.overall)] || ["עוד לא נסרק", "muted"];
+    const hist = D.history || [], ids = L ? L.checks.map(c => c.id) : [];
+    const uptime = id => { const h = hist.filter(x => id in x.c); return h.length ? Math.round(h.filter(x => x.c[id]).length / h.length * 1000) / 10 : null; };
+    const bar = id => `<span class="ubar" aria-hidden="true">${hist.map(x => `<i class="${!(id in x.c) ? "" : x.c[id] ? "u1" : "u0"}"></i>`).join("")}</span>`;
+    const open = (D.state && D.state.open) || [];
+    const groups = D.groups || [];
+    const hereLine = D.usage.here == null ? `<span class="small muted">לא מחובר (חסר HERE_API_KEY)</span>` : `<div class="meter"><i style="width:${Math.min(100, D.usage.here / D.usage.hereCap * 100)}%;background:var(--${D.usage.here / D.usage.hereCap >= 0.8 ? "no" : "go"})"></i></div><span class="small">${D.usage.here} / ${D.usage.hereCap} החודש</span>`;
+    $("mBody").innerHTML = `
+      <div class="card mstat ${ov[1]}"><div class="row" style="justify-content:space-between;align-items:center"><div><div class="mbig"><span class="dot" style="background:var(--${ov[1]})"></span>${ov[0]}</div><div class="small muted">סריקה אחרונה ${L ? `${ago(L.t)} (${fmt(L.t)})${L.manual ? " · ידנית" : ""} · גרסה באוויר ${esc(L.ver || "?")}` : "עוד לא בוצעה. לחצו ״סריקה עכשיו״."} · סריקה אוטומטית כל 30 דקות</div></div>
+        <div class="small muted" style="text-align:end">${D.adminSubs ? `התראות פעילות ב־${D.adminSubs} מכשירים` : `<b style="color:var(--caution)">התראות לטלפון כבויות</b>`}</div></div></div>
+      ${open.length ? `<div class="card"><h3>תקלות פתוחות</h3><div class="list">${open.map(o => `<div class="item inc ${o.level}"><div><b>${esc(o.title)}</b> <span class="tag">${o.level === "critical" ? "קריטי" : o.level === "high" ? "גבוה" : "רגיל"}</span><div class="small">${esc(o.detail)}</div><div class="small muted">מאז ${fmt(o.since)} · ${o.n} סריקות</div><div class="small hint">מה עושים: ${esc(o.hint)}</div></div></div>`).join("")}</div></div>` : ""}
+      <div class="card"><div class="head"><h3>בדיקות</h3><span class="small muted">הפס = 48 הסריקות האחרונות (בערך יממה)</span></div><div class="checks">${L ? L.checks.map(c => `<details class="chk ${c.ok ? "ok" : c.level}"><summary><span class="dot"></span><b>${esc(c.name)}</b><span class="small muted cdet">${esc(c.detail)}</span>${bar(c.id)}<span class="small mono">${uptime(c.id) ?? "–"}%</span></summary><div class="small hint">${esc((D.playbook[c.id] || [])[2] || "")}</div></details>`).join("") : '<div class="small muted">אין עדיין נתונים.</div>'}</div></div>
+      <div class="grid2">
+        <div class="card"><h3>שימוש בשירותים</h3><div class="small"><b>תנועה חיה (HERE)</b></div>${hereLine}<div class="small" style="margin-top:6px"><b>Open-Meteo דרך המטמון שלנו</b> · ${D.usage.openmeteo} פניות החודש</div><div class="small muted">כל רוכב מקבל את התחזית מהמטמון המשותף, כך שהמכסה של Open-Meteo לא נשחקת.</div></div>
+        <div class="card"><h3>תקלות שנסגרו</h3>${(D.incidents || []).length ? `<div class="list">${D.incidents.slice(0, 8).map(i => `<div class="small"><b>${esc(i.title)}</b> · ${fmt(i.since)} · ${Math.max(1, Math.round((i.closed - i.since) / 6e4))} דק׳</div>`).join("")}</div>` : '<div class="small muted">לא היו תקלות. מצוין.</div>'}</div>
+      </div>
+      <div class="card"><div class="head"><h3>בעיות מובילות מהשטח · 7 ימים</h3><span class="small muted">${D.errTotal} דיווחים · מקובצים לפי סוג</span></div>
+        ${groups.length ? `<div class="list">${groups.map(g => `<details class="item grp"><summary><span class="tag">${esc(g.kind)}</span> <b>${esc(g.msg)}</b><span class="small muted"> · ×${g.n} · אחרון ${ago(g.last)} · ${Object.entries(g.vers).map(([v, n]) => `v${esc(v)}×${n}`).join(" ")} · ${Object.entries(g.devs).map(([d, n]) => `${esc(d)}×${n}`).join(" ")}</span></summary><pre class="small mono">${esc(g.sample.src)}:${g.sample.line}${g.sample.tab ? " · לשונית " + esc(g.sample.tab) : ""}
+${esc(g.sample.stack)}
+${esc((g.sample.crumbs || []).join(" → "))}</pre></details>`).join("")}</div>` : '<div class="small muted">אין תקלות מהשטח בשבוע האחרון.</div>'}</div>
+      <div class="card"><div class="head"><h3>יומן השרת</h3><div class="row" role="group" aria-label="סינון">${["all", "warn", "error"].map(f => `<button type="button" class="btn sm" data-lf="${f}">${f === "all" ? "הכל" : f === "warn" ? "אזהרות ומעלה" : "שגיאות"}</button>`).join("")}</div></div>
+        <div class="scroll"><table class="tbl"><thead><tr><th>מתי</th><th>שירות</th><th>רמה</th><th>מה קרה</th></tr></thead><tbody id="mLog"></tbody></table></div></div>`;
+    const drawLog = f => { const rank = { info: 0, warn: 1, error: 2, critical: 3 }, min = f === "warn" ? 1 : f === "error" ? 2 : 0; const rows = (D.logs || []).filter(l => rank[l.level] >= min);
+      $("mLog").innerHTML = rows.map(l => `<tr class="lv-${l.level}"><td class="small">${fmt(l.t)}</td><td class="small mono">${esc(l.service)}</td><td><span class="tag lv">${LV[l.level] || esc(l.level)}</span></td><td class="small">${esc(l.msg)}</td></tr>`).join("") || '<tr><td colspan="4" class="muted small">ריק</td></tr>'; };
+    $("mBody").querySelectorAll("[data-lf]").forEach(b => b.onclick = () => drawLog(b.dataset.lf)); drawLog("all");
+  }
+  async function adminAlerts() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return toast("הדפדפן הזה לא תומך בהתראות. באייפון: מוסיפים את האתר למסך הבית ופותחים משם.");
+      if (Notification.permission === "denied") return toast("ההתראות חסומות לאתר הזה בהגדרות הדפדפן");
+      if ((await Notification.requestPermission()) !== "granted") return toast("לא אושרו התראות");
+      const reg = (await navigator.serviceWorker.getRegistration("/")) || await navigator.serviceWorker.register("/sw.js", { scope: "/" }); await navigator.serviceWorker.ready;
+      const key = (await (await fetch("/api/vapid")).json()).key, raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((key.length + 3) % 4)), c => c.charCodeAt(0));
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+      await api("POST", "ops/subscribe", { sub: sub.toJSON(), dev: /iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android" : "מחשב" });
+      const r = await api("POST", "ops/test", {}); toast(r.sent ? "התראות פעילות. נשלחה התראת בדיקה" : "נרשם, אבל התראת הבדיקה לא נשלחה"); monitor();
+    } catch (e) { toast("לא הצלחתי להפעיל התראות: " + e.message); }
+  }
+  function copyReport(D) {
+    const L = D.latest, lines = [`# Blue Ronin · דוח מצב ${fmt(Date.now())}`, `מצב כללי: ${(OV[D.state.overall] || ["?"])[0]} · גרסה ${L ? L.ver : "?"} · סריקה ${L ? fmt(L.t) : "—"}`, "", "## בדיקות"];
+    (L ? L.checks : []).forEach(c => lines.push(`- ${c.ok ? "✅" : c.level === "critical" ? "🔴" : "🟠"} ${c.name}: ${c.detail}`));
+    if ((D.state.open || []).length) { lines.push("", "## תקלות פתוחות"); D.state.open.forEach(o => lines.push(`- ${o.title} (${o.level}) מאז ${fmt(o.since)}: ${o.detail}`)); }
+    lines.push("", "## בעיות מובילות מהשטח (7 ימים)"); (D.groups || []).slice(0, 10).forEach(g => lines.push(`- [${g.kind}] ${g.msg} ×${g.n} · גרסאות ${Object.keys(g.vers).join(",")} · ${Object.keys(g.devs).join(",")}\n  ${String(g.sample.stack || "").split("\n").slice(0, 3).join(" | ")}`));
+    lines.push("", "## יומן שרת (שגיאות ואזהרות אחרונות)"); (D.logs || []).filter(l => l.level !== "info").slice(0, 15).forEach(l => lines.push(`- ${fmt(l.t)} [${l.service}/${l.level}] ${l.msg}`));
+    const txt = lines.join("\n");
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast("הדוח הועתק. אפשר להדביק לClaude לניתוח")).catch(() => { const w = open("", "_blank"); if (w) w.document.body.innerText = txt; });
+  }
   /* ---------- system: feature switches, security, audit ---------- */
-  const FLAGS = { move: ["מעבר לכתובת blueronin.app", "באנר בכתובת הישנה שמעביר כל רוכב לכתובת החדשה יחד עם הנתונים שלו. מדליקים רק כשהדומיין החדש עובד"], fly: ["מעוף ציפור", "כפתור המעוף והאנימציה"], builder: ["בניית מסלול אישי", "יצירה, שמירה ושיתוף של מסלולים"], fuelVotes: ["אימות רוכבים בתחנות", "כפתורי פתוח בשבת / יש 98"], photos: ["תמונות מקומות", "Mapillary ו־Wikimedia בחלונות"], feedback: ["דיווח מהאפליקציה", "טופס התקלות והרעיונות בלשונית כלים"] };
-  const ACT = { login: "כניסה", setup: "הקמה", reset: "שחזור", content: "פרסום תוכן", broadcast: "שידור התראה", password: "החלפת סיסמה", "logout-all": "ניתוק כל ההתחברויות", "fuel-reset": "איפוס תחנה", feedback: "טיפול בדיווח", "feedback-purge": "ניקוי דיווחים שטופלו", "fail:login": "כניסה נכשלה", "fail:setup": "הקמה נכשלה", "fail:setup-totp": "קוד אימות שגוי בהקמה", "fail:password": "החלפת סיסמה נכשלה" };
+  const FLAGS = { fly: ["מעוף ציפור", "כפתור המעוף והאנימציה"], builder: ["בניית מסלול אישי", "יצירה, שמירה ושיתוף של מסלולים"], fuelVotes: ["אימות רוכבים בתחנות", "כפתורי פתוח בשבת / יש 98"], photos: ["תמונות מקומות", "Mapillary ו־Wikimedia בחלונות"], feedback: ["דיווח מהאפליקציה", "טופס התקלות והרעיונות בלשונית כלים"] };
+  const ACT = { scan: "סריקת בקרה ידנית", "alerts-on": "הפעלת התראות בקרה", login: "כניסה", setup: "הקמה", reset: "שחזור", content: "פרסום תוכן", broadcast: "שידור התראה", password: "החלפת סיסמה", "logout-all": "ניתוק כל ההתחברויות", "fuel-reset": "איפוס תחנה", feedback: "טיפול בדיווח", "feedback-purge": "ניקוי דיווחים שטופלו", "fail:login": "כניסה נכשלה", "fail:setup": "הקמה נכשלה", "fail:setup-totp": "קוד אימות שגוי בהקמה", "fail:password": "החלפת סיסמה נכשלה" };
   async function loadErrors() {
     const box = $("errList"); if (!box) return; let items = [];
     try { items = (await api("GET", "errors")).items; } catch (e) { box.innerHTML = `<div class="small muted">${esc(e.message)}</div>`; return; }

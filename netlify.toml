@@ -7,6 +7,12 @@
   node_bundler = "esbuild"
 
 [[headers]]
+  for = "/sw-retire.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
@@ -26,7 +32,7 @@
 [[headers]]
   for = "/admin*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://cdnjs.cloudflare.com blob:; worker-src blob:; child-src blob:; connect-src 'self' https://tiles.openfreemap.org https://unpkg.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src https://fonts.gstatic.com data:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://cdnjs.cloudflare.com blob:; worker-src 'self' blob:; child-src blob:; connect-src 'self' https://tiles.openfreemap.org https://unpkg.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src https://fonts.gstatic.com data:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"
     Cache-Control = "no-store"
     X-Robots-Tag = "noindex, nofollow"
     Referrer-Policy = "no-referrer"
@@ -36,3 +42,19 @@
   [headers.values]
     Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
+
+# The old address retires: every page and link on it goes to the permanent home, path and query kept
+# (the browser keeps any #fragment). Deploy previews and branch deploys use other hostnames and are not affected.
+# An app installed from the old address keeps its old service worker; this hands it a retiring one that
+# clears its caches, unregisters and moves the window to blueronin.app. Must stay above the catch-all.
+[[redirects]]
+  from = "https://blueronin-north-map.netlify.app/sw.js"
+  to = "/sw-retire.js"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://blueronin-north-map.netlify.app/*"
+  to = "https://blueronin.app/:splat"
+  status = 301
+  force = true

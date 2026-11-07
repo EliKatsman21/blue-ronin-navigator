@@ -12,6 +12,7 @@
 import { sosStore, rid, hashKey, keyOk, clean, okId, inIL, body, J } from "./lib/safety.mjs";
 import { ipHash } from "./lib/admin.mjs";
 import { validSub, sendOne } from "./lib/push.mjs";
+import { opsLog } from "./lib/ops.mjs";
 const MAXG = 5, INV_DAYS = 7, INV_CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const invCode = () => { const b = rid(16); let o = ""; for (let i = 0; i < 8; i++) o += INV_CH[b.charCodeAt(i) % INV_CH.length]; return o; };
 const normInv = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -66,6 +67,8 @@ export default async req => {
     for (const g of C.g) { const ok = await sendOne({ sub: g.sub }, { title: T, body: B.trim(), tag: "sos-" + b.circle, url, sos: kind !== "test" }, { urgency: "high", ttl: 3600 }); if (ok) { sent++; alive.push(g); } }
     if (alive.length !== C.g.length) { C.g = alive; await s.setJSON("c:" + b.circle, C); }
     C.last = { t: now, kind, sent }; await s.setJSON("c:" + b.circle, C);
+    /* no personal data in the ops log: only that an alert went out and whether it reached anyone */
+    if (kind !== "test") await opsLog("sos", sent ? "warn" : "critical", sent ? `קריאת חירום (${kind}) נשלחה ל־${sent} אנשי קשר` : `קריאת חירום (${kind}) לא הגיעה לאף איש קשר`, { sent, total: C.g.length });
     return J({ sent, total: C.g.length, where });
   }
   return J({ error: "not found" }, 404);

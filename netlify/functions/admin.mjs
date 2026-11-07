@@ -7,7 +7,9 @@ import {
   sameOrigin, throttled, failed, cleared, audit, cleanContent, getContent, ipHash, addHistory, getHistory
 } from "./lib/admin.mjs";
 import { proStore, newCode } from "./lib/pro.mjs";
-import { sendAll } from "./lib/push.mjs";
+import { sendAll, validSub, keyOf } from "./lib/push.mjs";
+import { opsStore, usage } from "./lib/ops.mjs";
+import { runScan, notifyAdmins, PLAYBOOK, fingerprint } from "./lib/health.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
@@ -91,6 +93,26 @@ export default async req => {
     const all = (await fuelStore().get("all", { type: "json" })) || {}; delete all[b.id]; await fuelStore().setJSON("all", all); await audit("fuel-reset", { id: b.id });
     return json({ ok: true });
   }
+  /* ---------- monitoring center ---------- */
+  if (route === "GET ops") {
+    const ops = opsStore(), all = (await ops.list()).blobs.map(x => x.key);
+    const get = k => ops.get(k, { type: "json" }).catch(() => null), many = async ks => { const out = []; for (let i = 0; i < ks.length; i += 25) out.push(...await Promise.all(ks.slice(i, i + 25).map(get))); return out.filter(Boolean); };
+    const hs = all.filter(k => k.startsWith("h:")).sort().slice(-48), scans = await many(hs);
+    const logs = (await many(all.filter(k => k.startsWith("l:")).sort().slice(-150))).reverse();
+    const es = getStore({ name: "brn-err", consistency: "strong" }), ek = (await es.list({ prefix: "e:" })).blobs.map(x => x.key).sort().filter(k => Date.now() - +k.split(":")[1] < 7 * 864e5).slice(-300);
+    const errs = []; for (let i = 0; i < ek.length; i += 25) errs.push(...(await Promise.all(ek.slice(i, i + 25).map(k => es.get(k, { type: "json" }).catch(() => null)))).filter(Boolean));
+    const dev = ua => /iPhone|iPad/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "אחר";
+    const G = {}; errs.forEach(x => { const k = fingerprint(x); const g = G[k] || (G[k] = { k, kind: x.kind, msg: x.msg, n: 0, first: x.t, last: x.t, vers: {}, devs: {}, sample: x }); g.n++; g.first = Math.min(g.first, x.t); if (x.t >= g.last) { g.last = x.t; g.sample = x; } g.vers[x.ver] = (g.vers[x.ver] || 0) + 1; g.devs[dev(x.ua)] = (g.devs[dev(x.ua)] || 0) + 1; });
+    const groups = Object.values(G).sort((a, b) => b.last - a.last).sort((a, b) => b.n - a.n).slice(0, 30).map(g => ({ ...g, sample: { src: g.sample.src, line: g.sample.line, stack: g.sample.stack, crumbs: g.sample.crumbs, ua: g.sample.ua, tab: g.sample.tab } }));
+    const state = (await get("state")) || {}, cap = +(Netlify.env.get("HERE_MONTHLY_CAP") || 4500);
+    return json({ state: { overall: state.overall || null, lastScan: state.lastScan || 0, open: Object.values(state.open || {}) }, latest: scans[scans.length - 1] || null,
+      history: scans.map(x => ({ t: x.t, overall: x.overall, c: Object.fromEntries(x.checks.map(c => [c.id, c.ok ? 1 : 0])) })), incidents: (await get("incidents")) || [], logs, groups, errTotal: errs.length,
+      usage: { here: Netlify.env.get("HERE_API_KEY") ? await usage("here") : null, hereCap: cap, openmeteo: await usage("openmeteo") }, adminSubs: all.filter(k => k.startsWith("adminsub:")).length, playbook: PLAYBOOK });
+  }
+  if (route === "POST ops/scan") { const r = await runScan({ manual: true }); await audit("scan", { overall: r.overall }); return json(r); }
+  if (route === "POST ops/subscribe") { if (!validSub(b.sub)) return json({ error: "מנוי לא תקין" }, 400); await opsStore().setJSON("adminsub:" + keyOf(b.sub.endpoint), { sub: { endpoint: b.sub.endpoint, keys: b.sub.keys }, t: Date.now(), dev: String(b.dev || "").slice(0, 40) }); await audit("alerts-on"); return json({ ok: true }); }
+  if (route === "POST ops/unsubscribe") { if (typeof b.endpoint === "string") await opsStore().delete("adminsub:" + keyOf(b.endpoint)); return json({ ok: true }); }
+  if (route === "POST ops/test") { const n = await notifyAdmins([{ kind: "close", c: { id: "push", name: "בדיקת התראה" }, dur: 0 }]); return json({ sent: n }); }
   if (route === "GET errors") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); const keys = blobs.map(b => b.key).sort().reverse().slice(0, 100); const items = []; for (const k of keys) { const v = await es.get(k, { type: "json" }); if (v) items.push(v); } return json({ items }); }
   if (route === "POST errors/clear") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); for (const b of blobs) await es.delete(b.key); await audit("errors.clear"); return json({ ok: true }); }
   if (route === "GET feedback/media") {

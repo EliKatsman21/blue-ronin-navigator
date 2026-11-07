@@ -332,6 +332,7 @@ body.riding .sheet,body.riding .fabs .hide-ride{display:none}
 .terrlist{margin:0;padding:0;list-style:none;display:grid;gap:4px;border-inline-start:2px dashed var(--caution);padding-inline-start:10px}
 .terrlist li{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 /* traffic */
+.trinc{display:grid;gap:6px;margin:2px 0 4px}.trinc .item{display:flex;gap:8px;align-items:flex-start}.trinc .dot{width:10px;height:10px;border-radius:50%;flex:none;margin-top:5px}.trinc .small{display:block}
 .trstrip{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden}
 .trstrip i{flex:1;background:var(--line)}
 .trstrip.skel{background:linear-gradient(90deg,var(--line),var(--raised),var(--line));background-size:200% 100%;animation:skel 1.2s linear infinite}
@@ -530,6 +531,72 @@ body.gpicking #map{cursor:crosshair}
 .updbar.sosbar{background:#D7263D;color:#fff}
 .rppop{position:fixed;z-index:13;top:calc(80px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-12px) rotate(-2deg);opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1.3),opacity .3s;width:min(220px,60vw);padding:8px 8px 10px;background:#fff;color:#1a1a1a;border:0;border-radius:6px;box-shadow:0 12px 30px rgba(0,0,0,.45);display:grid;gap:6px;cursor:pointer;font:600 14px/1.3 inherit}
 .rppop.in{transform:translate(-50%,0) rotate(-2deg);opacity:1}.rppop img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:3px}
+
+/* ---------- ride HUD: three sizes, labelled buttons, map buttons always above it ---------- */
+.hsize{position:absolute;top:-38px;inset-inline-start:max(16px,env(safe-area-inset-left,0px));display:flex;gap:2px;padding:3px;border-radius:12px;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);backdrop-filter:blur(8px);box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.hsize button{border:0;background:none;color:var(--muted);font:700 12px/1 var(--body);padding:7px 10px;border-radius:9px;cursor:pointer;min-height:28px}
+.hsize button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.hud>*{min-width:0}
+.hud{grid-template-columns:minmax(0,1fr)}
+.hud .next{flex:1;min-width:0;overflow:hidden}
+.hud .next .v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud .next .d{white-space:nowrap}
+.hact{width:auto;min-width:58px;height:56px;padding:6px 8px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.hact svg{width:20px;height:20px}
+.hact .lbl,.hsos small{font:700 10.5px/1.05 var(--body);letter-spacing:.01em;white-space:nowrap}
+.hsos{height:56px;width:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.hsos small{position:relative;opacity:.9;letter-spacing:0}
+.hacts{flex-wrap:wrap}
+body.riding .fabs{top:auto;bottom:calc(var(--hudH,330px) + 14px);transition:bottom .25s cubic-bezier(.2,.8,.2,1)}
+body.riding .fabs .fab{width:56px}
+body.riding.fabs-row .fabs{flex-direction:row}
+body.riding.fabs-row .hsize{position:static;justify-self:start;width:max-content}
+/* compact (default): smaller speed, no reminder line */
+body.hud-compact .speed{font-size:68px}
+body.hud-compact .hud .row .small.muted{display:none}
+body.hud-compact .hud{gap:8px;padding-top:10px}
+/* map: one line + SOS, everything else tucked away (exit from the "רכיבה" button on the map) */
+body.hud-min .speed{font-size:46px}
+body.hud-min .speed small{font-size:13px}
+body.hud-min .hud{gap:8px;padding-top:10px;background:linear-gradient(to top,var(--bg) 80%,transparent)}
+body.hud-min .hud .next .k,body.hud-min .hud .eta,body.hud-min .hfuel,body.hud-min .hact,body.hud-min #hudExit,body.hud-min #hudVoice,body.hud-min .hud .row .small.muted{display:none}
+body.hud-min .hud .top{align-items:center}
+body.hud-min .hud .next .v{font-size:17px}
+body.hud-min .hud .next .d{font-size:18px}
+body.hud-min .hud{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+body.hud-min #hudMsg,body.hud-min .hud .row{grid-column:1/-1}
+body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
+@media (min-width:900px){.hud{left:auto;right:max(16px,env(safe-area-inset-right,0px));bottom:16px;width:min(460px,40vw);border-radius:18px;border:1px solid var(--line);background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(10px);padding:14px 16px}
+  .hsize{top:-40px;inset-inline-start:0}
+  body.riding .fabs{top:calc(64px + env(safe-area-inset-top,0px));bottom:auto}
+}
+
+/* ---------- Pro ride plan ---------- */
+.plancard{display:grid;gap:12px}
+.pdep{display:grid;gap:8px}
+.pdep .k{font-size:12px;color:var(--muted);margin-inline:0 6px}.pdep b{font-size:24px;color:var(--sun);margin-inline-end:14px}
+.pdep input[type=range]{width:100%;accent-color:var(--sun)}
+.pscore{font:800 22px/1 var(--mono);color:hsl(var(--h) 60% 48%)}.pscore small{font-size:12px;color:var(--muted);font-weight:600}
+.psum{margin:0;font-size:15px;line-height:1.5}
+.pwatch{display:grid;gap:6px}.pwatch b,.pgear b{font-size:13px}
+.pwrow{text-align:start;border:1px solid var(--line);background:var(--raised);color:var(--ink);border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;cursor:pointer;border-inline-start:4px solid var(--caution)}
+.pwrow.l3{border-inline-start-color:var(--no)}.pwrow.l1{border-inline-start-color:var(--accent)}
+.pgear{display:grid;gap:3px;font-size:14px}
+.rplan{list-style:none;margin:0;padding:0;display:grid;gap:0;position:relative}
+.rplan li{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0;position:relative;cursor:pointer}
+.rplan li.pst{border-top:1px solid var(--line)}
+.rplan .pt{font-size:14px;font-weight:700;color:var(--accent)}
+.rplan .pn{display:grid;min-width:0}.rplan .pn b{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rplan .pw{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:0 6px;max-width:132px;font-size:14px;text-align:end}.rplan .pw .small{flex-basis:100%;text-align:end}.rplan .pw .pwx svg{width:18px;height:18px}
+.rplan .pw .small{white-space:nowrap}
+.rplan li.pev{display:flex;gap:8px;align-items:center;padding:3px 0 3px;padding-inline-start:62px;font-size:12.5px;color:var(--muted)}
+.rplan li.pev .pi{width:16px;text-align:center;font-size:13px;flex:none}
+.rplan li.pev.sun{color:color-mix(in srgb,var(--sun) 80%,var(--ink))}.rplan li.pev.tech{color:var(--c3)}
+.pbadge{display:inline-block;justify-self:start;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--accent);color:var(--accent-ink);margin:2px 0}
+.pbadge.sun{background:var(--sun);color:#1a1205}
+.rplan li.brk{background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:10px;padding-inline:6px}
+.wins.lab{margin-bottom:16px}.wins.lab .w{position:relative;grid-template-rows:1fr}.wins.lab span{position:absolute;top:100%;margin-top:3px;inset-inline-end:0;white-space:nowrap;overflow:visible}
+.pdep input[type=range]{direction:ltr}
 </style>
 </head>
 <body>
@@ -634,13 +701,14 @@ body.gpicking #map{cursor:crosshair}
   </div>
 </div>
 <div class="hud" id="hud" hidden>
+  <div class="hsize" role="group" aria-label="גודל לוח הרכיבה"><button type="button" data-hs="full" aria-pressed="false" aria-label="לוח מלא">מלא</button><button type="button" data-hs="compact" aria-pressed="true" aria-label="לוח מצומצם">מצומצם</button><button type="button" data-hs="min" aria-pressed="false" aria-label="מפה כמעט מלאה, שורה אחת">מפה</button></div>
   <div id="hudMsg" class="hudmsg" hidden></div>
   <div class="top">
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
     <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div><div class="eta" id="hudGroup"></div></div>
   </div>
   <div class="hfuel" id="hudFuel" hidden aria-label="דלק במיכל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg><div class="fbar"><i></i></div><span id="hudFuelT" class="mono">--</span></div>
-  <div class="hacts"><button type="button" class="hsos" id="hudSos" aria-label="חירום: לחיצה ארוכה"><i></i><span>SOS</span></button><button type="button" class="hact" id="hudCam" aria-label="צילום לזיכרונות"></button><button type="button" class="hact" id="hudPark" aria-label="חניתי כאן"></button><button type="button" class="hact" id="hudLive" aria-label="שיתוף מיקום חי"></button></div>
+  <div class="hacts"><button type="button" class="hsos" id="hudSos" aria-label="חירום: לחיצה ארוכה"><i></i><span>SOS</span><small>לחיצה ארוכה</small></button><button type="button" class="hact" id="hudCam" aria-label="צילום לזיכרונות"></button><button type="button" class="hact" id="hudPark" aria-label="חניתי כאן"></button><button type="button" class="hact" id="hudLive" aria-label="שיתוף מיקום חי"></button></div>
   <div class="row"><button type="button" class="btn" id="hudExit">יציאה ממצב רכיבה</button><button type="button" class="btn primary" id="hudCenter" hidden>חזרה למעקב</button><button type="button" class="btn vbtn" id="hudVoice" aria-pressed="true" aria-label="הנחיות קוליות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>קול</button><span class="small muted">לא נוגעים במסך בזמן רכיבה. הטלפון בתושבת.</span></div>
 </div>
 

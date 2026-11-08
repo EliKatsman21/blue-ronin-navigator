@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.4.0";
+  const APP_VER = "2.5.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -81,7 +81,7 @@
     sat: L.nextSaturday()
   };
   /* Saved custom routes behave exactly like chapters once added to the list. */
-  const customChapter = u => ({ id: u.id, title: u.title, short: u.title, custom: true, region: "custom", tech: 0.5, opts: u.opts || {}, sub: u.sub || "מסלול שבניתי", note: "", stops: u.stops.map((p, i, a) => ({ id: u.id + "_" + i, name: p.name, lat: p.lat, lon: p.lon, kind: i === 0 ? "start" : i === a.length - 1 ? "view" : "road", note: p.note || "", roads: [] })) });
+  const customChapter = u => ({ id: u.id, title: u.title, short: u.title, custom: true, shared: u.shared || null, region: "custom", tech: 0.5, opts: u.opts || {}, sub: u.sub || "מסלול שבניתי", note: "", stops: u.stops.map((p, i, a) => ({ id: u.id + "_" + i, name: p.name, lat: p.lat, lon: p.lon, kind: i === 0 ? "start" : i === a.length - 1 ? "view" : "road", note: p.note || "", roads: [] })) });
   st.myRoutes.forEach(u => CHAPTERS.push(customChapter(u)));
   /* ---------- admin-managed layer (read-only for riders; edited in /admin.html) ---------- */
   st.flags = { fly: true, builder: true, fuelVotes: true, photos: true, feedback: true, move: false }; st.hazards = []; st.content = null;
@@ -430,6 +430,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.5.0", d: "2026-11-08", items: ["ניווט יומיומי בכל הארץ: לשונית ״ניווט״ עם חיפוש יעד (גם בקול), בית, עבודה ויעדים אחרונים, זמן הגעה עם תנועה חיה ומזג האוויר ביעד", "לשונית ״סופ״ש״ לתכנון רכיבת סוף שבוע: התדריך, הפרקים והתוכנית, כמו שהיו", "Blue Ronin · ישראל: האפליקציה לכל רוכבי הדו־גלגלי בארץ", "קישור למסלול נפתח ישר על המסלול, נשמר אצלכם ומסומן ״משיתוף״", "פרק 6 קוצר: בלי הקטע הלוך־חזור לים המלח, כדי שהדלק יספיק לכל הלולאה"] },
     { v: "2.4.0", d: "2026-11-07", items: ["תוכנית הרכיבה (Pro): בוחרים שעת יציאה ורואים מתי מגיעים לכל עצירה, מה מזג האוויר שם באותה שעה, כמה קר ברכיבה, מתי השמש בעיניים, איפה לעצור להפסקה ומה ללבוש", "תנועה חיה בישראל: כבישים איטיים וסגורים על המפה, ותאונות וחסימות על המסלול", "מצב רכיבה: שלושה גדלים ללוח (מלא, מצומצם, מפה), תוויות לכל כפתור, וכפתורי המפה תמיד מעל הלוח", "הדגמה של שחזור 3D בלשונית ״שלי״, עוד לפני הרכיבה הראשונה", "במפה נפתח חלון מידע אחד בכל פעם", "הכתובת הקודמת מעבירה אוטומטית ל־blueronin.app"] },
     { v: "2.3.1", d: "2026-11-06", items: ["תיקון דחוף: התדריך והמסלול נטענים תמיד, גם כששירות מזג האוויר החיצוני עמוס", "התחזית מגיעה עכשיו ממטמון משותף בשרת שלנו, עם גיבוי ישיר ושמירת התחזית האחרונה", "אם לשונית נתקלת בבעיה מוצגת הודעה עם כפתור טעינה מחדש במקום מסך ריק"] },
     { v: "2.3.0", d: "2026-11-06", items: ["שחזור 3D של רכיבה שרכבת: השעון האמיתי, צבע השמיים של אותה שעה, ועצירה על כל תמונה במקום שבו צילמת", "רכיבה קבוצתית: כל הרוכבים על מפה אחת, נקודת מפגש, וקריאת חירום שמגיעה לכל הקבוצה", "העברת נתונים בקוד מוצפן (גם באייפון), וגיבוי ושחזור לקובץ", "צילום מהמצלמה נשמר כבר מהפעם הראשונה, ועיבוד תמונות מהיר יותר", "חיפוש קולי עם מסך האזנה שתמיד אפשר לסגור, ומעבר להכתבה מהמקלדת כשצריך", "אישור ברור אחרי שליחת דיווח, עם מספר פנייה", "מנגנון שמונע היתקעות בפתיחה, ודיווח תקלות אוטומטי לצוות", "שמירת הנתונים שלך קודמת לכל מטמון כשהזיכרון בטלפון מתמלא"] },
@@ -668,16 +669,16 @@
   /* Stops may carry silent via points (s.via = [[lat, lon], ...] before the stop): they shape the line
      but are passed to OSRM as non-waypoints, so they add no legs and no "arrived" prompts. */
   const routeCoords = c => { const pts = [], wp = []; routePts(c).forEach(s => { (s.via || []).forEach(v => pts.push({ lat: v[0], lon: v[1] })); wp.push(pts.length); pts.push(s); }); return { pts, wp }; };
-  const routeKey = c => c.custom ? "uroute:v1:" + hashStr(JSON.stringify([routePts(c).map(s => [s.lon.toFixed(5), s.lat.toFixed(5)]), !!(c.opts && c.opts.noHighway)])) : "route:v4:" + c.id;
+  const routeKey = c => c.custom ? "uroute:v1:" + hashStr(JSON.stringify([routePts(c).map(s => [s.lon.toFixed(5), s.lat.toFixed(5)]), !!(c.opts && c.opts.noHighway)])) : "route:v4:" + c.id + (c.rv ? ":" + c.rv : ""); /* rv: bump when a built-in chapter's stops change */
   const osrmUrl = (c, extra = "") => { const { pts, wp } = routeCoords(c); return `https://router.project-osrm.org/route/v1/driving/${pts.map(s => `${s.lon.toFixed(5)},${s.lat.toFixed(5)}`).join(";")}?overview=full&geometries=geojson&continue_straight=false${wp.length < pts.length ? "&waypoints=" + wp.join(";") : ""}${c.opts && c.opts.noHighway ? "&exclude=motorway" : ""}${extra}`; };
   async function loadRoute(c) {
-    const key = routeKey(c); const cached = LS.get(key, null);
+    const key = routeKey(c); const cached = c.nav ? null : LS.get(key, null);
     if (cached) return cached;
     try {
       const r = await fetch(osrmUrl(c));
       const j = await r.json(); if (j.code !== "Ok") throw new Error(j.code);
       const rt = j.routes[0]; const out = { coords: rt.geometry.coordinates.map(p => [+p[0].toFixed(5), +p[1].toFixed(5)]), km: rt.distance / 1000, min: rt.duration / 60, legs: rt.legs.map(l => l.distance / 1000), real: true };
-      LS.set(key, out); return out;
+      if (!c.nav) LS.set(key, out); return out;
     } catch (e) {
       const cs = routeCoords(c).pts.map(lonlat); const cum = L.cumulative(cs);
       return { coords: cs, km: cum[cum.length - 1] * 1.35, min: cum[cum.length - 1] * 1.35 / 55 * 60, legs: [], real: false };
@@ -709,7 +710,7 @@
   const climbOf = el => { let c = 0; for (let i = 1; i < el.length; i++) if (el[i] > el[i - 1]) c += el[i] - el[i - 1]; return Math.round(c); };
   async function loadElev(id) {
     if (st.elev[id]) return st.elev[id];
-    const key = "elev:v4:" + (CHAPTERS.find(c => c.id === id) && CHAPTERS.find(c => c.id === id).custom ? routeKey(CHAPTERS.find(c => c.id === id)) : id); const c = LS.get(key, null); if (c) { c.climb = climbOf(c.el); return (st.elev[id] = c); }
+    const cc = CHAPTERS.find(c => c.id === id), key = "elev:v4:" + (cc && cc.custom ? routeKey(cc) : id + (cc && cc.rv ? ":" + cc.rv : "")); const c = LS.get(key, null); if (c) { c.climb = climbOf(c.el); return (st.elev[id] = c); }
     const r = st.routes[id]; if (!r) return null;
     const { pts, km } = L.sample(r.coords, Math.min(300, Math.max(100, Math.round(r.km / 1.2))));
     try {
@@ -728,7 +729,7 @@
   if (!wxValid(st.wx)) { st.wx = null; try { localStorage.removeItem("brn:wx2"); } catch (e) { } }
   function wxPoints() {
     const pts = [];
-    CHAPTERS.filter(c => !c.combo && (!c.custom || c.id === st.chap)).forEach(c => { const s = c.stops; [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].forEach(p => pts.push({ lat: p.lat, lon: p.lon, name: p.name.split(" · ")[0], chap: c.id })); });
+    CHAPTERS.filter(c => !c.combo && !c.nav && (!c.custom || c.id === st.chap)).forEach(c => { const s = c.stops; [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].forEach(p => pts.push({ lat: p.lat, lon: p.lon, name: p.name.split(" · ")[0], chap: c.id })); });
     /* "now" uses the rider's position rounded to ~10 km: precise enough for current conditions, and riding
        around no longer invalidates the cache and refetches every point. */
     const r1 = v => Math.round(v * 10) / 10;
@@ -926,10 +927,10 @@
   function renderRoute() { return paneSafe("route", renderRoute_); }
   function renderRoute_() {
     const c = chap(), r = st.routes[c.id], cs = st.cstats[c.id], e = st.elev[c.id];
-    let h = `<div class="chapsel">${CHAPTERS.filter(x => x.id !== DRAFT && !x.hidden).map(x => `<button type="button" data-c="${x.id}" aria-pressed="${x.id === st.chap && !st.build}"><span>${x.custom ? "★ " + esc(x.short) : `פרק ${CHAPTERS.indexOf(x) + 1} · ${esc(x.short)}`}</span>${leds(diffOf(x.id), true)}</button>`).join("")}${st.flags.builder ? `<button type="button" class="newroute" id="bNew" aria-pressed="${!!st.build}">＋ מסלול משלי</button><button type="button" class="newroute" id="bImp">⤓ מסלול מקישור</button>` : ""}</div>`;
+    let h = `<div class="chapsel">${CHAPTERS.filter(x => x.id !== DRAFT && !x.hidden).map(x => `<button type="button" data-c="${x.id}" aria-pressed="${x.id === st.chap && !st.build}"><span>${x.custom ? (x.shared ? "⇄ " : "★ ") + esc(x.short) : `פרק ${CHAPTERS.indexOf(x) + 1} · ${esc(x.short)}`}</span>${leds(diffOf(x.id), true)}</button>`).join("")}${st.flags.builder ? `<button type="button" class="newroute" id="bNew" aria-pressed="${!!st.build}">＋ מסלול משלי</button><button type="button" class="newroute" id="bImp">⤓ מסלול מקישור</button>` : ""}</div>`;
     if (st.build) h += builderPanel();
     if (st.build && st.chap !== DRAFT) { $("p-route").innerHTML = h; if ($("bNew")) $("bNew").onclick = () => startBuild(); if ($("bImp")) $("bImp").onclick = importLink; bindBuilder(); return; }
-    else h += `<div><div class="row" style="justify-content:space-between;align-items:flex-start"><h2>${esc(c.title)}</h2>${c.custom ? `<div class="row"><button type="button" class="btn sm" id="bEdit">עריכה</button><button type="button" class="btn sm" id="bShareR">שיתוף</button></div>` : ""}</div><p class="muted" style="margin:4px 0 0">${esc(c.sub)}</p></div>${c.alertMsg ? `<div class="alert">${esc(c.alertMsg)}</div>` : ""}`;
+    else h += `<div><div class="row" style="justify-content:space-between;align-items:flex-start"><h2>${esc(c.title)}${c.shared ? `<span class="chipshare" title="התקבל בקישור">משיתוף</span>` : ""}</h2>${c.custom ? `<div class="row"><button type="button" class="btn sm" id="bEdit">עריכה</button><button type="button" class="btn sm" id="bShareR">שיתוף</button></div>` : ""}</div><p class="muted" style="margin:4px 0 0">${c.shared ? `מסלול שקיבלתם בקישור${c.shared.t ? ` ב־${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric" }).format(c.shared.t)}` : ""}. הוא נשמר אצלכם, ואפשר לערוך או לצאת איתו.` : esc(c.sub)}</p></div>${c.alertMsg ? `<div class="alert">${esc(c.alertMsg)}</div>` : ""}`;
     h += `
       <div class="stats"><div class="stat"><div class="k">מרחק</div><div class="v">${r ? Math.round(r.km) : "--"}<span class="small"> ק״מ</span></div></div><div class="stat"><div class="k">זמן נטו</div><div class="v">${r ? `${Math.floor(r.min / 60)}:${String(Math.round(r.min % 60)).padStart(2, "0")}` : "--"}</div></div><div class="stat"><div class="k">מפותל</div><div class="v">${cs ? Math.round(cs.twisty) : "--"}<span class="small"> ק״מ</span></div></div><div class="stat"><div class="k">טיפוס</div><div class="v">${e && e.climb != null ? e.climb : "--"}<span class="small"> מ׳</span></div></div></div>`;
     h += terrCard(c.id) + diffCard(c.id) + trafficCard(c.id);
@@ -1392,7 +1393,7 @@
   }
 
   /* ---------- route builder: search, waypoints, preferences, save and share ---------- */
-  const DRAFT = "draft";
+  const DRAFT = "draft", NAV = "nav";
   function startBuild(from) {
     const prefs = Object.assign({}, st.buildPrefs, from && from.opts);
     st.build = { editing: from ? from.id : null, title: from ? from.title : "", pts: from ? from.stops.map(s => ({ name: s.name, lat: s.lat, lon: s.lon })) : [], opts: prefs, results: [], q: "" };
@@ -1428,9 +1429,9 @@
     if (st.osm) { st.osm.views.forEach(v => v.name && v.name.toLowerCase().includes(t) && add(v.name, "מצפור", v.lat, v.lon, "מצפור")); st.osm.fuel.forEach(f => ((f.name || "") + " " + (f.brand || "")).toLowerCase().includes(t) && add(f.name || f.brand, "תחנת דלק" + (f.brand && f.name ? " · " + f.brand : ""), f.lat, f.lon, "דלק")); }
     return out.slice(0, 6);
   }
-  async function remoteSearch(q) {
+  async function remoteSearch(q, near) {
     const ctl = new AbortController(); remoteSearch.ctl && remoteSearch.ctl.abort(); remoteSearch.ctl = ctl;
-    const c = map.getCenter();
+    const c = near ? { lat: near.lat, lng: near.lon } : map.getCenter();
     try {
       const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=34.2,29.4,35.95,33.45`, { signal: ctl.signal });
       const j = await r.json();
@@ -1508,20 +1509,157 @@
     $("ilPaste").onclick = async () => { try { $("ilIn").value = await navigator.clipboard.readText(); } catch (e) { $("ilIn").focus(); toast("לחיצה ארוכה בשדה ← הדבקה"); } };
     $("ilGo").onclick = () => { const v = $("ilIn").value.trim(); let q = null; try { q = new URL(v).searchParams.get("r"); } catch (e) { const m = v.match(/[?&]r=([A-Za-z0-9_-]+)/); q = m && m[1]; } if (!q) { $("ilErr").textContent = "זה לא קישור למסלול של Blue Ronin"; return; } closeModal(); importShared(q); };
   }
+  /* A shared link opens the route itself: it is saved with a "משיתוף" tag, selected and shown, so nobody
+     misses it in the builder. Same stops already saved → that route opens. At the free limit it opens as an
+     unsaved preview, with the option to save. */
   function importShared(fromLink) {
     const q = fromLink || new URLSearchParams(location.search).get("r"); if (!q) return;
     try {
       const d = JSON.parse(unb64u(q)); history.replaceState(null, "", location.pathname + location.hash);
       if (!Array.isArray(d.p) || d.p.length < 2) return;
-      st.build = { editing: null, title: String(d.t || "").slice(0, 40), pts: d.p.slice(0, 25).map(([name, lat, lon]) => ({ name: String(name).slice(0, 60), lat: +lat, lon: +lon })).filter(p => isFinite(p.lat) && isFinite(p.lon)), opts: { noHighway: !!(d.o && d.o.noHighway), loop: !!(d.o && d.o.loop) }, results: [], q: "" };
-      st.prevChap = st.chap; syncDraft(); setTab("route"); toast("קיבלתם מסלול מחבר. שמרו אותו כדי שיישאר.");
+      const pts = d.p.slice(0, 25).map(([name, lat, lon]) => ({ name: String(name).slice(0, 60), lat: +lat, lon: +lon })).filter(p => isFinite(p.lat) && isFinite(p.lon) && p.lat > 29 && p.lat < 34 && p.lon > 34 && p.lon < 36.3);
+      if (pts.length < 2) return;
+      const title = String(d.t || "").slice(0, 40).trim() || `${pts[0].name.split(",")[0]} ← ${pts[pts.length - 1].name.split(",")[0]}`;
+      const opts = { noHighway: !!(d.o && d.o.noHighway), loop: !!(d.o && d.o.loop) }, sig = JSON.stringify(pts.map(p => [p.lat.toFixed(4), p.lon.toFixed(4)]));
+      const same = st.myRoutes.find(u => JSON.stringify(u.stops.map(p => [(+p.lat).toFixed(4), (+p.lon).toFixed(4)])) === sig);
+      const show = id => { setChap(id); setTab("route"); if (innerWidth < 900) setSheet("half"); setTimeout(() => { const h = $("p-route").querySelector("h2"); if (h) h.scrollIntoView({ block: "start", behavior: "smooth" }); }, 400); };
+      if (same) { show(same.id); toast("המסלול הזה כבר שמור אצלכם. פתחתי אותו"); }
+      else if (st.myRoutes.length < FREE_ROUTES || isPro()) {
+        const id = "u" + Date.now().toString(36), rec = { id, title, stops: pts, opts, shared: { t: Date.now() } };
+        st.myRoutes.push(rec); LS.set("myRoutes", st.myRoutes); const c = customChapter(rec); CHAPTERS.push(c);
+        show(id); loadRoute(c).then(r => { processRoute(c, r); pushSources(); renderMarkers(); if (st.chap === id) { renderTab(); fitChapter(); } loadElev(id).then(() => st.tab === "route" && st.chap === id && renderRoute()); });
+        toast(`קיבלתם מסלול: ${title}. הוא נשמר אצלכם`, 3500);
+      } else {
+        st.build = { editing: null, title, pts, opts, results: [], q: "", shared: true };
+        st.prevChap = st.chap; syncDraft(); setTab("route"); toast("קיבלתם מסלול מחבר. הגעתם למגבלת המסלולים: שמירה תדרוש Pro או מחיקה של מסלול ישן", 4500);
+      }
       if (!fromLink && isIOS && !standalone()) setTimeout(() => updBar("האפליקציה מותקנת אצלכם? באייפון קישורים נפתחים בספארי. העתיקו את הקישור, ובאפליקציה: מסלול ← ״מסלול מקישור״", { ms: 14000 }), 3500);
     } catch (e) { }
   }
 
+  /* =====================================================================================
+     Everyday navigation ("ניווט"): the app as a daily navigator for two-wheelers anywhere in Israel,
+     next to the weekend tab. Search a place (or say it), see the trip with live traffic and the weather
+     on arrival, and go: the trip rides on the same engine as the chapters (voice, re-routing, HUD, SOS,
+     journal). Home, work and recent places are kept on the phone only.
+     ===================================================================================== */
+  st.nav = null; /* { dest, tr, wx, busy, err } */
+  const navPlaces = () => LS.get("navPlaces", {}) || {};
+  const navRecent = () => (LS.get("navRecent", []) || []).filter(x => x && isFinite(x.lat) && isFinite(x.lon));
+  const NAVQ = { q: "", results: [], searching: false };
+  const fmtDur = m => m < 60 ? `${Math.max(1, Math.round(m))} דק׳` : `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, "0")} שע׳`;
+  function navChapter() { return CHAPTERS.find(c => c.id === NAV); }
+  function navTrafficFactor() {
+    const t = st.traffic[NAV]; if (!t || !t.pts) return null; const r = t.pts.filter(p => p.ratio != null);
+    if (!r.length) return null; const inv = r.reduce((a, p) => a + 1 / Math.max(0.15, Math.min(1, p.ratio)), 0) / r.length; return Math.min(3, Math.max(1, inv));
+  }
+  async function navTo(dest, opts) {
+    const me = st.me ? { lat: st.me.lat, lon: st.me.lon } : await getPosFresh(9000).then(p => p && { lat: p[1], lon: p[0] }).catch(() => null);
+    if (!me) { toast("צריך גישה למיקום כדי לנווט. אפשר לאשר מיקום בהגדרות הדפדפן"); return; }
+    if (L.hav([me.lon, me.lat], [dest.lon, dest.lat]) < 0.15) { toast("אתם כבר שם"); return; }
+    navClear(true);
+    const o = Object.assign({ noHighway: !!(navPlaces().noHw) }, opts || {});
+    const c = customChapter({ id: NAV, title: dest.name, sub: dest.sub || "ניווט", stops: [{ name: "המיקום שלי", lat: +me.lat.toFixed(5), lon: +me.lon.toFixed(5) }, { name: dest.name, lat: +dest.lat, lon: +dest.lon }], opts: o });
+    c.nav = true; c.hidden = true; CHAPTERS.push(c);
+    st.navPrev = st.chap !== NAV ? st.chap : st.navPrev; st.nav = { dest, busy: true };
+    const rec = navRecent().filter(x => L.hav([x.lon, x.lat], [dest.lon, dest.lat]) > 0.1); rec.unshift({ name: dest.name, sub: dest.sub || "", lat: +dest.lat, lon: +dest.lon, t: Date.now() }); LS.set("navRecent", rec.slice(0, 8));
+    st.chap = NAV; renderGo();
+    const r = await loadRoute(c); if (navChapter() !== c) return;
+    processRoute(c, r); st.nav.busy = false; st.nav.err = r.real ? null : "השרת של המסלולים לא ענה, זה קו משוער. נסו שוב בעוד רגע";
+    pushSources(); renderMarkers(); fitChapter(900); if (innerWidth < 900) setSheet("half"); renderGo();
+    if (st.cfg.traffic) loadTraffic(NAV, true).then(() => st.tab === "go" && renderGo());
+    navArrivalWx(dest, r);
+  }
+  async function navArrivalWx(dest, r) {
+    const r1 = v => (Math.round(v * 10) / 10).toFixed(2);
+    try { const j = await (await withTimeout(fetch(`/api/wx?p=${r1(dest.lat)},${r1(dest.lon)}`), 9000)).json(); const h = j.data && j.data[0] && j.data[0].hourly; if (!h || !st.nav) return;
+      const eta = new Date(Date.now() + r.min * (navTrafficFactor() || 1) * 6e4), iso = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit" }).format(eta).replace(" ", "T") + ":00", i = h.time.indexOf(iso);
+      if (i < 0) return; st.nav.wx = { t: h.temperature_2m[i], p: h.precipitation_probability[i], g: h.wind_gusts_10m[i], code: h.weather_code[i] }; if (st.tab === "go") renderGo();
+    } catch (e) { }
+  }
+  function navClear(quiet) {
+    const i = CHAPTERS.findIndex(c => c.id === NAV); if (i >= 0) CHAPTERS.splice(i, 1);
+    ["routes", "curves", "cstats", "glare", "elev", "terr", "traffic"].forEach(k => delete st[k][NAV]);
+    st.nav = null; if (quiet) return;
+    st.chap = st.navPrev && CHAPTERS.some(c => c.id === st.navPrev) ? st.navPrev : LS.get("chap", "c1"); if (!CHAPTERS.some(c => c.id === st.chap)) st.chap = "c1";
+    pushSources(); renderMarkers(); renderGo();
+  }
+  function navSave() {
+    const c = navChapter(); if (!c) return; if (st.myRoutes.length >= FREE_ROUTES && !isPro()) return openPaywall("routes");
+    const id = "u" + Date.now().toString(36), rec = { id, title: c.title.slice(0, 40), stops: c.stops.map(s => ({ name: s.name, lat: s.lat, lon: s.lon })), opts: c.opts };
+    st.myRoutes.push(rec); LS.set("myRoutes", st.myRoutes); const nc = customChapter(rec); CHAPTERS.push(nc); if (st.routes[NAV]) processRoute(nc, st.routes[NAV]);
+    toast("נשמר במסלולים שלך, בלשונית מסלול");
+  }
+  function navSetPlace(kind) { const n = st.nav; if (!n) return; const P = navPlaces(); P[kind] = { name: n.dest.name, sub: n.dest.sub || "", lat: +n.dest.lat, lon: +n.dest.lon }; LS.set("navPlaces", P); toast(kind === "home" ? "נשמר כבית" : "נשמר כעבודה"); renderGo(); }
+  function navTripCard() {
+    const n = st.nav, c = navChapter(); if (!n || !c) return "";
+    if (n.busy) return `<div class="card navtrip"><div class="row" style="gap:10px"><span class="spin"></span><b>מחשב מסלול אל ${esc(n.dest.name)}…</b></div></div>`;
+    const r = st.routes[NAV]; if (!r) return "";
+    const f = navTrafficFactor(), mins = r.min * 1.05 * (f || 1), eta = new Date(Date.now() + mins * 6e4), t = st.traffic[NAV];
+    const slow = t && t.pts ? t.pts.filter(p => p.ratio != null && p.ratio < 0.55) : [], inc = t && t.inc ? t.inc.filter(i => i.on) : [];
+    const trLine = !st.cfg.traffic ? "" : !t ? `<span class="small muted">בודק תנועה…</span>` : inc.length ? `<span class="trk no">${esc(inc[0].label)}${inc[0].closed ? " · כביש סגור" : ""} במסלול</span>` : slow.length ? `<span class="trk warn">עומס בחלק מהדרך${f ? ` · +${Math.round(r.min * (f - 1))} דק׳` : ""}</span>` : t.pts && t.pts.some(p => p.ratio != null) ? `<span class="trk go">התנועה זורמת</span>` : `<span class="small muted">אין נתוני תנועה לדרך הזאת</span>`;
+    const w = n.wx, P = navPlaces();
+    return `<div class="card navtrip"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0"><div class="small muted">אל</div><h3 class="navto">${esc(n.dest.name)}</h3>${n.dest.sub ? `<div class="small muted">${esc(n.dest.sub)}</div>` : ""}</div><button type="button" class="ic-btn" id="navX" aria-label="ביטול הניווט">✕</button></div>
+      <div class="navnums"><div><b class="mono">${fmtT(eta)}</b><span>הגעה</span></div><div><b class="mono">${fmtDur(mins)}</b><span>${f && f > 1.08 ? "כולל עומסים" : "זמן נסיעה"}</span></div><div><b class="mono">${r.km < 10 ? r.km.toFixed(1) : Math.round(r.km)}</b><span>ק״מ</span></div></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">${trLine}${w ? `<span class="trk wx"><span class="pwx">${wxIcon(w.code)}</span>ביעד ${Math.round(w.t)}°${w.p >= 20 ? ` · ${w.p}% גשם` : ""}${w.g >= 40 ? ` · משבים ${Math.round(w.g)}` : ""}</span>` : ""}</div>
+      ${n.err ? `<div class="alert info small">${esc(n.err)}</div>` : ""}
+      <button type="button" class="btn primary navgo" id="navGo">${IC.nav}יוצאים לדרך</button>
+      <div class="row navacts"><label class="toggle small"><input type="checkbox" id="navNoHw" ${c.opts && c.opts.noHighway ? "checked" : ""}> בלי כבישים מהירים</label></div>
+      <div class="row navacts"><button type="button" class="btn sm" id="navShare">${PWI.share}שיתוף</button><button type="button" class="btn sm" id="navSave">שמירה כמסלול</button><button type="button" class="btn sm" id="navHome">${P.home && L.hav([P.home.lon, P.home.lat], [n.dest.lon, n.dest.lat]) < 0.1 ? "★ הבית" : "שמירה כבית"}</button><button type="button" class="btn sm" id="navWork">${P.work && L.hav([P.work.lon, P.work.lat], [n.dest.lon, n.dest.lat]) < 0.1 ? "★ העבודה" : "שמירה כעבודה"}</button></div></div>`;
+  }
+  function navResultsHtml() {
+    if (!NAVQ.q) return "";
+    if (!NAVQ.results.length) return NAVQ.searching ? `<div class="small muted sr">מחפש…</div>` : `<div class="small muted sr">לא נמצאו תוצאות</div>`;
+    return NAVQ.results.map((r, i) => `<button type="button" class="sr" data-go="${i}"><span class="sr-k">${r.k}</span><span class="grow"><b>${esc(r.name)}</b><span class="small muted">${esc(r.sub || "")}</span></span><span class="sr-plus">${IC.nav}</span></button>`).join("");
+  }
+  function renderGo() { return paneSafe("go", renderGo_); }
+  function renderGo_() {
+    const p = $("p-go"); if (!p) return; const P = navPlaces(), rec = navRecent(), riding = !!st.ride;
+    const qb = (id, icon, label, sub, dis) => `<button type="button" class="gq" id="${id}" ${dis ? 'aria-disabled="true"' : ""}><span class="gqi">${icon}</span><b>${label}</b><span class="small muted">${sub}</span></button>`;
+    const HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>', WORK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>', FUEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12M4 10h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3"/></svg>';
+    let h = `<div class="go"><div class="gohead"><h2>לאן רוכבים?</h2><span class="small muted">ניווט לאופנוע ולקטנוע בכל הארץ, עם תנועה חיה ומזג אוויר בדרך</span></div>
+      <div class="search"><input id="goQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="כתובת, מקום, יישוב או צומת" value="${esc(NAVQ.q)}" aria-label="חיפוש יעד"><div class="sres" id="goRes">${navResultsHtml()}</div></div>
+      ${navTripCard()}
+      <div class="gquick">${qb("gqHome", HOME, "הביתה", P.home ? esc(P.home.name) : "עוד לא הוגדר")}${qb("gqWork", WORK, "לעבודה", P.work ? esc(P.work.name) : "עוד לא הוגדר")}${qb("gqFuel", FUEL, "דלק קרוב", "לפי המיקום")}${st.park ? qb("gqPark", PWI.moto, "לאופנוע", "איפה חניתי") : ""}</div>
+      ${rec.length ? `<div class="card"><h3>אחרונים</h3><div class="list golist">${rec.slice(0, 6).map((x, i) => `<button type="button" class="gli" data-rec="${i}"><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.sub || "")}</span></span><span class="small muted">${st.me ? `${Math.round(L.hav([st.me.lon, st.me.lat], [x.lon, x.lat]))} ק״מ` : ""}</span></button>`).join("")}</div></div>` : ""}
+      ${st.myRoutes.length ? `<div class="card"><h3>המסלולים שלי</h3><div class="list golist">${st.myRoutes.slice(-4).reverse().map(u => `<button type="button" class="gli" data-mr="${esc(u.id)}"><span class="grow"><b>${esc(u.title)}</b><span class="small muted">${u.stops.length} נקודות${u.shared ? " · התקבל בשיתוף" : ""}</span></span><span class="small muted">פתיחה</span></button>`).join("")}</div></div>` : ""}
+      <button type="button" class="gowk" id="goWeekend"><span><b>מתכננים רכיבת סוף שבוע?</b><span class="small muted">תדריך, פרקים מפותלים ותחזית לכל עצירה</span></span><span aria-hidden="true">←</span></button>
+      ${riding ? "" : `<p class="small muted" style="margin:0">החיפוש והניווט עובדים בכל הארץ. בית, עבודה והיעדים האחרונים נשמרים רק בטלפון שלך.</p>`}</div>`;
+    p.innerHTML = h; bindGo();
+  }
+  function goSearchAt() { return st.me ? { lat: st.me.lat, lon: st.me.lon } : null; }
+  function bindGo() {
+    const q = $("goQ"); if (!q) return;
+    const refresh = () => { const el = $("goRes"); if (!el) return; el.innerHTML = navResultsHtml(); el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const r = NAVQ.results[+b.dataset.go]; NAVQ.q = ""; NAVQ.results = []; navTo({ name: r.name, sub: r.sub, lat: r.lat, lon: r.lon }); }); };
+    q.oninput = () => {
+      NAVQ.q = q.value; NAVQ.results = localSearch(NAVQ.q); NAVQ.searching = NAVQ.q.trim().length >= 2; refresh();
+      clearTimeout(bindGo.t); if (NAVQ.q.trim().length < 2) return;
+      bindGo.t = setTimeout(async () => { try { const rem = await remoteSearch(NAVQ.q, goSearchAt()); const loc = localSearch(NAVQ.q); NAVQ.results = rem.concat(loc.filter(l => !rem.some(r => L.hav([l.lon, l.lat], [r.lon, r.lat]) < 0.2))).slice(0, 10); } catch (e) { return; } NAVQ.searching = false; refresh(); }, 300);
+    };
+    const mic = micFor(q, () => q.oninput()); if (mic) q.parentNode.insertBefore(mic, q.nextSibling);
+    q.onkeydown = e => { if (e.key === "Enter" && NAVQ.results[0]) { e.preventDefault(); const r = NAVQ.results[0]; NAVQ.q = ""; NAVQ.results = []; navTo(r); } };
+    q.onfocus = () => { if (innerWidth < 900 && st.sheet !== "full") setSheet("full"); };
+    refresh();
+    const P = navPlaces();
+    $("gqHome").onclick = () => P.home ? navTo(P.home) : (toast("חפשו את הכתובת של הבית, ואז ״שמירה כבית״", 3500), q.focus());
+    $("gqWork").onclick = () => P.work ? navTo(P.work) : (toast("חפשו את הכתובת של העבודה, ואז ״שמירה כעבודה״", 3500), q.focus());
+    $("gqFuel").onclick = () => fuelNearMe();
+    if ($("gqPark")) $("gqPark").onclick = () => walkStart();
+    $("p-go").querySelectorAll("[data-rec]").forEach(b => b.onclick = () => navTo(navRecent()[+b.dataset.rec]));
+    $("p-go").querySelectorAll("[data-mr]").forEach(b => b.onclick = () => { setChap(b.dataset.mr); setTab("route"); });
+    $("goWeekend").onclick = () => setTab("brief");
+    if ($("navX")) $("navX").onclick = () => { navClear(); fitChapter(); };
+    if ($("navGo")) $("navGo").onclick = () => { if (st.ride) return toast("כבר במצב רכיבה"); startRide(); };
+    if ($("navSave")) $("navSave").onclick = navSave;
+    if ($("navShare")) $("navShare").onclick = () => { const c = navChapter(); if (c) shareRoute(c); };
+    if ($("navHome")) $("navHome").onclick = () => navSetPlace("home");
+    if ($("navWork")) $("navWork").onclick = () => navSetPlace("work");
+    if ($("navNoHw")) $("navNoHw").onchange = e => { const P2 = navPlaces(); P2.noHw = e.target.checked; LS.set("navPlaces", P2); if (st.nav) navTo(st.nav.dest, { noHighway: e.target.checked }); };
+  }
+
   /* ---------- turn-by-turn steps from OSRM ---------- */
   async function loadSteps(c, route) {
-    const key = "steps:v2:" + routeKey(c); const cached = LS.get(key, null); if (cached) return cached;
+    const key = "steps:v2:" + routeKey(c); const cached = c.nav ? null : LS.get(key, null); if (cached) return cached;
     try {
       const j = await (await fetch(osrmUrl(c, "&steps=true"))).json(); if (j.code !== "Ok") throw 0;
       const legs = j.routes[0].legs; const out = []; let from = 0; const coords = route.coords, cum = route.cum;
@@ -1531,7 +1669,7 @@
       }));
       function stepRec(m, sp, last) { const loc = m.location; let bi = from, bd = 1e9; for (let i = from; i < coords.length; i++) { const d = (coords[i][0] - loc[0]) ** 2 + (coords[i][1] - loc[1]) ** 2; if (d < bd) { bd = d; bi = i; } if (d > bd * 400 && i > bi + 400) break; } from = bi;
         return { km: +cum[bi].toFixed(3), type: m.type, modifier: m.modifier || "", exit: m.exit || 0, name: sp.name || "", ref: sp.ref || "", last }; }
-      LS.set(key, out); return out;
+      if (!c.nav) LS.set(key, out); return out;
     } catch (e) { return null; }
   }
   /* Voice: Hebrew speech when the phone has a Hebrew voice. */
@@ -1566,7 +1704,7 @@
   function renderTools_() {
     const off = LS.get("offline", null); const ios = /iphone|ipad|ipod/i.test(navigator.userAgent); const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
     let h = `<h2>כלים</h2>
-    <div class="card"><h3>מפות אופליין לצפון</h3><p class="small muted" style="margin:0">מוריד את מפת הצפון עד רמת רחוב, את מסלולי שלושת הפרקים בפירוט מלא ואת התבליט. עד כ־50MB, כדאי ב־Wi-Fi.</p><div class="progress"><span id="offBar" style="width:${off ? 100 : 0}%"></span></div><div class="row"><button type="button" class="btn primary" id="offGo">${off ? "עדכון ההורדה" : "הורדה לאופליין"}</button><span class="small muted" id="offTxt">${off ? `${off.n} אריחים · ${ago(off.ts)}` : "עוד לא הורד"}</span></div></div>
+    <div class="card"><h3>מפות אופליין למסלולים</h3><p class="small muted" style="margin:0">מוריד את המפה סביב המסלולים עד רמת רחוב, את הפרקים בפירוט מלא ואת התבליט. עד כ־50MB, כדאי ב־Wi-Fi.</p><div class="progress"><span id="offBar" style="width:${off ? 100 : 0}%"></span></div><div class="row"><button type="button" class="btn primary" id="offGo">${off ? "עדכון ההורדה" : "הורדה לאופליין"}</button><span class="small muted" id="offTxt">${off ? `${off.n} אריחים · ${ago(off.ts)}` : "עוד לא הורד"}</span></div></div>
     <div class="card"><h3>התקנה כאפליקציה</h3>${standalone ? '<p class="small muted" style="margin:0">האפליקציה מותקנת.</p>' : installEvt ? '<button type="button" class="btn primary" id="instGo">התקנה למסך הבית</button>' : ios ? '<p class="small muted" style="margin:0">באייפון: כפתור השיתוף בספארי ← ״הוספה למסך הבית״.</p>' : '<p class="small muted" style="margin:0">בתפריט הדפדפן: ״התקנת אפליקציה״ או ״הוספה למסך הבית״.</p>'}</div>
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
     <div class="card"><h3>שיתוף ודיווח לחבר׳ה</h3><div class="row"><button type="button" class="btn" id="shareGo">שיתוף האפליקציה</button><a class="btn" target="_blank" rel="noopener" href="${LIVE_BOARD}">לוח הדיווחים החי</a></div>
@@ -1615,7 +1753,7 @@
     const s = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Blue Ronin//HE", "BEGIN:VEVENT", `UID:blue-ronin-brief@${location.host || "app"}`, "DTSTAMP:20261104T120000Z", "DTSTART;TZID=Asia/Jerusalem:20261106T200000", "DURATION:PT15M", "RRULE:FREQ=WEEKLY;BYDAY=FR", "SUMMARY:Blue Ronin · תדריך שבת", `DESCRIPTION:מזג אוויר\\, ערפל\\, סנוור ופרק מומלץ לשבת: ${url}`, `URL:${url}`, "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:תדריך שבת", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     saveFile("blue-ronin-shabbat.ics", s, "text/calendar"); toast("פתחו את הקובץ כדי להוסיף ליומן");
   }
-  async function share() { const d = { title: "Blue Ronin Navigator", text: "מסלולי אופנוע לצפון עם תדריך שבת חי", url: location.href.split("#")[0] }; try { if (navigator.share) await navigator.share(d); else { await navigator.clipboard.writeText(d.url); toast("הקישור הועתק"); } } catch (e) { } }
+  async function share() { const d = { title: "Blue Ronin Navigator", text: "הנביגטור של רוכבי הדו־גלגלי בישראל: ניווט יומיומי ומסלולי סוף שבוע", url: location.href.split("#")[0] }; try { if (navigator.share) await navigator.share(d); else { await navigator.clipboard.writeText(d.url); toast("הקישור הועתק"); } } catch (e) { } }
   function report() {
     const type = $("repType").value;
     const send = (lat, lon, src) => { const txt = `Blue Ronin · ${type}\n${src}\nWaze: https://waze.com/ul?ll=${lat.toFixed(5)},${lon.toFixed(5)}\n${new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date())}`; const u = "https://wa.me/?text=" + encodeURIComponent(txt); const w = window.open(u, "_blank"); if (!w) location.href = u; };
@@ -1654,7 +1792,7 @@
       const list = [...urls]; const cache = await caches.open("brn-tiles-v1"); let done = 0, ok = 0;
       const worker = async () => { while (list.length) { const u = list.pop(); try { if (!(await cache.match(u))) { const r = await fetch(u, { mode: "cors" }); if (r.ok) { await cache.put(u, r); ok++; } } else ok++; } catch (e) { } done++; if (done % 20 === 0 || !list.length) { $("offBar").style.width = (done / urls.size * 100).toFixed(1) + "%"; $("offTxt").textContent = `${done} / ${urls.size}`; } } };
       await Promise.all(Array.from({ length: 4 }, worker));
-      LS.set("offline", { ts: Date.now(), n: ok }); $("offTxt").textContent = `${ok} אריחים נשמרו`; toast("הצפון שמור במכשיר. המפה תעבוד גם בלי קליטה.");
+      LS.set("offline", { ts: Date.now(), n: ok }); $("offTxt").textContent = `${ok} אריחים נשמרו`; toast("המפה שמורה במכשיר. המפה תעבוד גם בלי קליטה.");
     } catch (e) { toast("ההורדה נעצרה. נסו שוב עם חיבור יציב."); }
     btn.disabled = false;
   }
@@ -1842,13 +1980,13 @@
     if (st.ride) return stopRide();
     if (!navigator.geolocation) return toast("מצב רכיבה צריך גישה למיקום");
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
-    say("מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
+    say(c.nav ? "יוצאים לדרך. ניווט אל " + c.title : "מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
     unlockAudio(); if (st.sos.crash) askMotion().then(ok => { if (ok && st.ride) fallArm(); }); geoPause(); walkStop();
     st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, off: 0, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
     loadSteps(c, r).then(s => { if (st.ride && st.ride.c === c) st.ride.G.steps = s; });
     try { st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { }
     if (!st.ride) return;
-    document.body.classList.add("riding"); $("hud").hidden = false; requestAnimationFrame(hudMeasure); $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
+    document.body.classList.add("riding"); $("hud").hidden = false; $("hudNextK").textContent = c.nav ? "יעד" : "העצירה הבאה"; requestAnimationFrame(hudMeasure); $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
     if (!st.terrain) toggle3d(true);
     st.ride.watch = navigator.geolocation.watchPosition(onPos, () => toast("אין אות GPS"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
   }
@@ -1887,7 +2025,7 @@
   /* Ride extras: arrival call-outs, remaining distance and ETA, spoken sharp-curve warnings, sunset race. */
   function rideExtras(R, G, me, myKm, near, spd) {
     const name = s => s.name.split(" · ")[0];
-    if (near.d < 0.3) G.stopKm.forEach((k, i) => { if (i === 0 || R.alerted.has("st" + i) || myKm < k - 0.06) return; R.alerted.add("st" + i); if (myKm - k > 1) return; const nx = G.stops[i + 1]; say(nx ? `הגעתם ל${name(G.stops[i])}. הבא: ${name(nx)}, בעוד ${distSpeak(G.stopKm[i + 1] - k)}` : `הגעתם ל${name(G.stops[i])}. סוף הפרק. רכיבה טובה`); });
+    if (near.d < 0.3) G.stopKm.forEach((k, i) => { if (i === 0 || R.alerted.has("st" + i) || myKm < k - 0.06) return; R.alerted.add("st" + i); if (myKm - k > 1) return; const nx = G.stops[i + 1]; say(nx ? `הגעתם ל${name(G.stops[i])}. הבא: ${name(nx)}, בעוד ${distSpeak(G.stopKm[i + 1] - k)}` : R.c.nav ? `הגעתם ליעד, ${name(G.stops[i])}` : `הגעתם ל${name(G.stops[i])}. סוף הפרק. רכיבה טובה`); });
     const total = G.cum[G.cum.length - 1], left = Math.max(0, total - myKm), r = st.routes[R.c.id];
     const pace = r && r.km > 0 ? r.min / r.km : 1.2, avg = R.moving > 300 && R.odo > 3 ? 60 * R.moving / 3600 / R.odo : pace;
     const mins = left * Math.max(pace * 0.8, Math.min(pace * 1.6, avg)), eta = new Date(Date.now() + mins * 6e4);
@@ -2628,13 +2766,13 @@
 
   function setTab(t) {
     st.tab = t; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.t === t)));
-    ["brief", "route", "stops", "me", "tools"].forEach(k => $("p-" + k).hidden = k !== t); $("panes").scrollTop = 0;
+    ["go", "brief", "route", "stops", "me", "tools"].forEach(k => $("p-" + k).hidden = k !== t); $("panes").scrollTop = 0;
     if (innerWidth < 900 && st.sheet === "peek") setSheet("half");
     renderTab();
   }
-  const renderTab = () => ({ brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
+  const renderTab = () => ({ go: renderGo, brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
-  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; if (id !== DRAFT) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
+  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; if (id !== DRAFT && id !== NAV) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
   const renderAll = () => { renderTab(); renderMarkers(); };
 
   /* ---------- layers popover ---------- */
@@ -2704,7 +2842,11 @@
   fetch("/api/config").then(r => r.ok ? r.json() : {}).then(cfg => { Object.assign(st.cfg, cfg); if (styleReady) addTrafficLayer(); if (st.tab === "route") { loadTraffic(st.chap); renderRoute(); } }).catch(() => { });
   importShared();
   loadRoutes(); loadWeather(); loadOSM(); loadCrowd();
-  if (location.hash === "#brief") setTab("brief"); else if (location.hash === "#route") setTab("route");
+  /* opening tab: a link that names one wins; otherwise the weekend tab on Friday and Saturday, and everyday
+     navigation the rest of the week */
+  { const hs = { "#brief": "brief", "#route": "route", "#go": "go", "#stops": "stops", "#me": "me", "#tools": "tools" }[location.hash];
+    const dow = new Date(new Date().toLocaleString("en-US", { timeZone: TZ })).getDay(); /* 0 = Sunday … 6 = Saturday */
+    if (hs) setTab(hs); else if (st.tab === "brief" && !new URLSearchParams(location.search).get("r") && dow >= 0 && dow <= 4) setTab("go"); }
   /* ---------- transparent updates: what's happening is always on screen ---------- */
   function updBar(text, opt = {}) {
     const b = $("updbar"); b.className = "updbar" + (opt.cls ? " " + opt.cls : ""); $("updT").innerHTML = (opt.spin ? '<span class="spin" style="display:inline-block;vertical-align:-2px;margin-inline-end:8px"></span>' : "") + esc(text);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Blue Ronin Navigator</title>
-<meta name="description" content="נביגטור רכיבה לצפון: מסלולי עיקולים, תדריך שבת עם מזג אוויר חי, מצב רכיבה ומפות אופליין.">
+<meta name="description" content="נביגטור הרכיבה של ישראל: ניווט יומיומי לדו־גלגלי עם תנועה חיה, מסלולי עיקולים לסוף השבוע עם תדריך מזג אוויר, מצב רכיבה ובטיחות.">
 <meta name="theme-color" content="#0A111E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -597,6 +597,30 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
 .rplan li.brk{background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:10px;padding-inline:6px}
 .wins.lab{margin-bottom:16px}.wins.lab .w{position:relative;grid-template-rows:1fr}.wins.lab span{position:absolute;top:100%;margin-top:3px;inset-inline-end:0;white-space:nowrap;overflow:visible}
 .pdep input[type=range]{direction:ltr}
+
+/* ---------- everyday navigation ---------- */
+.go{display:grid;gap:12px}
+.gohead h2{margin:0 0 2px;font-size:22px}
+.gquick{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.gq{display:grid;justify-items:start;gap:1px;text-align:start;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:8px 10px;cursor:pointer;font:inherit;min-width:0}
+.gq .gqi{color:var(--accent);display:flex}.gq .gqi svg{width:22px;height:22px}
+.gq b{font-size:14.5px}.gq .small{font-size:11.5px}.gq .small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.golist{display:grid;gap:0}
+.gli{display:flex;align-items:center;gap:10px;text-align:start;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);padding:9px 2px;font:inherit;cursor:pointer}
+.gli:last-child{border-bottom:0}.gli .grow{display:grid;min-width:0}.gli .grow b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gowk{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:start;border:1px dashed var(--line);background:none;color:var(--ink);border-radius:14px;padding:12px 14px;font:inherit;cursor:pointer}
+.gowk>span:first-child{display:grid}
+.navtrip{display:grid;gap:10px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+.navto{margin:0;font-size:19px;overflow:hidden;text-overflow:ellipsis}
+.navnums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.navnums>div{display:grid;background:var(--raised);border-radius:12px;padding:8px 10px}
+.navnums b{font-size:22px;line-height:1.1}.navnums span{font-size:12px;color:var(--muted)}
+.trk{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--raised)}
+.trk.go{color:var(--go)}.trk.warn{color:var(--caution)}.trk.no{color:var(--no)}.trk .pwx svg{width:16px;height:16px}
+.navgo{min-height:50px;font-size:17px;width:100%;justify-content:center}
+.navacts{gap:6px;flex-wrap:wrap}
+@media (max-width:899px){.tab{padding:8px 7px 10px;font-size:14.5px}.tabs{gap:2px;padding-inline:8px}}
+.chipshare{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--report,#C58BFF);color:#1b0b2a;margin-inline-start:6px;vertical-align:2px}
 </style>
 </head>
 <body>
@@ -617,17 +641,17 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
 <path d="M26 -37 36 -29" stroke="var(--ink)" stroke-width="3.2" stroke-linecap="round"/>
 <circle cx="29" cy="-44" r="5.6" fill="var(--ink)"/><path d="M30.5 -46.5a4.6 4.6 0 0 1 3.6 3" stroke="var(--sun)" stroke-width="2.4" stroke-linecap="round" fill="none"/>
 </g></svg>
-    <p>טוען את הצפון: כבישים, מזג אוויר, שבת.</p>
+    <p>טוען את הדרך: כבישים, תנועה, מזג אוויר.</p>
     <button type="button" class="ign" id="ignBtn" hidden aria-label="הנעה עם צליל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 7.5a8 8 0 1 0 11.4 0"/></svg>הקישו להנעה</button>
   </div>
 </div>
 <script src="guard.js"></script>
 <script src="intro.js"></script>
 
-<div id="map" aria-label="מפת הצפון"></div>
+<div id="map" aria-label="מפת ישראל"></div>
 
 <header class="bar">
-  <div class="brand">BLUE RONIN <span>· צפון</span><span class="probadge hb" id="proBadge" hidden>PRO</span></div>
+  <div class="brand">BLUE RONIN <span>· ישראל</span><span class="probadge hb" id="proBadge" hidden>PRO</span></div>
   <div class="row" style="flex-wrap:nowrap;gap:6px"><button type="button" class="bell" id="bellBtn" aria-label="הודעות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bn" id="bellN" hidden></span></button>
   <button type="button" class="now" id="nowChip" aria-label="מזג אוויר עכשיו"><span id="nowIcon"></span><b id="nowTemp">--°</b><span id="nowText" class="small muted">טוען</span></button></div>
 </header>
@@ -635,7 +659,7 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
 <div class="maint" id="maint" role="dialog" aria-modal="true" aria-labelledby="maintH" hidden><div class="box"><b id="maintH">עבודות בשטח</b><p id="maintT" style="margin:0"></p><button type="button" class="btn primary" id="maintX">המשך למפה</button></div></div>
 
 <div class="fabs" id="fabs">
-  <button type="button" class="fab home" id="fHome" aria-label="בית: כל הצפון מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="lbl">בית</span></button>
+  <button type="button" class="fab home" id="fHome" aria-label="בית: כל המסלולים מלמעלה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span class="lbl">בית</span></button>
   <button type="button" class="fab hide-ride" id="fLayers" aria-label="שכבות" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><span class="lbl">שכבות</span></button>
   <button type="button" class="fab" id="f3d" aria-label="תלת־ממד" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m2 19 6-10 4 6 3-4 7 8z"/></svg><span class="lbl">תלת־ממד</span></button>
   <button type="button" class="fab hide-ride" id="fFly" aria-label="מעוף על המסלול"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg><span class="lbl">מעוף</span></button>
@@ -674,13 +698,15 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
     </div>
   </div>
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-t="brief" aria-selected="true">תדריך שבת</button>
+    <button class="tab" role="tab" data-t="go" aria-selected="false">ניווט</button>
+    <button class="tab" role="tab" data-t="brief" aria-selected="true">סופ״ש</button>
     <button class="tab" role="tab" data-t="route" aria-selected="false">מסלול</button>
     <button class="tab" role="tab" data-t="stops" aria-selected="false">עצירות ודלק</button>
     <button class="tab" role="tab" data-t="me" aria-selected="false">שלי</button>
     <button class="tab" role="tab" data-t="tools" aria-selected="false">כלים</button>
   </div>
   <div class="panes" id="panes">
+    <div class="pane" id="p-go" hidden></div>
     <div class="pane" id="p-brief"></div>
     <div class="pane" id="p-route" hidden></div>
     <div class="pane" id="p-stops" hidden></div>
@@ -705,7 +731,7 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
   <div id="hudMsg" class="hudmsg" hidden></div>
   <div class="top">
     <div class="speed"><span id="hudSpeed">--</span><small>קמ״ש</small></div>
-    <div class="next"><div class="k">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div><div class="eta" id="hudGroup"></div></div>
+    <div class="next"><div class="k" id="hudNextK">העצירה הבאה</div><div class="v" id="hudNext">--</div><div class="d" id="hudDist">--</div><div class="eta mono" id="hudEta"></div><div class="eta" id="hudGroup"></div></div>
   </div>
   <div class="hfuel" id="hudFuel" hidden aria-label="דלק במיכל"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20M3.5 20h12M7.5 7h4v3.5h-4z"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg><div class="fbar"><i></i></div><span id="hudFuelT" class="mono">--</span></div>
   <div class="hacts"><button type="button" class="hsos" id="hudSos" aria-label="חירום: לחיצה ארוכה"><i></i><span>SOS</span><small>לחיצה ארוכה</small></button><button type="button" class="hact" id="hudCam" aria-label="צילום לזיכרונות"></button><button type="button" class="hact" id="hudPark" aria-label="חניתי כאן"></button><button type="button" class="hact" id="hudLive" aria-label="שיתוף מיקום חי"></button></div>

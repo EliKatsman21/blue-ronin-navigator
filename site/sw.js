@@ -1,5 +1,5 @@
 /* Blue Ronin Navigator — service worker: offline shell, cached map tiles, network-first live data. */
-const SHELL = "brn-shell-v15", TILES = "brn-tiles-v1", DATA = "brn-data-v1";
+const SHELL = "brn-shell-v16", TILES = "brn-tiles-v1", DATA = "brn-data-v1";
 const SHELL_FILES = ["./", "index.html", "guard.js", "intro.js", "app.js", "bikes.js", "logic.js", "geo.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/badge-96.png", "sounds/ignition.mp3"];
 const TILE_HOSTS = ["tiles.openfreemap.org", "s3.amazonaws.com"];
 const LIB_HOSTS = ["unpkg.com", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];

@@ -23,6 +23,7 @@ export const PLAYBOOK = {
   tiles: ["מפות OpenFreeMap", "critical", "שרת המפות לא עונה: המפה ריקה למי שאין לו מטמון. אם נמשך מעל שעה, לשקול סגנון גיבוי."],
   libs: ["ספריות CDN", "critical", "MapLibre או SunCalc לא נטענים מה־CDN. האפליקציה לא תעלה למי שאין לו מטמון."],
   osrm: ["ניתוב OSRM", "normal", "שרת הניתוב לא עונה: בניית מסלול וניווט מחדש בזמן רכיבה נפגעים. המסלולים המובנים שמורים."],
+  geo: ["חיפוש כתובות (HERE)", "normal", "מכסת החיפושים החודשית מתקרבת לסוף. מעבר לה האפליקציה עוברת לחיפוש החלופי (פחות מדויק במספרי בתים). אפשר להעלות HERE_GEO_CAP אם יש יתרה."],
   traffic: ["תנועה (HERE)", "normal", "מכסת HERE החודשית מתקרבת לסוף. אפשר להעלות את HERE_MONTHLY_CAP אם יש יתרה בחשבון."],
   field: ["תקלות מהשטח", "high", "קפיצה בתקלות מהטלפונים. לפתוח את ״בעיות מובילות״ ולבדוק איזו גרסה ואיזה מכשיר."],
   boot: ["פתיחת האפליקציה", "critical", "טלפונים לא מצליחים לפתוח את האפליקציה. לבדוק את התקלות האחרונות ולשקול Rollback."],
@@ -66,7 +67,8 @@ export async function runScan({ manual = false } = {}) {
   add("tiles", tiles.ok && /"layers"/.test(tiles.body), tiles.ok ? `${tiles.ms} מ״ש` : tiles.err || "HTTP " + tiles.status, tiles.ms);
   add("libs", ml.ok && sc.ok, ml.ok && sc.ok ? `MapLibre ${ml.ms} · SunCalc ${sc.ms} מ״ש` : `MapLibre ${ml.status || ml.err} · SunCalc ${sc.status || sc.err}`);
   add("osrm", osrm.ok && osrm.json && osrm.json.code === "Ok", osrm.ok ? `${osrm.ms} מ״ש` : osrm.err || "HTTP " + osrm.status, osrm.ms);
-  if (Netlify.env.get("HERE_API_KEY")) { const cap = +(Netlify.env.get("HERE_MONTHLY_CAP") || 4500), n = await usage("here"), pct = n / cap; add("traffic", pct < 0.8, `${n} מתוך ${cap} קריאות החודש (${Math.round(pct * 100)}%)`, null, pct >= 1 ? "high" : "normal"); }
+  if (Netlify.env.get("HERE_API_KEY")) { const cap = +(Netlify.env.get("HERE_MONTHLY_CAP") || 4500), n = await usage("here"), pct = n / cap; add("traffic", pct < 0.8, `${n} מתוך ${cap} קריאות החודש (${Math.round(pct * 100)}%)`, null, pct >= 1 ? "high" : "normal");
+    const gc = +(Netlify.env.get("HERE_GEO_CAP") || 9000), gn = await usage("heregeo"), gp = gn / gc; add("geo", gp < 0.8, `${gn} מתוך ${gc} חיפושים החודש (${Math.round(gp * 100)}%)`, null, gp >= 1 ? "high" : "normal"); }
 
   /* field errors since the last scan */
   let recent = [], all = [];

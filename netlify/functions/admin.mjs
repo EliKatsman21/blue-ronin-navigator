@@ -107,7 +107,7 @@ export default async req => {
     const state = (await get("state")) || {}, cap = +(Netlify.env.get("HERE_MONTHLY_CAP") || 4500);
     return json({ state: { overall: state.overall || null, lastScan: state.lastScan || 0, open: Object.values(state.open || {}) }, latest: scans[scans.length - 1] || null,
       history: scans.map(x => ({ t: x.t, overall: x.overall, c: Object.fromEntries(x.checks.map(c => [c.id, c.ok ? 1 : 0])) })), incidents: (await get("incidents")) || [], logs, groups, errTotal: errs.length,
-      usage: { here: Netlify.env.get("HERE_API_KEY") ? await usage("here") : null, hereCap: cap, openmeteo: await usage("openmeteo") }, adminSubs: all.filter(k => k.startsWith("adminsub:")).length, playbook: PLAYBOOK });
+      usage: { here: Netlify.env.get("HERE_API_KEY") ? await usage("here") : null, hereCap: cap, geo: Netlify.env.get("HERE_API_KEY") ? await usage("heregeo") : null, geoCap: +(Netlify.env.get("HERE_GEO_CAP") || 9000), openmeteo: await usage("openmeteo") }, adminSubs: all.filter(k => k.startsWith("adminsub:")).length, playbook: PLAYBOOK });
   }
   if (route === "POST ops/scan") { const r = await runScan({ manual: true }); await audit("scan", { overall: r.overall }); return json(r); }
   if (route === "POST ops/subscribe") { if (!validSub(b.sub)) return json({ error: "מנוי לא תקין" }, 400); await opsStore().setJSON("adminsub:" + keyOf(b.sub.endpoint), { sub: { endpoint: b.sub.endpoint, keys: b.sub.keys }, t: Date.now(), dev: String(b.dev || "").slice(0, 40) }); await audit("alerts-on"); return json({ ok: true }); }

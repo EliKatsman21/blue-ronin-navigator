@@ -602,6 +602,9 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
 .go{display:grid;gap:12px}
 .gohead h2{margin:0 0 2px;font-size:22px}
 .gquick{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.gqw{position:relative;display:grid}
+.gqe{position:absolute;top:6px;inset-inline-end:6px;width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:var(--raised);color:var(--muted);font-size:14px;cursor:pointer;line-height:1}
+.setfor{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--accent) 14%,transparent);font-size:14px;font-weight:700}
 .gq{display:grid;justify-items:start;gap:1px;text-align:start;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:8px 10px;cursor:pointer;font:inherit;min-width:0}
 .gq .gqi{color:var(--accent);display:flex}.gq .gqi svg{width:22px;height:22px}
 .gq b{font-size:14.5px}.gq .small{font-size:11.5px}.gq .small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -621,6 +624,30 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
 .navacts{gap:6px;flex-wrap:wrap}
 @media (max-width:899px){.tab{padding:8px 7px 10px;font-size:14.5px}.tabs{gap:2px;padding-inline:8px}}
 .chipshare{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--report,#C58BFF);color:#1b0b2a;margin-inline-start:6px;vertical-align:2px}
+
+/* viewing a past ride: a clean map */
+body.rideview .maplibregl-marker{display:none}
+.ridechip{position:fixed;top:calc(64px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:6px 6px 6px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.2);font-weight:700;font-size:14px}
+.ridechip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ridechip button{width:30px;height:30px;border-radius:50%;border:0;background:var(--raised);color:var(--ink);cursor:pointer;flex:none}
+
+/* ride: the moving motorcycle replaces the location dot; summary fits five numbers */
+body.riding .me{display:none}
+.ridebike{width:40px;height:72px;pointer-events:none}
+.ridesum .fsum{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:380px){.ridesum .fsum{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* landscape phone (rotated on the handlebar): the HUD becomes a side panel, the map gets the rest */
+@media (orientation:landscape) and (max-height:560px) and (max-width:1000px){
+  body.riding .hud{left:auto;right:max(10px,env(safe-area-inset-right,0px));top:max(8px,env(safe-area-inset-top,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));width:min(320px,44vw);border-radius:16px;border:1px solid var(--line);background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(10px);padding:10px 12px;overflow-y:auto;align-content:start}
+  body.riding .hsize{position:static;justify-self:start;width:max-content}
+  body.riding .speed{font-size:52px}
+  body.riding .fabs{top:auto;bottom:max(8px,env(safe-area-inset-bottom,0px));left:max(10px,env(safe-area-inset-left,0px));flex-direction:row}
+  body.riding header.bar{display:none}
+  body.riding #turn{left:max(10px,env(safe-area-inset-left,0px));right:auto;top:max(8px,env(safe-area-inset-top,0px));max-width:calc(56vw - 30px)}
+}
+
+.helps{display:grid;gap:10px}.helptow{display:grid;gap:8px}.helprow{gap:6px}.helprow .btn.sm svg{width:16px;height:16px}
+.sel{user-select:all;-webkit-user-select:all}
 </style>
 </head>
 <body>
@@ -681,6 +708,7 @@ body.hud-min .hud .row:not(:has(#hudCenter:not([hidden]))){display:none}
   <label><input type="checkbox" data-l="cafes" checked><span class="ic" style="background:var(--sun)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h12v5a5 5 0 0 1-10 0z"/><path d="M16 10h2a2.5 2.5 0 0 1 0 5h-2"/></svg></span>קפה פתוח בשבת</label>
   <label><input type="checkbox" data-l="osmview"><span class="ic" style="background:var(--view)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z"/></svg></span>מצפורים</label>
   <label><input type="checkbox" data-l="fuel"><span class="ic" style="background:var(--fuel)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20"/><path d="M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"/></svg></span>תחנות דלק</label>
+  <label><input type="checkbox" data-l="moto" checked><span class="ic" style="background:#7A5AF8"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5.4 5l-5.6 5.6a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a4 4 0 0 0 5-5.4l-2.4 2.4-2.1-.4-.4-2.1z"/></svg></span>מוסכי אופנועים</label>
   <h5>מפה</h5>
   <label><input type="checkbox" data-l="traffic" checked><span class="sw" style="background:linear-gradient(90deg,var(--go),var(--caution),var(--no))"></span>תנועה חיה</label>
   <label><input type="checkbox" data-l="green" checked><span class="sw" style="background:repeating-linear-gradient(90deg,var(--caution) 0 4px,transparent 4px 7px)"></span>הקו הירוק ומעבר בשטחים</label>

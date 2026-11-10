@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.5.0";
+  const APP_VER = "2.6.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -68,7 +68,7 @@
   /* ---------- state ---------- */
   const st = {
     chap: LS.get("chap", "c1"),
-    layers: Object.assign({ curves: true, glare: true, stops: true, wx: true, radar: false, cams: true, cafes: true, osmview: true, fuel: true, hillshade: true, green: true, traffic: true }, LS.get("layers", {})),
+    layers: Object.assign({ curves: true, glare: true, stops: true, wx: true, radar: false, cams: true, cafes: true, osmview: true, fuel: true, moto: true, hillshade: true, green: true, traffic: true }, LS.get("layers", {})),
     shabbat: LS.get("shabbat", true),
     theme: LS.get("theme", "system"),
     routes: {}, curves: {}, cstats: {}, glare: {}, elev: {},
@@ -145,16 +145,18 @@
     fuel: ["M5 20V5.5A1.5 1.5 0 0 1 6.5 4h6A1.5 1.5 0 0 1 14 5.5V20", "M3.5 20h12", "M7.5 7h4v3.5h-4z", "M14 9.5h1.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.3 1.3 0 0 0 2.6 0V8.5L17 6"],
     view: ["M2.5 19 8.5 10l3.5 5 2.5-3.5 7 7.5z", "M16.5 7.2a1.8 1.8 0 1 0 .01 0"],
     cam: ["M3 8.5h11v7H3z", "M14 10.5l6-3v9l-6-3", "M6 12h.01"],
+    moto: ["M14.5 6.5a4 4 0 0 0-5.4 5l-5.6 5.6a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a4 4 0 0 0 5-5.4l-2.4 2.4-2.1-.4-.4-2.1z"],
     haz: ["M12 4 3 19.5h18z", "M12 10v4.5", "M12 17h.01"],
     cup: ["M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z", "M16 10.5h1.4a2 2 0 0 1 0 4H16", "M8.5 4.5c0 1 1 1.2 1 2.2M12 4.5c0 1 1 1.2 1 2.2", "M4 20.5h13"]
   };
   /* ================= modal sheet (one at a time) ================= */
   function openModal(html, cls = "") {
+    clearTimeout(closeModal.t); /* a sheet opened right after another closed must not be wiped by the old close */
     const m = $("modal"); $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
     requestAnimationFrame(() => m.classList.add("in")); const f = m.querySelector("[autofocus], .btn.primary"); if (f) setTimeout(() => f.focus(), 250);
     return $("mbody");
   }
-  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; }, 220); }
+  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); clearTimeout(closeModal.t); closeModal.t = setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; }, 220); }
   $("mx").onclick = closeModal; $("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
   addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
@@ -210,15 +212,24 @@
       <div class="pwhead"><span class="pwlogo">PRO</span><h2>${esc(h)}</h2><p>${esc(sub)}</p>${pl ? `<div class="pwme">${esc(pl)}</div>` : ""}</div>
       ${isPro() ? `<div class="alert info">Pro פעיל עוד ${daysLeft()} ימים${st.pro.src === "trial" ? " (תקופת ניסיון)" : ""}.</div>` : `<button type="button" class="btn primary big" id="pwTrial" ${used ? "hidden" : ""}>7 ימי Pro חינם · בלי כרטיס אשראי</button>`}
       <ul class="pwf">${f.map(([i, t, d]) => `<li><span class="pwi">${PWI[i]}</span><div><b>${t}</b><span>${d}</span></div></li>`).join("")}</ul>
-      <div class="pwplans"><button type="button" class="plan best" data-plan="yearly"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly"><b>₪14.90</b><span>לחודש</span></button></div>
-      <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום.</p>
+      <div class="pwplans" role="group" aria-label="בחירת מסלול"><button type="button" class="plan best" data-plan="yearly" aria-pressed="false"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly" aria-pressed="false"><b>₪14.90</b><span>לחודש</span></button></div>
+      <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום. לחיצה נוספת מבטלת.</p>
       <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
       <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, איש קשר לחירום, זיהוי נפילה ושיתוף מיקום חי, מצב רכיבה עם הנחיות קוליות, התראות עיקולים חדים, מצלמות ומפגעים, התראות שטחים, התשובה אם הדלק מספיק, איתור התחנה הקרובה לפי הדלק שנשאר ונורית דלק במצב רכיבה, מפות אופליין. בטיחות לא נמכרת.</div>
       <div class="err small" id="pwErr"></div></div>`, "pwmodal");
     const err = m => { $("pwErr").textContent = m; };
     if ($("pwTrial")) $("pwTrial").onclick = async () => { $("pwTrial").disabled = true; try { setPro(await proPost("trial", { cid })); closeModal(); toast("Pro פעיל ל־7 ימים. רכיבה טובה!"); if (reason === "fly" && st.fly) { st.fly.cap = Infinity; } } catch (e) { err(e.message); $("pwTrial").disabled = false; if (/נוצלה/.test(e.message)) { st.pro = Object.assign(st.pro || {}, { trialUsed: true }); LS.set("pro", st.pro); $("pwTrial").hidden = true; } } };
     $("pwRedeem").onclick = async () => { try { const j = await proPost("redeem", { cid, code: $("pwCode").value }); setPro(j); closeModal(); toast(`הקוד הופעל. Pro פעיל ל־${Math.round((j.exp - Date.now()) / 864e5)} ימים`); if (st.fly) st.fly.cap = Infinity; } catch (e) { err(e.message); } };
-    box.querySelectorAll("[data-plan]").forEach(b => b.onclick = async () => { b.disabled = true; try { await proPost("interest", { plan: b.dataset.plan, ver: APP_VER }); b.classList.add("chosen"); toast("נשמר. מחיר המייסדים שמור לך, ונעדכן כשהתשלום ייפתח"); } catch (e) { err(e.message); b.disabled = false; } });
+    /* the plans behave like a choice: one at a time, tap again to cancel, remembered on this phone */
+    const paint = () => { const cur = LS.get("proPlan", null); box.querySelectorAll("[data-plan]").forEach(b => { b.classList.toggle("chosen", b.dataset.plan === cur); b.setAttribute("aria-pressed", String(b.dataset.plan === cur)); }); };
+    paint();
+    box.querySelectorAll("[data-plan]").forEach(b => b.onclick = async () => {
+      const cur = LS.get("proPlan", null), next = cur === b.dataset.plan ? "none" : b.dataset.plan;
+      box.querySelectorAll("[data-plan]").forEach(x => x.disabled = true);
+      try { await proPost("interest", { plan: next, prev: cur, ver: APP_VER }); LS.set("proPlan", next === "none" ? null : next); paint();
+        toast(next === "none" ? "השריון בוטל" : cur ? `עודכן ל${next === "yearly" ? "מנוי שנתי" : "מנוי חודשי"}. המחיר שמור לך` : "נשמר. מחיר המייסדים שמור לך, ונעדכן כשהתשלום ייפתח"); }
+      catch (e) { err(e.message); } box.querySelectorAll("[data-plan]").forEach(x => x.disabled = false);
+    });
   }
   const PWI = {
     spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>',
@@ -370,7 +381,7 @@
     const t = p.timestamp, last = R.trk[R.trk.length - 1];
     if (!last || L.hav([last[0], last[1]], me) > 0.025 || t - last[2] > 10000) R.trk.push([+me[0].toFixed(5), +me[1].toFixed(5), t, spd != null ? Math.round(spd) : null]);
     if (R.trk.length % 20 === 0 && R.trk.length !== R.liveN) { R.liveN = R.trk.length; LS.set("rideLive", { cid: R.c.id, title: R.c.title, odo: R.odo, moving: R.moving, vmax: R.vmax, trk: R.trk.slice(-1500) }); }
-    if (spd != null && spd < 230) { R.vmax = Math.max(R.vmax || 0, spd); if (spd > 5 && R.lastT) R.moving += Math.min(30, (t - R.lastT) / 1000); }
+    if (spd != null && spd < 230) { if (R.prevSpd != null) R.vmax = Math.max(R.vmax || 0, Math.min(spd, R.prevSpd)); R.prevSpd = spd; if (spd > 5 && R.lastT) R.moving += Math.min(30, (t - R.lastT) / 1000); }
     R.lastT = t;
   }
   function saveRide(R) {
@@ -385,15 +396,28 @@
   function rideSummary(ride) {
     const avg = ride.moving > 60 ? ride.km / (ride.moving / 3600) : 0;
     openModal(`<div class="ridesum"><div class="small muted">${esc(fmtD(new Date(ride.start)))} · ${esc(ride.title)}</div><h2>רכיבה טובה!</h2>
-      <div class="fsum"><div><span class="k">מרחק</span><b class="mono">${ride.km}</b><span class="k">ק״מ</span></div><div><span class="k">זמן תנועה</span><b class="mono">${dur(ride.moving)}</b></div><div><span class="k">ממוצע</span><b class="mono">${Math.round(avg)}</b><span class="k">קמ״ש</span></div><div><span class="k">דלק משוער</span><b class="mono">${ride.fuel}</b><span class="k">ל׳</span></div></div>
-      <p class="small muted" style="margin:0">נשמר ביומן הרכיבות בלשונית ״שלי״. המהירות המרבית לא מוצגת כאן בכוונה.</p>
+      <div class="fsum"><div><span class="k">מרחק</span><b class="mono">${ride.km}</b><span class="k">ק״מ</span></div><div><span class="k">זמן תנועה</span><b class="mono">${dur(ride.moving)}</b></div><div><span class="k">ממוצע</span><b class="mono">${Math.round(avg)}</b><span class="k">קמ״ש</span></div>${ride.vmax ? `<div><span class="k">מירבית</span><b class="mono">${Math.round(ride.vmax)}</b><span class="k">קמ״ש</span></div>` : ""}<div><span class="k">דלק משוער</span><b class="mono">${ride.fuel}</b><span class="k">ל׳</span></div></div>
+      <p class="small muted" style="margin:0">נשמר ביומן הרכיבות בלשונית ״שלי״.</p>
       <div class="row"><button type="button" class="btn primary" id="rsPlay">${PWI.play}שחזור 3D</button><button type="button" class="btn" id="rsShow">במפה</button><button type="button" class="btn" id="rsShare">שיתוף</button><button type="button" class="btn" id="rsClose">סגירה</button></div></div>`);
     $("rsPlay").onclick = () => { closeModal(); if (innerWidth < 900) setSheet("peek"); replayRide(ride); }; $("rsShare").onclick = () => shareRideCard(ride);
     $("rsShow").onclick = () => { closeModal(); showRide(ride); }; $("rsClose").onclick = closeModal;
     memAll().then(ms => { const mine = ms.filter(m => m.kind === "photo" && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4).slice(0, 8); const box = document.querySelector(".ridesum"); if (!mine.length || !box) return; const g = document.createElement("div"); g.className = "memgrid"; g.innerHTML = mine.map(m => `<button type="button" class="memt" data-mem="${m.id}"><img src="${blobUrl(m.id + "t", m.thumb)}" alt=""></button>`).join(""); box.insertBefore(g, box.querySelector(".row")); g.querySelectorAll("[data-mem]").forEach(b => b.onclick = () => memViewer(b.dataset.mem)); });
   }
+  /* Viewing a past ride: only the ride on a clean map. Chapter routes, curve/glare/traffic lines, POIs and the
+     stop/weather markers step aside until the rider leaves this view (✕, home, another chapter or ride mode). */
+  const RIDE_CLUTTER = ["br-route-dim", "br-route-casing", "br-route-solid", "br-curves", "br-glare", "br-fuelline", "br-trafpts", "br-traffic", "br-inc", "br-view", "br-fuel", "br-moto", "br-cafe", "br-cam", "br-enf-pt", "br-enf-line", "br-pick", "br-terr", "br-terr-pt", "br-green"];
+  let rideSaved = null;
+  function rideFocus(on, ride) {
+    if (on && !rideSaved) { rideSaved = {}; RIDE_CLUTTER.forEach(id => { if (!map.getLayer(id)) return; rideSaved[id] = map.getLayoutProperty(id, "visibility") || "visible"; map.setLayoutProperty(id, "visibility", "none"); }); }
+    if (!on && rideSaved) { Object.entries(rideSaved).forEach(([id, v]) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", v); }); rideSaved = null; }
+    document.body.classList.toggle("rideview", !!on);
+    let chip = $("rideChip"); if (!on) { if (chip) chip.remove(); return; }
+    if (!chip) { chip = document.createElement("div"); chip.id = "rideChip"; chip.className = "ridechip"; document.body.appendChild(chip); }
+    chip.innerHTML = `<span>${esc(ride.title)} · ${ride.km} ק״מ</span><button type="button" aria-label="חזרה למפה הרגילה">✕</button>`;
+    chip.querySelector("button").onclick = () => { st.rideShown = null; pushSources(); rideFocus(false); fitChapter(); };
+  }
   function showRide(ride) {
-    st.rideShown = ride; pushSources();
+    st.rideShown = ride; pushSources(); rideFocus(true, ride);
     const b = new maplibregl.LngLatBounds(); ride.trk.forEach(p => b.extend([p[0], p[1]])); map.fitBounds(b, { padding: 60, duration: 900, maxZoom: 13 }); if (innerWidth < 900) setSheet("peek");
     toast(`${ride.title} · ${ride.km} ק״מ`);
   }
@@ -430,6 +454,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.6.0", d: "2026-11-10", items: ["חיפוש כתובות מדויק עד מספר הבית, כולל מרכזים מסחריים ועסקים", "זמן הגעה מדויק יותר: התנועה החיה נמדדת רק בכיוון הנסיעה שלכם", "״עזרה בדרך״: מוסכי אופנועים קרובים עם חיוג וניווט, ומספר הגרר של הביטוח במקום אחד. המוסכים מופיעים גם על המפה", "בית ועבודה: עריכה, החלפה והסרה בלחיצה על העיפרון", "מצב רכיבה: אופנוע שזז בצורה חלקה על המפה, ותצוגה שמתאימה את עצמה כשמסובבים את הטלפון", "סיכום רכיבה עם המהירות המרבית", "סופ״ש: היציאה מחושבת מהמיקום שלכם, והתזכורת ליומן תמיד לשישי הקרוב", "מפה נקייה יותר: תחנות, בתי קפה, תצפיות ומצלמות מופיעים כשמתקרבים לאזור", "״במפה״ ברכיבה שמורה מציג רק את הרכיבה, בלי שכבות", "כפתור הבית מציג תמיד את כל הארץ", "Pro: בחירת מסלול אחד בכל פעם, ולחיצה נוספת מבטלת", "טקסט המשוב נשמר גם כשעוברים לשונית"] },
     { v: "2.5.0", d: "2026-11-08", items: ["ניווט יומיומי בכל הארץ: לשונית ״ניווט״ עם חיפוש יעד (גם בקול), בית, עבודה ויעדים אחרונים, זמן הגעה עם תנועה חיה ומזג האוויר ביעד", "לשונית ״סופ״ש״ לתכנון רכיבת סוף שבוע: התדריך, הפרקים והתוכנית, כמו שהיו", "Blue Ronin · ישראל: האפליקציה לכל רוכבי הדו־גלגלי בארץ", "קישור למסלול נפתח ישר על המסלול, נשמר אצלכם ומסומן ״משיתוף״", "פרק 6 קוצר: בלי הקטע הלוך־חזור לים המלח, כדי שהדלק יספיק לכל הלולאה"] },
     { v: "2.4.0", d: "2026-11-07", items: ["תוכנית הרכיבה (Pro): בוחרים שעת יציאה ורואים מתי מגיעים לכל עצירה, מה מזג האוויר שם באותה שעה, כמה קר ברכיבה, מתי השמש בעיניים, איפה לעצור להפסקה ומה ללבוש", "תנועה חיה בישראל: כבישים איטיים וסגורים על המפה, ותאונות וחסימות על המסלול", "מצב רכיבה: שלושה גדלים ללוח (מלא, מצומצם, מפה), תוויות לכל כפתור, וכפתורי המפה תמיד מעל הלוח", "הדגמה של שחזור 3D בלשונית ״שלי״, עוד לפני הרכיבה הראשונה", "במפה נפתח חלון מידע אחד בכל פעם", "הכתובת הקודמת מעבירה אוטומטית ל־blueronin.app"] },
     { v: "2.3.1", d: "2026-11-06", items: ["תיקון דחוף: התדריך והמסלול נטענים תמיד, גם כששירות מזג האוויר החיצוני עמוס", "התחזית מגיעה עכשיו ממטמון משותף בשרת שלנו, עם גיבוי ישיר ושמירת התחזית האחרונה", "אם לשונית נתקלת בבעיה מוצגת הודעה עם כפתור טעינה מחדש במקום מסך ריק"] },
@@ -521,6 +546,7 @@
     set("i-fuel-closed", iconImage(fuel, "fuel", css("--no")));
     set("i-fuel-unknown", iconImage(fuel, "fuel", "#9AA5B4"));
     set("i-view", iconImage(css("--view"), "view"));
+    set("i-moto", iconImage("#7A5AF8", "moto"));
     set("i-cam", iconImage(css("--warn"), "cam"));
     set("i-haz", iconImage(css("--caution"), "haz"));
     set("i-cafe", iconImage("#8F5A35", "cup")); set("i-cafe-top", iconImage(css("--sun"), "cup"));
@@ -553,13 +579,14 @@
     map.addLayer({ id: "br-trafpts", type: "circle", source: "br-trafpts", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "circle-color": ["case", [">=", ["get", "r"], 0.8], c("--go"), [">=", ["get", "r"], 0.55], c("--caution"), c("--no")], "circle-stroke-color": "#fff", "circle-stroke-width": 1.8, "circle-opacity": 0.95 } });
     map.addLayer({ id: "br-pick", type: "circle", source: "br-pick", paint: { "circle-radius": 9, "circle-color": c("--report"), "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
     if (st.cfg.traffic) addTrafficLayer();
-    map.addLayer({ id: "br-enf-pt", type: "circle", source: "br-enf", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": c("--warn"), "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    map.addLayer({ id: "br-enf-pt", type: "circle", source: "br-enf", filter: ["==", ["geometry-type"], "Point"], minzoom: 9, paint: { "circle-radius": 7, "circle-color": c("--warn"), "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
     addIcons();
     const sz = (a, b) => ["interpolate", ["linear"], ["zoom"], 7, a, 13, b];
-    map.addLayer({ id: "br-view", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "view"], minzoom: 8.5, layout: { "icon-image": "i-view", "icon-size": sz(0.5, 0.9), "icon-allow-overlap": false, "icon-padding": 1, "symbol-sort-key": 3 } });
-    map.addLayer({ id: "br-fuel", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "fuel"], minzoom: 7.5, layout: { "icon-image": ["concat", "i-fuel-", ["coalesce", ["get", "s"], "unknown"]], "icon-size": sz(0.55, 0.95), "icon-allow-overlap": true, "symbol-sort-key": 2 } });
-    map.addLayer({ id: "br-cafe", type: "symbol", source: "br-cafes", minzoom: 8, layout: { "icon-image": ["case", ["get", "top"], "i-cafe-top", "i-cafe"], "icon-size": sz(0.5, 0.88), "icon-allow-overlap": ["case", ["get", "top"], true, false], "icon-padding": 1, "symbol-sort-key": ["case", ["get", "top"], 0, 4] } });
-    map.addLayer({ id: "br-cam", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "cam"], layout: { "icon-image": "i-cam", "icon-size": sz(0.55, 0.9), "icon-allow-overlap": true, "symbol-sort-key": 1 } });
+    map.addLayer({ id: "br-view", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "view"], minzoom: 9.6, layout: { "icon-image": "i-view", "icon-size": sz(0.5, 0.9), "icon-allow-overlap": false, "icon-padding": 1, "symbol-sort-key": 3 } });
+    map.addLayer({ id: "br-fuel", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "fuel"], minzoom: 9.3, layout: { "icon-image": ["concat", "i-fuel-", ["coalesce", ["get", "s"], "unknown"]], "icon-size": sz(0.55, 0.95), "icon-allow-overlap": true, "symbol-sort-key": 2 } });
+    map.addLayer({ id: "br-cafe", type: "symbol", source: "br-cafes", minzoom: 9.6, layout: { "icon-image": ["case", ["get", "top"], "i-cafe-top", "i-cafe"], "icon-size": sz(0.5, 0.88), "icon-allow-overlap": ["case", ["get", "top"], true, false], "icon-padding": 1, "symbol-sort-key": ["case", ["get", "top"], 0, 4] } });
+    map.addLayer({ id: "br-moto", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "moto"], minzoom: 9.5, layout: { visibility: st.layers.moto ? "visible" : "none", "icon-image": "i-moto", "icon-size": sz(0.5, 0.9), "icon-allow-overlap": false, "icon-padding": 1, "symbol-sort-key": 2 } });
+    map.addLayer({ id: "br-cam", type: "symbol", source: "br-osm", filter: ["==", ["get", "k"], "cam"], minzoom: 9, layout: { "icon-image": "i-cam", "icon-size": sz(0.55, 0.9), "icon-allow-overlap": true, "symbol-sort-key": 1 } });
     map.addLayer({ id: "br-haz-halo", type: "circle", source: "br-haz", paint: { "circle-radius": sz(9, 18), "circle-color": c("--caution"), "circle-opacity": 0.22 } });
     map.addLayer({ id: "br-haz", type: "symbol", source: "br-haz", layout: { "icon-image": "i-haz", "icon-size": sz(0.6, 1), "icon-allow-overlap": true, "symbol-sort-key": 0 } });
     if (st.layers.radar) addRadarLayer();
@@ -574,10 +601,11 @@
   map.on("click", "br-haz", e => { const p = e.features[0].properties; new maplibregl.Popup({ closeButton: false, maxWidth: "280px" }).setLngLat(e.lngLat).setHTML(`<b>${esc(HZK[p.kind] || "עדכון דרך")}</b><div>${esc(p.text)}</div><div class="small muted">עדכון מצוות Blue Ronin${p.until ? ` · בתוקף עד ${esc(p.until.split("-").reverse().join("."))}` : ""}</div>`).addTo(map); });
   map.on("click", "br-cafe", e => { const c = allCafes().find(x => x.id === e.features[0].properties.id); if (c) cafePopup(c); });
   map.on("mouseenter", "br-cafe", () => map.getCanvas().style.cursor = "pointer"); map.on("mouseleave", "br-cafe", () => map.getCanvas().style.cursor = "");
-  ["br-cam", "br-view", "br-fuel", "br-enf-pt", "br-enf-line"].forEach(id => {
+  ["br-cam", "br-view", "br-fuel", "br-moto", "br-enf-pt", "br-enf-line"].forEach(id => {
     map.on("click", id, e => {
       const f = e.features[0], p = f.properties; const [lon, lat] = e.lngLat.toArray ? e.lngLat.toArray() : [e.lngLat.lng, e.lngLat.lat];
       let h = "";
+      if (id === "br-moto") { const n = st.osm && (st.osm.moto || []).find(x => x.id === p.id); if (n) motoPopup(n); return; }
       if (id === "br-fuel") { const n = st.osm && st.osm.fuel.find(x => x.id === p.id); if (n) { openFuelPopup(n); return; } }
       if (id === "br-view") { const [vl, vt] = f.geometry.coordinates; viewPopup({ name: p.name, lat: vt, lon: vl }); return; }
       if (id === "br-cam") h = `<b>מצלמת מהירות</b><div class="small muted">OpenStreetMap${p.maxspeed ? " · מהירות " + esc(p.maxspeed) : ""}</div>`;
@@ -590,7 +618,7 @@
     map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
   });
 
-  const LAYER_MAP = { curves: ["br-curves"], glare: ["br-glare"], cams: ["br-cam", "br-enf-pt", "br-enf-line"], osmview: ["br-view"], fuel: ["br-fuel"], cafes: ["br-cafe"], fuelline: ["br-fuelline"], hillshade: ["br-hill"], radar: ["br-radar"], green: ["br-green", "br-terr", "br-terr-pt"], traffic: ["br-traffic", "br-trafpts", "br-inc"] };
+  const LAYER_MAP = { curves: ["br-curves"], glare: ["br-glare"], cams: ["br-cam", "br-enf-pt", "br-enf-line"], osmview: ["br-view"], fuel: ["br-fuel"], moto: ["br-moto"], cafes: ["br-cafe"], fuelline: ["br-fuelline"], hillshade: ["br-hill"], radar: ["br-radar"], green: ["br-green", "br-terr", "br-terr-pt"], traffic: ["br-traffic", "br-trafpts", "br-inc"] };
   function applyLayerVis() {
     if (!styleReady) { renderMarkers(); return; }
     for (const k in LAYER_MAP) LAYER_MAP[k].forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", st.layers[k] ? "visible" : "none"); });
@@ -613,7 +641,7 @@
     paintFuelLine();
     setSrc("br-haz", FC(st.hazards.map(h => ({ type: "Feature", properties: { id: h.id, text: h.text, kind: h.kind, until: h.until || "" }, geometry: { type: "Point", coordinates: [h.lon, h.lat] } }))));
     const o = st.osm;
-    if (o) setSrc("br-osm", FC([...o.cams.map(n => ({ type: "Feature", properties: { k: "cam", maxspeed: n.maxspeed || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.views.map(n => ({ type: "Feature", properties: { k: "view", name: n.name || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.fuel.map(n => { const f = fuelStatus(n); return { type: "Feature", properties: { k: "fuel", id: n.id, name: n.name || "", brand: n.brand || "", s: f.sat }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } }; })]));
+    if (o) setSrc("br-osm", FC([...(o.moto || []).map(n => ({ type: "Feature", properties: { k: "moto", id: n.id }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.cams.map(n => ({ type: "Feature", properties: { k: "cam", maxspeed: n.maxspeed || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.views.map(n => ({ type: "Feature", properties: { k: "view", name: n.name || "" }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } })), ...o.fuel.map(n => { const f = fuelStatus(n); return { type: "Feature", properties: { k: "fuel", id: n.id, name: n.name || "", brand: n.brand || "", s: f.sat }, geometry: { type: "Point", coordinates: [n.lon, n.lat] } }; })]));
   }
 
   /* ---------- DOM markers ---------- */
@@ -656,6 +684,15 @@
     map.easeTo(Object.assign({}, cam, { pitch: pitch || 0, bearing: 0, duration: dur }));
   }
   const routeBounds = id => { const r = st.routes[id]; const pts = r ? r.coords : CHAPTERS.find(c => c.id === id).stops.map(lonlat); return pts.reduce((b, p) => [[Math.min(b[0][0], p[0]), Math.min(b[0][1], p[1])], [Math.max(b[1][0], p[0]), Math.max(b[1][1], p[1])]], [[180, 90], [-180, -90]]); };
+  /* the home button: all of Israel, close enough to read, the same every time (the sheet size no longer changes
+     the zoom: the map is framed for the space above a half sheet at most) */
+  const ISRAEL = [[34.27, 29.5], [35.9, 33.33]];
+  function homeIsrael(dur = 1200) {
+    const ph = innerWidth < 900, H = innerHeight, pad = ph ? { top: 70, bottom: Math.min(H * 0.42, sheetPad().bottom || 0) + 10, left: 70, right: 16 } : { top: 70, bottom: 30, left: 90, right: Math.min(innerWidth * 0.42, 460) + 20 };
+    let cam = null; try { cam = map.cameraForBounds(ISRAEL, { padding: pad, bearing: 0 }); } catch (e) { }
+    if (!cam) try { cam = map.cameraForBounds(ISRAEL, { padding: 10, bearing: 0 }); } catch (e) { }
+    if (cam) map.easeTo(Object.assign({}, cam, { pitch: 0, bearing: 0, duration: dur })); else map.fitBounds(ISRAEL, { padding: 10, duration: dur });
+  }
   const home = (dur = 1400) => frame(REGIONS[chap().region] || (chap().custom ? routeBounds(st.chap) : NORTH_BOUNDS), dur, 0);
   function fitChapter(dur = 1200) {
     const r = st.routes[st.chap]; const pts = r ? r.coords : chap().stops.map(lonlat);
@@ -685,6 +722,13 @@
     }
   }
   const sunAt = (t, lon, lat) => { const p = SunCalc.getPosition(t, lat, lon); return { az: (p.azimuth * 180 / Math.PI + 180) % 360, alt: p.altitude * 180 / Math.PI }; };
+  /* where the weekend ride starts from, for the brief's sunrise row: the rider's position, else the saved home,
+     else the start of the selected chapter (never a fixed town) */
+  function briefOrigin() {
+    if (st.me) return { lat: st.me.lat, lon: st.me.lon, label: "יציאה מהמיקום שלך" };
+    const h = (LS.get("navPlaces", {}) || {}).home; if (h && isFinite(h.lat)) return { lat: h.lat, lon: h.lon, label: "יציאה מהבית" };
+    const c = CHAPTERS.find(x => x.id === st.chap && !x.nav) || CHAPTERS[0], s0 = c.stops[0]; return { lat: s0.lat, lon: s0.lon, label: "יציאה מ" + s0.name.split(" · ")[0].split(",")[0] };
+  }
   const departFor = c => { const s = c.stops[0]; return new Date(SunCalc.getTimes(st.sat.noonUTC, s.lat, s.lon).sunrise.getTime() + 15 * 6e4); };
   /* Everything derived from a route geometry: curves, stop kilometres, glare, territory crossings. */
   function processRoute(c, r) {
@@ -856,10 +900,10 @@
   }
   function renderBrief() { return paneSafe("brief", renderBrief_); }
   function renderBrief_() {
-    const p = $("p-brief"); const satDate = st.sat.noonUTC; const t = SunCalc.getTimes(satDate, 32.651, 35.105);
-    const golden = new Date(t.sunrise.getTime() + 60 * 6e4);
+    const p = $("p-brief"); const satDate = st.sat.noonUTC, org = briefOrigin(); const t = SunCalc.getTimes(satDate, org.lat, org.lon);
+    const golden = new Date(t.sunrise.getTime() + 60 * 6e4), leave = new Date(t.sunrise.getTime() + 15 * 6e4);
     let h = `<div class="brief-head"><div><div class="small muted">${st.sat.isToday ? "היום" : st.sat.daysAway === 1 ? "מחר" : `בעוד ${st.sat.daysAway} ימים`}</div><h2>${esc(fmtD(satDate))}</h2></div><button type="button" class="btn sm" id="wxRefresh">רענון</button></div>
-      <div class="sunrow"><div><div class="k">זריחה</div><div class="v sun mono">${fmtT(t.sunrise)}</div></div><div><div class="k">יציאה מיוקנעם</div><div class="v mono">${fmtT(departFor(CHAPTERS[0]))}</div></div><div><div class="k">אור זהב עד</div><div class="v mono">${fmtT(golden)}</div></div></div>`;
+      <div class="sunrow"><div><div class="k">זריחה</div><div class="v sun mono">${fmtT(t.sunrise)}</div></div><div><div class="k">${esc(org.label)}</div><div class="v mono">${fmtT(leave)}</div></div><div><div class="k">אור זהב עד</div><div class="v mono">${fmtT(golden)}</div></div></div>`;
     if (!st.wx) { h += st.wxFail ? `<div class="alert info">התחזית לשבת לא זמינה כרגע (שירות מזג האוויר עמוס). המסלולים, העצירות והניווט עובדים כרגיל, והתחזית תתעדכן לבד. אפשר גם ללחוץ ״רענון״.</div>` : `<p class="muted">טוען תחזית לשבת…</p>`; h += shareSatBtn(); p.innerHTML = h; bindBrief(); return; }
     const res = CHAPTERS.filter(c => !c.hidden && (!c.custom || c.id === st.chap)).map(c => ({ c, w: chapterWx(c.id) })).filter(x => x.w);
     const best = res.filter(x => !x.c.combo).sort((a, b) => b.w.ri.i - a.w.ri.i)[0];
@@ -1207,6 +1251,30 @@
     if (!f || f.date !== today || f.chap !== st.chap) f = st.fuelRide = { date: today, chap: st.chap, refills: [] };
     return f;
   }
+  /* ---------- motorcycle garages and roadside help ---------- */
+  const motoKind = n => n.rep ? (n.tyres ? "מוסך אופנועים · צמיגים" : "מוסך אופנועים") : n.tyres ? "חנות אופנועים · צמיגים" : "חנות אופנועים";
+  function motoPopup(n) {
+    const pop = new maplibregl.Popup({ closeButton: false, maxWidth: "290px" }).setLngLat([n.lon, n.lat]).setHTML(`<b>${esc(n.name || motoKind(n))}</b><div class="small muted">${motoKind(n)}${n.brand && n.brand !== n.name ? " · " + esc(n.brand) : ""}</div>${n.oh ? `<div class="small mono" dir="ltr" style="text-align:end">${esc(n.oh)}</div>` : ""}${n.phone ? `<div class="small"><span dir="ltr" class="mono sel">${esc(n.phone)}</span></div>` : ""}
+      <div class="row" style="margin-top:6px">${n.phone ? `<a class="btn sm" href="${telOf(n.phone)}">${PWI.phone}חיוג</a>` : ""}<button type="button" class="btn sm primary" data-mgo="1">${IC.nav}ניווט</button>${navBtn("w", wazeLL(n.lat, n.lon))}</div><div class="small muted">OpenStreetMap · כדאי להתקשר לפני שמגיעים</div>`).addTo(map);
+    const b = pop.getElement().querySelector("[data-mgo]"); if (b) b.onclick = () => { pop.remove(); setTab("go"); navTo({ name: n.name || motoKind(n), sub: motoKind(n), lat: n.lat, lon: n.lon }); };
+  }
+  async function helpSheet() {
+    let me = st.me ? [st.me.lon, st.me.lat] : null; if (!me) try { me = await getPosFresh(6000); } catch (e) { }
+    if (!st.osm) await loadOSM(true).catch(() => { });
+    const list = me && st.osm ? (st.osm.moto || []).map(n => Object.assign({ d: L.hav(me, [n.lon, n.lat]) }, n)).sort((a, b) => a.d - b.d).slice(0, 6) : [];
+    const tow = LS.get("towPhone", "");
+    openModal(`<div class="xsheet helps"><h2>עזרה בדרך</h2><p class="muted" style="margin:0">תקלה, פנצ׳ר או נפילה בלי פציעה. בפציעה: קודם כל 101.</p>
+      <div class="card helptow"><div class="row" style="justify-content:space-between;align-items:center"><div style="min-width:0"><b>הגרר של הביטוח</b><div class="small muted">${tow ? `<span dir="ltr" class="mono">${esc(tow)}</span>` : "שמרו את המספר מהפוליסה, כדי שיהיה כאן כשצריך"}</div></div>${tow ? `<a class="btn primary" href="${telOf(tow)}">${PWI.phone}חיוג</a>` : ""}</div>
+        <div class="row"><input id="towIn" class="btn" inputmode="tel" dir="ltr" placeholder="מספר שירות הגרירה" value="${esc(tow)}" style="flex:1;min-width:0"><button type="button" class="btn sm" id="towSave">שמירה</button></div>
+        <div class="small muted">כשמזמינים: אמרו שזה אופנוע ובקשו גרר עם מתקן לאופנועים, ותנו את המיקום המדויק (למטה).</div></div>
+      ${me ? `<p class="small muted mono" style="margin:0" dir="ltr">${me[1].toFixed(5)}, ${me[0].toFixed(5)}</p>` : ""}
+      <h3 style="margin:4px 0 0">מוסכים וחנויות אופנועים קרובים</h3>
+      ${list.length ? `<div class="list golist">${list.map((n, i) => `<div class="gli helprow"><span class="grow"><b>${esc(n.name || motoKind(n))}</b><span class="small muted">${motoKind(n)} · ${n.d < 10 ? n.d.toFixed(1) : Math.round(n.d)} ק״מ${n.oh ? " · " + esc(n.oh) : ""}</span></span>${n.phone ? `<a class="btn sm" href="${telOf(n.phone)}" aria-label="חיוג">${PWI.phone}</a>` : ""}<button type="button" class="btn sm" data-hgo="${i}">ניווט</button></div>`).join("")}</div>` : `<p class="small muted" style="margin:0">${me ? "עוד אין מוסכי אופנועים מסומנים קרוב אליך במפה הפתוחה." : "צריך מיקום כדי למצוא את הקרובים."}</p>`}
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent("גרר אופנועים קרוב אליי")}">חיפוש גרר אופנועים באזור</a>
+      <p class="small muted" style="margin:0">פנצ׳ר בכביש מהיר: עוצרים בשול רחוק ככל האפשר, מדליקים מהבהבים, ועומדים מאחורי המעקה, לא ליד האופנוע.</p></div>`);
+    $("towSave").onclick = () => { const v = $("towIn").value.replace(/[^\d+*#-]/g, "").slice(0, 20); LS.set("towPhone", v); toast(v ? "נשמר" : "נמחק"); closeModal(); helpSheet(); };
+    document.querySelectorAll("[data-hgo]").forEach(b => b.onclick = () => { const n = list[+b.dataset.hgo]; closeModal(); setTab("go"); navTo({ name: n.name || motoKind(n), sub: motoKind(n), lat: n.lat, lon: n.lon }); });
+  }
   async function fuelNearMe() {
     const out = $("fuelLive"); if (!out) return; out.innerHTML = `<p class="small muted">מאתר את המיקום שלך…</p>`;
     let me; try { me = await getPos(); } catch (e) { out.innerHTML = `<div class="alert">אין גישה למיקום. מאשרים מיקום לאתר בהגדרות הדפדפן ומנסים שוב.</div>`; return; }
@@ -1429,9 +1497,17 @@
     if (st.osm) { st.osm.views.forEach(v => v.name && v.name.toLowerCase().includes(t) && add(v.name, "מצפור", v.lat, v.lon, "מצפור")); st.osm.fuel.forEach(f => ((f.name || "") + " " + (f.brand || "")).toLowerCase().includes(t) && add(f.name || f.brand, "תחנת דלק" + (f.brand && f.name ? " · " + f.brand : ""), f.lat, f.lon, "דלק")); }
     return out.slice(0, 6);
   }
+  /* Search: HERE (exact addresses with house numbers, businesses, junctions) and OSM/Photon (outdoor places,
+     viewpoints) in parallel; HERE first, duplicates within 150 m dropped. Either one alone is enough. */
   async function remoteSearch(q, near) {
     const ctl = new AbortController(); remoteSearch.ctl && remoteSearch.ctl.abort(); remoteSearch.ctl = ctl;
     const c = near ? { lat: near.lat, lng: near.lon } : map.getCenter();
+    const here = st.cfg.geo ? fetch(`/api/geo?q=${encodeURIComponent(q)}&at=${c.lat.toFixed(3)},${c.lng.toFixed(3)}`, { signal: ctl.signal }).then(r => r.ok ? r.json() : { items: [] }).then(j => j.items || []).catch(e => { if (e.name === "AbortError") throw e; return []; }) : Promise.resolve([]);
+    const osm = remoteSearchOsm(q, c, ctl).catch(e => { if (e.name === "AbortError") throw e; return []; });
+    const [a, b] = await Promise.all([here, osm]);
+    return a.concat(b.filter(x => !a.some(y => L.hav([x.lon, x.lat], [y.lon, y.lat]) < 0.15))).slice(0, 10);
+  }
+  async function remoteSearchOsm(q, c, ctl) {
     try {
       const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=34.2,29.4,35.95,33.45`, { signal: ctl.signal });
       const j = await r.json();
@@ -1549,9 +1625,12 @@
   const NAVQ = { q: "", results: [], searching: false };
   const fmtDur = m => m < 60 ? `${Math.max(1, Math.round(m))} דק׳` : `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, "0")} שע׳`;
   function navChapter() { return CHAPTERS.find(c => c.id === NAV); }
+  /* Traffic delay as a share of the whole trip: every sampled point stands for an equal slice of the route, a
+     point with no live data counts as free-flowing, and one jammed point can slow its slice at most ~2.5×.
+     The total is capped (+80%), so a few mismatched segments can never double the trip as before. */
   function navTrafficFactor() {
-    const t = st.traffic[NAV]; if (!t || !t.pts) return null; const r = t.pts.filter(p => p.ratio != null);
-    if (!r.length) return null; const inv = r.reduce((a, p) => a + 1 / Math.max(0.15, Math.min(1, p.ratio)), 0) / r.length; return Math.min(3, Math.max(1, inv));
+    const t = st.traffic[NAV]; if (!t || !t.pts || !t.pts.length) return null; const n = t.pts.length, r = t.pts.filter(p => p.ratio != null);
+    if (!r.length) return null; const extra = r.reduce((a, p) => a + (1 / Math.max(0.4, Math.min(1, p.ratio)) - 1), 0) / n; return Math.min(1.8, 1 + extra);
   }
   async function navTo(dest, opts) {
     const me = st.me ? { lat: st.me.lat, lon: st.me.lon } : await getPosFresh(9000).then(p => p && { lat: p[1], lon: p[0] }).catch(() => null);
@@ -1595,7 +1674,7 @@
     const n = st.nav, c = navChapter(); if (!n || !c) return "";
     if (n.busy) return `<div class="card navtrip"><div class="row" style="gap:10px"><span class="spin"></span><b>מחשב מסלול אל ${esc(n.dest.name)}…</b></div></div>`;
     const r = st.routes[NAV]; if (!r) return "";
-    const f = navTrafficFactor(), mins = r.min * 1.05 * (f || 1), eta = new Date(Date.now() + mins * 6e4), t = st.traffic[NAV];
+    const f = navTrafficFactor(), mins = r.min * (f || 1), eta = new Date(Date.now() + mins * 6e4), t = st.traffic[NAV];
     const slow = t && t.pts ? t.pts.filter(p => p.ratio != null && p.ratio < 0.55) : [], inc = t && t.inc ? t.inc.filter(i => i.on) : [];
     const trLine = !st.cfg.traffic ? "" : !t ? `<span class="small muted">בודק תנועה…</span>` : inc.length ? `<span class="trk no">${esc(inc[0].label)}${inc[0].closed ? " · כביש סגור" : ""} במסלול</span>` : slow.length ? `<span class="trk warn">עומס בחלק מהדרך${f ? ` · +${Math.round(r.min * (f - 1))} דק׳` : ""}</span>` : t.pts && t.pts.some(p => p.ratio != null) ? `<span class="trk go">התנועה זורמת</span>` : `<span class="small muted">אין נתוני תנועה לדרך הזאת</span>`;
     const w = n.wx, P = navPlaces();
@@ -1607,6 +1686,16 @@
       <div class="row navacts"><label class="toggle small"><input type="checkbox" id="navNoHw" ${c.opts && c.opts.noHighway ? "checked" : ""}> בלי כבישים מהירים</label></div>
       <div class="row navacts"><button type="button" class="btn sm" id="navShare">${PWI.share}שיתוף</button><button type="button" class="btn sm" id="navSave">שמירה כמסלול</button><button type="button" class="btn sm" id="navHome">${P.home && L.hav([P.home.lon, P.home.lat], [n.dest.lon, n.dest.lat]) < 0.1 ? "★ הבית" : "שמירה כבית"}</button><button type="button" class="btn sm" id="navWork">${P.work && L.hav([P.work.lon, P.work.lat], [n.dest.lon, n.dest.lat]) < 0.1 ? "★ העבודה" : "שמירה כעבודה"}</button></div></div>`;
   }
+  function placeSheet(k, setMode) {
+    const P = navPlaces(), pl = P[k], label = k === "home" ? "הבית" : "העבודה"; if (!pl) return setMode(k);
+    openModal(`<div class="xsheet"><h2>${label}</h2><p class="muted" style="margin:0">${esc(pl.name)}${pl.sub ? ` · ${esc(pl.sub)}` : ""}</p>
+      <button type="button" class="btn primary" id="plChange">בחירת כתובת אחרת</button>
+      ${st.me ? `<button type="button" class="btn" id="plHere">המיקום הנוכחי שלי הוא ${label}</button>` : ""}
+      <button type="button" class="btn danger" id="plDel">הסרת ${label}</button></div>`);
+    $("plChange").onclick = () => { closeModal(); setMode(k); };
+    if ($("plHere")) $("plHere").onclick = () => { const P2 = navPlaces(); P2[k] = { name: k === "home" ? "הבית" : "העבודה", sub: "נשמר מהמיקום", lat: +st.me.lat.toFixed(6), lon: +st.me.lon.toFixed(6) }; LS.set("navPlaces", P2); closeModal(); toast(`${label} עודכן למיקום הנוכחי`); renderGo(); };
+    $("plDel").onclick = () => { const P2 = navPlaces(); delete P2[k]; LS.set("navPlaces", P2); closeModal(); toast(`${label} הוסר`); renderGo(); };
+  }
   function navResultsHtml() {
     if (!NAVQ.q) return "";
     if (!NAVQ.results.length) return NAVQ.searching ? `<div class="small muted sr">מחפש…</div>` : `<div class="small muted sr">לא נמצאו תוצאות</div>`;
@@ -1615,12 +1704,14 @@
   function renderGo() { return paneSafe("go", renderGo_); }
   function renderGo_() {
     const p = $("p-go"); if (!p) return; const P = navPlaces(), rec = navRecent(), riding = !!st.ride;
-    const qb = (id, icon, label, sub, dis) => `<button type="button" class="gq" id="${id}" ${dis ? 'aria-disabled="true"' : ""}><span class="gqi">${icon}</span><b>${label}</b><span class="small muted">${sub}</span></button>`;
+    const qb = (id, icon, label, sub, edit) => `<div class="gqw"><button type="button" class="gq" id="${id}"><span class="gqi">${icon}</span><b>${label}</b><span class="small muted">${sub}</span></button>${edit ? `<button type="button" class="gqe" data-edit="${edit}" aria-label="שינוי ${label}">✎</button>` : ""}</div>`;
+    const WRENCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5.4 5l-5.6 5.6a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a4 4 0 0 0 5-5.4l-2.4 2.4-2.1-.4-.4-2.1z"/></svg>';
     const HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>', WORK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>', FUEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12M4 10h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3"/></svg>';
     let h = `<div class="go"><div class="gohead"><h2>לאן רוכבים?</h2><span class="small muted">ניווט לאופנוע ולקטנוע בכל הארץ, עם תנועה חיה ומזג אוויר בדרך</span></div>
-      <div class="search"><input id="goQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="כתובת, מקום, יישוב או צומת" value="${esc(NAVQ.q)}" aria-label="חיפוש יעד"><div class="sres" id="goRes">${navResultsHtml()}</div></div>
+      ${NAVQ.setFor ? `<div class="setfor"><span>בוחרים כתובת ${NAVQ.setFor === "home" ? "לבית" : "לעבודה"}: חפשו ובחרו מהרשימה</span><button type="button" class="linkbtn" id="setCancel">ביטול</button></div>` : ""}
+      <div class="search"><input id="goQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="${NAVQ.setFor ? "הכתובת המלאה, למשל: המרגנית 42 יקנעם עילית" : "כתובת, מקום, יישוב או צומת"}" value="${esc(NAVQ.q)}" aria-label="חיפוש יעד"><div class="sres" id="goRes">${navResultsHtml()}</div></div>
       ${navTripCard()}
-      <div class="gquick">${qb("gqHome", HOME, "הביתה", P.home ? esc(P.home.name) : "עוד לא הוגדר")}${qb("gqWork", WORK, "לעבודה", P.work ? esc(P.work.name) : "עוד לא הוגדר")}${qb("gqFuel", FUEL, "דלק קרוב", "לפי המיקום")}${st.park ? qb("gqPark", PWI.moto, "לאופנוע", "איפה חניתי") : ""}</div>
+      <div class="gquick">${qb("gqHome", HOME, "הביתה", P.home ? esc(P.home.name) : "לחצו להגדרה", P.home ? "home" : "")}${qb("gqWork", WORK, "לעבודה", P.work ? esc(P.work.name) : "לחצו להגדרה", P.work ? "work" : "")}${qb("gqFuel", FUEL, "דלק קרוב", "לפי המיקום")}${qb("gqHelp", WRENCH, "עזרה בדרך", "מוסך, צמיג, גרר")}${st.park ? qb("gqPark", PWI.moto, "לאופנוע", "איפה חניתי") : ""}</div>
       ${rec.length ? `<div class="card"><h3>אחרונים</h3><div class="list golist">${rec.slice(0, 6).map((x, i) => `<button type="button" class="gli" data-rec="${i}"><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.sub || "")}</span></span><span class="small muted">${st.me ? `${Math.round(L.hav([st.me.lon, st.me.lat], [x.lon, x.lat]))} ק״מ` : ""}</span></button>`).join("")}</div></div>` : ""}
       ${st.myRoutes.length ? `<div class="card"><h3>המסלולים שלי</h3><div class="list golist">${st.myRoutes.slice(-4).reverse().map(u => `<button type="button" class="gli" data-mr="${esc(u.id)}"><span class="grow"><b>${esc(u.title)}</b><span class="small muted">${u.stops.length} נקודות${u.shared ? " · התקבל בשיתוף" : ""}</span></span><span class="small muted">פתיחה</span></button>`).join("")}</div></div>` : ""}
       <button type="button" class="gowk" id="goWeekend"><span><b>מתכננים רכיבת סוף שבוע?</b><span class="small muted">תדריך, פרקים מפותלים ותחזית לכל עצירה</span></span><span aria-hidden="true">←</span></button>
@@ -1630,20 +1721,27 @@
   function goSearchAt() { return st.me ? { lat: st.me.lat, lon: st.me.lon } : null; }
   function bindGo() {
     const q = $("goQ"); if (!q) return;
-    const refresh = () => { const el = $("goRes"); if (!el) return; el.innerHTML = navResultsHtml(); el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const r = NAVQ.results[+b.dataset.go]; NAVQ.q = ""; NAVQ.results = []; navTo({ name: r.name, sub: r.sub, lat: r.lat, lon: r.lon }); }); };
+    const refresh = () => { const el = $("goRes"); if (!el) return; el.innerHTML = navResultsHtml(); el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => pickResult(NAVQ.results[+b.dataset.go])); };
+    const pickResult = r => { if (!r) return; NAVQ.q = ""; NAVQ.results = [];
+      if (NAVQ.setFor) { const P2 = navPlaces(), k = NAVQ.setFor; P2[k] = { name: r.name, sub: r.sub || "", lat: +r.lat, lon: +r.lon }; LS.set("navPlaces", P2); NAVQ.setFor = null; toast(k === "home" ? "הבית עודכן" : "העבודה עודכנה"); renderGo(); return; }
+      navTo({ name: r.name, sub: r.sub, lat: r.lat, lon: r.lon }); };
     q.oninput = () => {
       NAVQ.q = q.value; NAVQ.results = localSearch(NAVQ.q); NAVQ.searching = NAVQ.q.trim().length >= 2; refresh();
       clearTimeout(bindGo.t); if (NAVQ.q.trim().length < 2) return;
       bindGo.t = setTimeout(async () => { try { const rem = await remoteSearch(NAVQ.q, goSearchAt()); const loc = localSearch(NAVQ.q); NAVQ.results = rem.concat(loc.filter(l => !rem.some(r => L.hav([l.lon, l.lat], [r.lon, r.lat]) < 0.2))).slice(0, 10); } catch (e) { return; } NAVQ.searching = false; refresh(); }, 300);
     };
     const mic = micFor(q, () => q.oninput()); if (mic) q.parentNode.insertBefore(mic, q.nextSibling);
-    q.onkeydown = e => { if (e.key === "Enter" && NAVQ.results[0]) { e.preventDefault(); const r = NAVQ.results[0]; NAVQ.q = ""; NAVQ.results = []; navTo(r); } };
+    q.onkeydown = e => { if (e.key === "Enter" && NAVQ.results[0]) { e.preventDefault(); pickResult(NAVQ.results[0]); } };
     q.onfocus = () => { if (innerWidth < 900 && st.sheet !== "full") setSheet("full"); };
     refresh();
     const P = navPlaces();
-    $("gqHome").onclick = () => P.home ? navTo(P.home) : (toast("חפשו את הכתובת של הבית, ואז ״שמירה כבית״", 3500), q.focus());
-    $("gqWork").onclick = () => P.work ? navTo(P.work) : (toast("חפשו את הכתובת של העבודה, ואז ״שמירה כעבודה״", 3500), q.focus());
+    const setMode = k => { NAVQ.setFor = k; renderGo(); const q2 = $("goQ"); if (q2) q2.focus(); };
+    $("gqHome").onclick = () => P.home ? navTo(P.home) : setMode("home");
+    $("gqWork").onclick = () => P.work ? navTo(P.work) : setMode("work");
+    if ($("setCancel")) $("setCancel").onclick = () => { NAVQ.setFor = null; renderGo(); };
+    $("p-go").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => placeSheet(b.dataset.edit, setMode));
     $("gqFuel").onclick = () => fuelNearMe();
+    $("gqHelp").onclick = () => helpSheet();
     if ($("gqPark")) $("gqPark").onclick = () => walkStart();
     $("p-go").querySelectorAll("[data-rec]").forEach(b => b.onclick = () => navTo(navRecent()[+b.dataset.rec]));
     $("p-go").querySelectorAll("[data-mr]").forEach(b => b.onclick = () => { setChap(b.dataset.mr); setTab("route"); });
@@ -1717,6 +1815,9 @@
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
     if ($("fbGo")) { $("fbGo").onclick = sendFeedback; st.fbAtt = st.fbAtt || {}; paintFbAtt();
+      /* the draft survives leaving the tab (or the app): a rider often goes to check where the problem was */
+      { const d = LS.get("fbDraft", null); if (d) { if (d.text) $("fbText").value = d.text; if (d.kind) $("fbKind").value = d.kind; }
+        const save = () => LS.set("fbDraft", { text: $("fbText").value, kind: $("fbKind").value, t: Date.now() }); $("fbText").addEventListener("input", save); $("fbKind").addEventListener("change", save); }
       $("fbPhoto").onclick = async () => { const [f] = await pickFile({}); if (!f) return; try { const im = await decodeImg(f); let q = 0.8, b = await toJpeg(im, 1400, q); while (b.size > 560 * 1024 && q > 0.4) { q -= 0.15; b = await toJpeg(im, 1100, q); } try { im.close && im.close(); } catch (e) { } st.fbAtt.photo = b; paintFbAtt(); } catch (e) { toast(e.message); } };
       $("fbVoice").onclick = async () => { const b = await recordVoice(60); if (b) { if (b.size > 680 * 1024) return toast("ההקלטה ארוכה מדי"); st.fbAtt.voice = b; paintFbAtt(); } }; }
     $("repPhoto").onclick = reportPhoto;
@@ -1731,7 +1832,7 @@
   async function sendFeedback() {
     const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return toast("כתבו כמה מילים");
     const a = st.fbAtt || {}, photo = a.photo ? await b64of(a.photo) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
-    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; st.fbAtt = {}; paintFbAtt();
+    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
         $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span></div></div>`;
         try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } $("fbRes").scrollIntoView({ block: "nearest", behavior: "smooth" }); toast("הדיווח נשלח ✓");
       } catch (e) { $("fbRes").innerHTML = `<div class="fberr" role="alert">${esc(e.message || "אין חיבור")}. הטקסט נשמר, אפשר לנסות שוב.</div>`; } $("fbGo").disabled = false; };
@@ -1749,8 +1850,12 @@
     saveFile(`blue-ronin-${c.id}.gpx`, g, "application/gpx+xml"); toast("קובץ GPX נשמר. ייבוא ל־OsmAnd או Organic Maps.");
   }
   function ics() {
-    const url = location.href.split("#")[0];
-    const s = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Blue Ronin//HE", "BEGIN:VEVENT", `UID:blue-ronin-brief@${location.host || "app"}`, "DTSTAMP:20261104T120000Z", "DTSTART;TZID=Asia/Jerusalem:20261106T200000", "DURATION:PT15M", "RRULE:FREQ=WEEKLY;BYDAY=FR", "SUMMARY:Blue Ronin · תדריך שבת", `DESCRIPTION:מזג אוויר\\, ערפל\\, סנוור ופרק מומלץ לשבת: ${url}`, `URL:${url}`, "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:תדריך שבת", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    const url = (location.origin || NEW_HOME) + "/#brief";
+    /* first occurrence = the coming Friday 20:00 Israel time (today if it is Friday before 20:00) */
+    const now = new Date(), il = new Date(now.toLocaleString("en-US", { timeZone: TZ })), add = ((5 - il.getDay()) + 7) % 7 || (il.getHours() >= 20 ? 7 : 0);
+    const fri = new Date(il.getFullYear(), il.getMonth(), il.getDate() + add), ymd = `${fri.getFullYear()}${String(fri.getMonth() + 1).padStart(2, "0")}${String(fri.getDate()).padStart(2, "0")}`;
+    const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const s = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Blue Ronin//HE", "BEGIN:VEVENT", `UID:blue-ronin-brief@${location.host || "app"}`, `DTSTAMP:${stamp}`, `DTSTART;TZID=Asia/Jerusalem:${ymd}T200000`, "DURATION:PT15M", "RRULE:FREQ=WEEKLY;BYDAY=FR", "SUMMARY:Blue Ronin · תדריך שבת", `DESCRIPTION:מזג אוויר\\, ערפל\\, סנוור ופרק מומלץ לשבת: ${url}`, `URL:${url}`, "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:תדריך שבת", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     saveFile("blue-ronin-shabbat.ics", s, "text/calendar"); toast("פתחו את הקובץ כדי להוסיף ליומן");
   }
   async function share() { const d = { title: "Blue Ronin Navigator", text: "הנביגטור של רוכבי הדו־גלגלי בישראל: ניווט יומיומי ומסלולי סוף שבוע", url: location.href.split("#")[0] }; try { if (navigator.share) await navigator.share(d); else { await navigator.clipboard.writeText(d.url); toast("הקישור הועתק"); } } catch (e) { } }
@@ -1991,7 +2096,7 @@
     st.ride.watch = navigator.geolocation.watchPosition(onPos, () => toast("אין אות GPS"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
   }
   function stopRide() {
-    if (!st.ride) return; navigator.geolocation.clearWatch(st.ride.watch); try { st.ride.lock && st.ride.lock.release(); } catch (e) { }
+    if (!st.ride) return; navigator.geolocation.clearWatch(st.ride.watch); try { cancelAnimationFrame(st.ride.mkRaf); st.ride.mk && st.ride.mk.remove(); } catch (e) { } try { st.ride.lock && st.ride.lock.release(); } catch (e) { }
     try { speechSynthesis.cancel(); } catch (e) { }
     let done = null; try { done = saveRide(st.ride); } catch (e) { } LS.set("rideLive", null);
     fallDisarm(); try { const R0 = st.ride; if (R0.last && R0.odo > 0.3 && (R0.spd == null || R0.spd < 8)) setPark({ lat: R0.last.p[1], lon: R0.last.p[0], acc: st.meAcc }, true); } catch (e) { }
@@ -1999,7 +2104,7 @@
     if (st.updWaiting) setTimeout(() => updBar("גרסה חדשה מוכנה", { btn: "עדכון עכשיו", go: () => location.reload() }), done ? 1200 : 300);
     st.ride = null; geoResume(); if (st.live) { liveFlush("stopped"); setTimeout(() => updBar("שיתוף המיקום החי עדיין פעיל", { btn: "הפסקה", go: () => { $("updbar").hidden = true; liveStop(); }, ms: 20000 }), 2500); } $("hudCenter").hidden = true; $("hudEta").textContent = ""; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
   }
-  function ridePad() { const h = $("hud"), wide = innerWidth >= 900, H = h && !h.hidden ? h.getBoundingClientRect().height : 230; return wide ? { top: 120, bottom: 60, left: 20, right: Math.min(innerWidth * 0.45, 500) } : { top: 150, bottom: Math.max(120, Math.min(H - 40, innerHeight * 0.45)), left: 20, right: 20 }; }
+  function ridePad() { const land = innerWidth > innerHeight && innerHeight <= 560 && innerWidth <= 1000; if (land && st.ride) return { top: 40, bottom: 40, left: 20, right: Math.min(330, innerWidth * 0.45) + 10 }; const h = $("hud"), wide = innerWidth >= 900, H = h && !h.hidden ? h.getBoundingClientRect().height : 230; return wide ? { top: 120, bottom: 60, left: 20, right: Math.min(innerWidth * 0.45, 500) } : { top: 150, bottom: Math.max(120, Math.min(H - 40, innerHeight * 0.45)), left: 20, right: 20 }; }
   function nearestOn(G, me) {
     const n = G.coords.length; let lo = Math.max(0, G.idx - 150), hi = Math.min(n - 1, G.idx + 2500), bi = G.idx, bd = 1e9;
     const scan = (a, z) => { for (let i = a; i <= z; i++) { const d = L.hav(G.coords[i], me); if (d < bd) { bd = d; bi = i; } } };
@@ -2037,6 +2142,16 @@
   $("hudCenter").onclick = () => { if (st.ride) { st.ride.free = 0; $("hudCenter").hidden = true; if (st.me) map.easeTo({ center: [st.me.lon, st.me.lat], zoom: 15, pitch: 55, duration: 600, padding: ridePad() }); } };
   /* the screen lock is dropped whenever the app goes to the background; take it again on return */
   document.addEventListener("visibilitychange", async () => { if (document.visibilityState !== "visible" || !st.ride) return; try { if (!st.ride.lock || st.ride.lock.released) st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { } try { speechSynthesis.paused && speechSynthesis.resume(); } catch (e) { } });
+  /* the rider on the map during a ride: the same motorcycle as the fly-through, lying on the map and turned to the
+     direction of travel, gliding between GPS fixes instead of jumping (and the camera glides with it) */
+  function rideMarker(R, me, head, dur) {
+    if (!R.mk) { const el = document.createElement("div"); el.className = "bike ridebike"; el.innerHTML = BIKE_SVG; R.mk = new maplibregl.Marker({ element: el, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(me).setRotation(head || 0).addTo(map); R.mkPos = me; R.mkRot = head || 0; return; }
+    const from = R.mkPos, r0 = R.mkRot, r1 = head != null && !isNaN(head) ? head : r0, dr = ((r1 - r0 + 540) % 360) - 180, t0 = performance.now();
+    cancelAnimationFrame(R.mkRaf);
+    const step = now => { const k = Math.min(1, (now - t0) / dur); const p = [from[0] + (me[0] - from[0]) * k, from[1] + (me[1] - from[1]) * k];
+      R.mkPos = p; R.mkRot = (r0 + dr * k + 360) % 360; R.mk.setLngLat(p).setRotation(R.mkRot); if (k < 1 && st.ride === R) R.mkRaf = requestAnimationFrame(step); };
+    R.mkRaf = requestAnimationFrame(step);
+  }
   function onPos(p) {
     const R = st.ride; if (!R) return; const me = [p.coords.longitude, p.coords.latitude]; feed(p);
     let spd = p.coords.speed != null && p.coords.speed >= 0 ? p.coords.speed * 3.6 : null;
@@ -2046,6 +2161,8 @@
     R.spd = spd; R.spdT = Date.now(); fallSpeed(spd); try { parkWatch(R, me, spd); } catch (e) { }
     R.last = { p: me, t: p.timestamp };
     $("hudSpeed").textContent = spd != null ? Math.round(spd) : "--";
+    const glide = Math.max(300, Math.min(1100, R.lastFixAt ? Date.now() - R.lastFixAt : 900)); R.lastFixAt = Date.now();
+    try { rideMarker(R, me, head, glide); } catch (e) { }
     try { rideTrack(R, me, p, spd); } catch (e) { }
     const G = R.G; const near = nearestOn(G, me); const myKm = near.km;
     const ni = G.stopKm.findIndex(k => k > myKm + 0.08);
@@ -2098,7 +2215,7 @@
     if (!msg) { const seg = (st.curves[st.chap] || []).find(s => s.cls >= 2 && s.startKm > myKm && s.startKm - myKm < 1.6); if (seg && G.coords === st.routes[R.c.id].coords) { msg = `${L.CURVE_LABEL[seg.cls]} בעוד ${(seg.startKm - myKm).toFixed(1)} ק״מ`; cls = "curve"; } }
     const m = $("hudMsg"); m.hidden = !msg; if (msg) { m.textContent = msg; m.className = "hudmsg " + cls; }
     if (R.free && Date.now() - R.free < 15000) return; if (R.free) { R.free = 0; $("hudCenter").hidden = true; }
-    map.easeTo({ center: me, bearing: head != null && !isNaN(head) ? head : map.getBearing(), pitch: 55, zoom: spd && spd > 80 ? 14.3 : 15, duration: 900, padding: ridePad() });
+    map.easeTo({ center: me, bearing: head != null && !isNaN(head) ? head : map.getBearing(), pitch: 55, zoom: spd && spd > 80 ? 14.3 : 15, duration: glide, easing: t => t, padding: ridePad() });
   }
 
   /* ---------- sheet / tabs ---------- */
@@ -2198,9 +2315,10 @@
       ${lat != null ? `<p class="small muted mono" style="margin:0" dir="ltr">${lat.toFixed(5)}, ${lon.toFixed(5)}</p>` : ""}
       <a class="btn sosbig" href="tel:101">${PWI.phone}מד״א 101</a>
       ${c.cPhone ? `<a class="btn sosbig alt" href="${telOf(c.cPhone)}">${PWI.phone}התקשרות ל${esc(c.cName || "איש הקשר")}</a><div class="row"><a class="btn" target="_blank" rel="noopener" href="${waOf(c.cPhone, txt)}">וואטסאפ עם המיקום</a><a class="btn" href="${smsOf(c.cPhone, txt)}">SMS עם המיקום</a></div>` : `<button type="button" class="btn" id="sosSetup">הגדרת איש קשר לחירום</button>`}
-      <div class="row"><a class="btn sm" href="tel:100">משטרה 100</a><a class="btn sm" href="tel:112">חירום 112</a></div>
+      <div class="row"><a class="btn sm" href="tel:100">משטרה 100</a><a class="btn sm" href="tel:112">חירום 112</a><button type="button" class="btn sm" id="sosHelp">מוסך או גרר</button></div>
       <button type="button" class="btn" id="sosOk">אני בסדר, ביטול מצב חירום</button></div>`, "sosm");
     if ($("sosSetup")) $("sosSetup").onclick = () => { closeModal(); setTab("me"); };
+    if ($("sosHelp")) $("sosHelp").onclick = () => { closeModal(); helpSheet(); };
     $("sosOk").onclick = async () => { st.sosOn = false; closeModal(); if (st.group) gTick(); if (res && res.sent && st.sos.circle) { try { await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind: "test", lat, lon, name: st.sos.name }); } catch (e) { } } liveFlush(st.ride ? "riding" : "stopped"); toast("מצב החירום בוטל"); };
   }
   /* A phone that stands still often stops sending position updates, so "old" is not "wrong": ask for a
@@ -2460,6 +2578,7 @@
   }
   document.querySelectorAll("[data-hs]").forEach(b => b.onclick = () => hudSize(b.dataset.hs));
   if ("ResizeObserver" in window) new ResizeObserver(hudMeasure).observe($("hud"));
+  addEventListener("orientationchange", () => setTimeout(() => { hudMeasure(); if (st.ride && st.me && !st.ride.free) map.easeTo({ center: [st.me.lon, st.me.lat], duration: 400, padding: ridePad() }); }, 350));
   hudSize(LS.get("hudSize", "compact"));
   $("hudCam").onclick = () => pickPhotos(true);
   $("hudPark").onclick = () => { if (!st.me) return toast("אין מיקום עדיין"); setPark({ lat: st.me.lat, lon: st.me.lon, acc: st.meAcc }); };
@@ -2772,7 +2891,7 @@
   }
   const renderTab = () => ({ go: renderGo, brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
-  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; if (id !== DRAFT && id !== NAV) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
+  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; rideFocus(false); if (id !== DRAFT && id !== NAV) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
   const renderAll = () => { renderTab(); renderMarkers(); };
 
   /* ---------- layers popover ---------- */
@@ -2784,14 +2903,14 @@
   document.querySelectorAll("#layersPop input").forEach(i => i.onchange = () => {
     st.layers[i.dataset.l] = i.checked; LS.set("layers", Object.assign({}, st.layers, { radar: false }));
     if (i.dataset.l === "radar") { if (i.checked) addRadarLayer(); else if (map.getLayer("br-radar")) { map.removeLayer("br-radar"); map.removeSource("br-radar"); } }
-    if (["osmview", "fuel", "cams"].includes(i.dataset.l) && i.checked && !st.osm) loadOSM(true);
+    if (["osmview", "fuel", "cams", "moto"].includes(i.dataset.l) && i.checked && !st.osm) loadOSM(true);
     if (i.dataset.l === "traffic" && i.checked && !st.cfg.traffic) toast(st.cfg.trafficKey ? "שירות התנועה לא זמין כרגע" : "שכבת התנועה החיה עוד לא מחוברת");
     applyLayerVis();
   });
   syncLayerBoxes();
 
   /* ---------- buttons ---------- */
-  $("fHome").onclick = () => { stopFly(); home(); };
+  $("fHome").onclick = () => { stopFly(); if (st.rideShown) { st.rideShown = null; pushSources(); rideFocus(false); } if (innerWidth < 900 && st.sheet === "full") setSheet("half"); homeIsrael(); };
   $("f3d").onclick = () => toggle3d();
   $("fFly").onclick = () => startFly();
   $("fLocate").onclick = locate;
@@ -2808,7 +2927,7 @@
   if (innerWidth < 900) setSheet("half"); else st.sheet = "half";
   safe("brief", renderBrief);
   let introDone = false;
-  const endIntro = () => { if (introDone) return; const wait = (window.BR_introHold || 0) - performance.now(); if (wait > 0) return void setTimeout(endIntro, wait); introDone = true; $("intro").classList.add("out"); setTimeout(() => home(2600), 250); };
+  const endIntro = () => { if (introDone) return; const wait = (window.BR_introHold || 0) - performance.now(); if (wait > 0) return void setTimeout(endIntro, wait); introDone = true; $("intro").classList.add("out"); setTimeout(() => st.tab === "go" ? homeIsrael(2600) : home(2600), 250); };
   map.on("load", () => setTimeout(endIntro, 900));
   setTimeout(endIntro, 4500);
   if (window.BRG) BRG.booted = true;
@@ -2841,6 +2960,10 @@
   try { const d = new Date().toISOString().slice(0, 10); if (LS.get("pingDay", "") !== d) { LS.set("pingDay", d); fetch("/api/ping", { method: "POST", keepalive: true }).catch(() => { }); } } catch (e) { }
   fetch("/api/config").then(r => r.ok ? r.json() : {}).then(cfg => { Object.assign(st.cfg, cfg); if (styleReady) addTrafficLayer(); if (st.tab === "route") { loadTraffic(st.chap); renderRoute(); } }).catch(() => { });
   importShared();
+  /* if location is already allowed, take one quiet fix so the brief, the weather "now" and navigation start from
+     where the rider actually is (never prompts) */
+  try { navigator.permissions && navigator.permissions.query({ name: "geolocation" }).then(ps => { if (ps.state !== "granted" || st.me) return;
+    navigator.geolocation.getCurrentPosition(p => { const first = !st.me; feed(p); if (first) { if (st.tab === "brief") renderBrief(); if (st.tab === "go") renderGo(); try { Promise.resolve(wxBusy).catch(() => { }).then(() => loadWeather()); } catch (e) { } } }, () => { }, { enableHighAccuracy: false, maximumAge: 10 * 6e4, timeout: 8000 }); }).catch(() => { }); } catch (e) { }
   loadRoutes(); loadWeather(); loadOSM(); loadCrowd();
   /* opening tab: a link that names one wins; otherwise the weekend tab on Friday and Saturday, and everyday
      navigation the rest of the week */

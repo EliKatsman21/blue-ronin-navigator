@@ -43,13 +43,16 @@ export default async req => {
     return json({ token: await sign({ cid: b.cid, exp, src: "code", code }), exp, src: "code", label: c.label || "" });
   }
   if (path === "interest") {
-    if (await limited(req, "interest", 5, day)) return json({ error: "כבר נרשמת" }, 429);
+    if (await limited(req, "interest", 8, day)) return json({ error: "יותר מדי שינויים היום. נסו מחר" }, 429);
+    /* one reservation per rider: changing the plan moves it, "none" cancels it */
+    const prev = ["monthly", "yearly"].includes(b.prev) ? b.prev : null;
+    if (b.plan === "none") { if (prev) { const c0 = (await s.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 }; c0[prev] = Math.max(0, (c0[prev] || 0) - 1); await s.setJSON("interest", c0); } return json({ ok: true }); }
     const plan = ["monthly", "yearly"].includes(b.plan) ? b.plan : "yearly";
     const fb = getStore({ name: "brn-feedback", consistency: "strong" }); const inbox = (await fb.get("inbox", { type: "json" })) || [];
     const contact = String(b.contact || "").replace(/[\u0000-\u001F‪-‮]/g, "").trim().slice(0, 120);
     inbox.push({ id: randomBytes(6).toString("hex"), t: Date.now(), ip: await ipHash(req), kind: "pro", text: `שריון מחיר מייסד: ${plan === "yearly" ? "שנתי" : "חודשי"}${contact ? " · " + contact : ""}`, status: "new", ver: String(b.ver || "").slice(0, 20) });
     await fb.setJSON("inbox", inbox.slice(-500));
-    const cnt = (await s.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 }; cnt[plan]++; await s.setJSON("interest", cnt);
+    const cnt = (await s.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 }; cnt[plan]++; if (prev && prev !== plan) cnt[prev] = Math.max(0, (cnt[prev] || 0) - 1); await s.setJSON("interest", cnt);
     return json({ ok: true });
   }
   return json({ error: "not found" }, 404);

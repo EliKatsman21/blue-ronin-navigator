@@ -51,7 +51,14 @@ export default async req => {
     }
   }
   /* answer for the requested points */
-  const out = pts.map(([lat, lon]) => { const p = [lon, lat]; let best = null, bd = 0.12; for (const sg of area.segs) for (const l of sg.lines) { const d = lineDist(p, l); if (d < bd) { bd = d; best = sg; } }
+  /* match each route point to the closest segment that runs the same way as the route (HERE gives each
+     direction of a divided road separately; matching the opposite carriageway made jams appear that weren't ours) */
+  const brg = (a, b) => { const y = Math.sin((b[0] - a[0]) * R) * Math.cos(b[1] * R), x = Math.cos(a[1] * R) * Math.sin(b[1] * R) - Math.sin(a[1] * R) * Math.cos(b[1] * R) * Math.cos((b[0] - a[0]) * R); return (Math.atan2(y, x) / R + 360) % 360; };
+  const adiff = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+  const lineNear = (p, l) => { let d = 1e9, k = 0; for (let i = 1; i < l.length; i++) { const x = segDist(p, l[i - 1], l[i]); if (x < d) { d = x; k = i; } } return l.length === 1 ? { d: hav(p, l[0]), b: null } : { d, b: brg(l[k - 1], l[k]) }; };
+  const out = pts.map(([lat, lon], i) => { const p = [lon, lat], q = pts[Math.min(pts.length - 1, i + 1)], o = pts[Math.max(0, i - 1)];
+    const rb = i < pts.length - 1 ? brg(p, [q[1], q[0]]) : brg([o[1], o[0]], p); let best = null, bd = 0.08;
+    for (const sg of area.segs) for (const l of sg.lines) { const m = lineNear(p, l); if (m.d < bd && (m.b == null || pts.length < 2 || adiff(m.b, rb) < 60)) { bd = m.d; best = sg; } }
     return best ? { lat, lon, cur: best.cur, free: best.free, ratio: best.free ? Math.min(1.2, best.cur / best.free) : null, closed: best.closed, jam: best.jam } : { lat, lon, ratio: null }; });
   const route = pts.map(p => [p[1], p[0]]), near = l => l.some(q => lineDist(q, route) < 0.6);
   const segs = area.segs.filter(sg => sg.closed || (sg.jam != null && sg.jam >= 3)).flatMap(sg => sg.lines.map(l => ({ l, j: sg.closed ? 10 : Math.round(sg.jam), c: sg.closed ? 1 : 0 }))).slice(0, 600);

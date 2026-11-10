@@ -5,7 +5,7 @@ const headers = { "content-type": "application/json", "cache-control": "public, 
 
 export default async (req, context) => {
   let data = await getCached();
-  if (data && (Date.now() - data.ts > MAX_AGE || !data.cafes)) context.waitUntil(fetch(new URL("/.netlify/functions/osm-refresh-background", req.url), { method: "POST" }).catch(e => console.log("bg trigger failed", e.message)));
+  if (data && (Date.now() - data.ts > MAX_AGE || !data.cafes || !data.moto)) context.waitUntil(fetch(new URL("/.netlify/functions/osm-refresh-background", req.url), { method: "POST" }).catch(e => console.log("bg trigger failed", e.message)));
   if (!data) {
     try { data = await refresh(); }
     catch (e) { return Response.json({ error: "overpass unavailable" }, { status: 503, headers: { "cache-control": "no-store" } }); }

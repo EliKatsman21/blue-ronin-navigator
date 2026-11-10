@@ -1,0 +1,17 @@
+name: באג / תקלה
+description: משהו לא עובד כמו שצריך
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: מה קרה?, description: מה ציפית שיקרה ומה קרה בפועל }
+    validations: { required: true }
+  - type: input
+    id: where
+    attributes: { label: איפה?, description: "לשונית / מסך / פרק, למשל: ניווט, מצב רכיבה, פרק 3" }
+  - type: input
+    id: device
+    attributes: { label: מכשיר וגרסה, description: "למשל: iPhone 15, אפליקציה מותקנת, 2.6.0 (כלים ← גרסה)" }
+  - type: textarea
+    id: more
+    attributes: { label: צילום מסך / דוח מצב / פרטים נוספים, description: "אפשר להדביק כאן את ״דוח מצב להעתקה״ מהבקרה" }

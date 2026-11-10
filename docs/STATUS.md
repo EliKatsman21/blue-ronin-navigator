@@ -1,0 +1,96 @@
+# Blue Ronin Navigator: project status
+
+Source of truth for the project's state. Rules for working on the code are in `/CLAUDE.md`; the human workflow is in
+`docs/WORKFLOW.md`. A copy of this file lives in the claude.ai Project as `claude/blue-ronin-navigator.md` and is
+refreshed at the end of every round.
+
+Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.6.0 (deployed 2026-11-10), SW shell v16.
+
+## How it ships
+- Code: GitHub `EliKatsman21/blue-ronin-navigator` (public). Netlify site `blueronin-north-map` (id 4bff772c-…) builds production from `main` only; `netlify.toml` `ignore` skips every non-production build (since 2026-11-10).
+- Branches: day-to-day work on `dev`; `main` = what is live. Merge `dev` → `main` only for a release Eli approved.
+- Netlify Personal plan: 1,000 credits/month, ~15 per production deploy. Eli wants changes batched and one deploy per round; he decides when a round is big enough. Urgent fixes may go out alone.
+- Commits: author Eli Katsman, committer Claude <noreply@anthropic.com>.
+- Release checklist: in `CLAUDE.md` (`scripts/bump-version.sh`, CHANGELOG entry, `scripts/check.sh`, merge, verify live, refresh this file and the Project doc).
+- Backlog: GitHub Issues with labels (see `docs/WORKFLOW.md`). Content and video work shares the same backlog (`video` label, `media/`).
+- Tests (in the repo since 2026-11-10): `tests/unit` (node:test: versions, parsing, sw shell, chapter stops inside Israel, no secrets, netlify guards) and `tests/e2e` (Playwright Chromium, phone + desktop: offline boot, all six tabs render, no uncaught errors, boot guard). GitHub Actions runs them on every push to `dev` and on PRs. The older scenario suites (transfer, camera, voice, group, replay, weather outage, ride HUD sizes, single popup, ride plan, traffic, load tests, HERE traffic unit test) lived in a session scratchpad and were lost; rebuild them in `tests/` as those areas are touched. No WebKit in the sandbox, so iPhone-only issues show up in the field error reporter and the monitor.
+
+## Structure
+- `site/`: `index.html`, `guard.js` (loads first), `intro.js`, `app.js`, `logic.js`, `data.js`, `bikes.js`, `geo.js`, `sw.js`, `sw-retire.js` (served as /sw.js on the old host only), `admin.html` + `admin.js`, `live.html` + `live.js`, `privacy.html`, `terms.html`.
+- `netlify/functions/`: `osm*`, `fuel`, `brief*`, `vapid`, `subscribe`, `test-push`, `config`, `traffic` (HERE), `traffic-tile` (retired, 410), `wx` (weather proxy), `health-scan` (every 30 min), `photos`, `admin`, `content`, `feedback`, `ping`, `pro`, `live`, `sos`, `group`, `xfer`, `errlog`, `geo`. Shared: `lib/admin.mjs`, `lib/push.mjs`, `lib/pro.mjs`, `lib/safety.mjs`, `lib/ops.mjs` (ops log + usage counters, store `brn-ops`), `lib/health.mjs` (scanner + playbook + admin alerts), `lib/osm.mjs`, `lib/brief.mjs`.
+- `tests/`, `scripts/`, `docs/`, `media/`, `.github/`: see `CLAUDE.md`.
+- Tabs: ניווט · סופ״ש (the former תדריך שבת) · מסלול · עצירות ודלק · שלי · כלים. Opening tab: a #hash wins; else סופ״ש on Fri/Sat and ניווט Sun–Thu.
+
+## Release 2.6.0 (2026-11-10)
+- Address search: `/api/geo` (HERE Geocoding & Search autosuggest, `in=countryCode:ISR`, Hebrew) finds house numbers, commercial centres and businesses; runs in parallel with Photon/Nominatim, HERE first, OSM duplicates within 150 m dropped. Queries are not logged or stored. Budget `HERE_GEO_CAP` (default 9,000/month, counter `heregeo`), health check "geo", admin usage meter.
+- ETA: traffic matching is direction-aware (segment bearing within 60° of the route, 80 m), factor is coverage-weighted and capped at 1.8×. Root cause of the 2:36-vs-0:39 report: samples from the opposite carriageway and parallel roads.
+- Help on the road ("עזרה בדרך", go tab and SOS sheet): insurance tow number saved per device, 6 nearest motorcycle garages (call / navigate / Waze), Google tow search link. OSM layer `br-moto` (shop=motorcycle, motorcycle_repair, service:vehicle:motorcycle, motorcycle:repair), toggle "מוסכי אופנועים".
+- Home/work: ✎ next to each quick button opens change / set to current location / remove; unset buttons enter "set" mode.
+- Ride mode: interpolated bike marker (same icon as the fly-through), camera eases with the time between fixes; landscape layout (HUD side panel, fab row, header hidden) and re-centre on rotation. Summary shows max speed (needs two sustained readings).
+- Weekend brief: departure from the rider's location (else home, else the chapter start); calendar reminder = the coming Friday 20:00.
+- Decluttered map: fuel 9.3, view/cafe 9.6, cameras 9 minzoom. Home button frames all of Israel with fixed bounds. "במפה" on a saved ride hides all layers and chapters (chip ✕ to exit).
+- Pro paywall plans are exclusive, tap again cancels (`proPlan` in LS; server counts `prev` / `plan:"none"`). Feedback draft persists (`fbDraft`).
+- Fixed a long-standing race: a sheet opened right after another closed was wiped by the old close timer.
+- OSM layers are filtered by a coarse outline of Israel (`IL_POLY`/`inIL` in lib/osm.mjs, at refresh and on read): the query boxes had put ~186 cafes, ~99 fuel stations and garages from Lebanon/Jordan on the map. All 66 chapter stops are inside (now enforced by a unit test); re-check when adding chapters near a border.
+- Deferred by Eli's choice: mute + music player in ride mode (possible Pro later).
+
+## Everyday navigation (2.5.0)
+Tab "ניווט": search (local stops/cafes/OSM + Photon, biased to the rider's position, all Israel; voice), home/work/recents in LS (`navPlaces`, `navRecent`), quick buttons (home, work, nearest fuel, back to the bike). Choosing a place builds a hidden custom chapter `id: "nav"` (`nav: true, hidden: true`) from the rider's position to the destination; OSRM route (not cached in LS, nor its steps), HERE traffic for the trip with an ETA factor, weather at arrival from `/api/wx` (point rounded to 0.1°), avoid-highways toggle, share, save as route, save as home/work. "יוצאים לדרך" starts ride mode on the trip (voice says "ניווט אל…", HUD label "יעד", arrival "הגעתם ליעד"). The trip is excluded from forecast points, chapter lists and the saved `chap`. Follow-ups: stronger route line and fewer POI markers during a trip, alternatives, rain-on-the-way alert.
+
+## Shared links (2.5.0)
+`?r=` links save the route to `myRoutes` with `shared: {t}` and open it in the route tab (tag "משיתוף", chip "⇄"), dedupe by stops, invalid points dropped (must be inside Israel bounds). At the free limit (2 routes) the link opens as an unsaved builder preview.
+
+## Chapter 6 (2.5.0)
+Removed the out-and-back to Almog (north Dead Sea): the loop is Beit She'an → Route 90 → Petza'el → 505 climb → Allon road → Mehola → Beit She'an, ~70 km shorter, so fuel covers it. The 90-pin via point moved to the Petza'el stop. Built-in chapters carry `rv` (route version) in the route/elevation cache keys; bump it whenever a chapter's stops change.
+
+## Weather (fixed in 2.3.1 after an outage)
+Incident 2026-11-06: Open-Meteo answered 429 (daily limit); the error object was cached as the forecast and the brief/route tabs went blank. Fix: every reply is validated; the last good forecast is kept; bad caches are dropped at boot; `/api/wx` is a shared server cache (Blobs + CDN, 20 min fresh, up to 3 days stale) tried first, direct Open-Meteo as fallback; the rider's "now" point is rounded to ~10 km; 3-minute back-off after a failed round. Every tab has an error boundary (retry card + field report) so no tab can render empty.
+
+## Live traffic (v2.4.0, live since 2026-11-07)
+TomTom has no traffic data for Israel, so it was replaced by HERE Traffic API v7 (Israel: flow + incidents). `/api/traffic?pts=…` makes one flow + one incidents call per area (bbox snapped to 0.02°, ≤1° per side), cached 5 min (Blobs + CDN), stale up to 1 h. Returns per-point speed ratio (the route-tab strip), slow/closed segments (map lines, jam ≥3) and incidents flagged when on the route. Monthly budget guard `HERE_MONTHLY_CAP` (default 4,500 calls). `HERE_API_KEY` set in Netlify on 2026-11-07 (plain env var: secret vars returned 403 on this plan; server-side only, never in the repo; do not enable HERE "trusted domains", server calls carry no referrer). Without it the app shows the Waze fallback. `TOMTOM_KEY` env var is unused and can be deleted.
+
+## Monitoring (admin "בקרה", v2.4.0)
+Scheduled scan every 30 min, plus "סריקה עכשיו". Checks: site, app.js version, Blobs round-trip, /api/content, /api/wx, OSM age and count (auto re-queues refresh if older than 30 h), OpenFreeMap style, MapLibre/SunCalc CDN, OSRM, HERE monthly usage, boot failures, field errors (grouped by fingerprint, new kinds logged), server ops log, push subscribers. An incident opens after two failing scans (one if critical) and pushes to admin devices ("התראות לטלפון שלי"); recovery pushes too. History of closed incidents, 48-scan uptime bars, top field issues (7 days, by version and device), server log with filters, "דוח מצב להעתקה" (markdown report to paste to Claude or into an issue labelled `from-monitor`). Housekeeping prunes scans (~5 days), logs (14 days), usage counters and field reports (300).
+
+## Transfer and backup
+`/api/xfer`: phone encrypts its data (AES-GCM, key = SHA-256 of 10 code chars that never leave the phones), server holds ciphertext 24 h / 6 reads. Backup file + restore. Transfer and backup stay in "שלי".
+
+## Admin console (`/admin.html`, not linked from the app)
+scrypt + TOTP, HMAC cookie, lockout, audit. Views: overview, בקרה (monitoring), announcement, chapters, hazards, inbox with media, fuel votes, Pro, system (flags, field errors, password, logout-all).
+
+## Safety (free)
+Emergency circle, SOS sheet (HUD long-press), fall detection (beta), live location, parked bike + walk-back. SOS sends are written to the ops log (count only, no personal data); an SOS that reached nobody is logged as critical.
+
+## Group rides
+`/api/group/*`: leader with Pro opens, members join free with a code, max 20, 12 h, one record per member, meeting point, group SOS.
+
+## Memories and replay
+Photos/voice in IndexedDB `brn-mem` (24 free, unlimited Pro). 3D replay of recorded rides (real clock, sky of that hour, photo pauses, share card). Free replay stops at 30%. "הדגמה: שחזור 3D" in the journal (tab "שלי") plays a generated ride on the current chapter (bend-aware speeds), never saved. Good source of clean footage for videos (`media/`).
+
+## Pro
+Safety never paywalled. Pro: ride plan ("תוכנית הרכיבה": departure slider, ETA + weather + riding wind-chill per stop, sun glare to the minute, technical/climb stretches per leg, break suggestion, what to wear, tap to map), full fuel plan, full fly-through and replay, unlimited routes and memories, full journal + GPX, opening group rides. Planned for Pro once HERE is proven: traffic alerts on the chosen route before leaving. 7-day trial or admin codes; ₪99/yr founders, ₪14.90/mo once Play Billing opens.
+
+## Ride mode
+Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset reminder, free pan, wake lock. HUD sizes: מלא / מצומצם (default) / מפה (one line + SOS), remembered per device; labelled buttons (צילום, חניתי, שיתוף, SOS "לחיצה ארוכה"); map buttons sit above the HUD (row layout on short screens); desktop HUD is a side card. Map: one popup at a time.
+
+## Keys / headers
+`HERE_API_KEY`, `HERE_MONTHLY_CAP` (optional), `HERE_GEO_CAP` (optional), `MAPILLARY_TOKEN`, `ADMIN_SETUP_CODE`. CSP (self, unpkg, cdnjs); admin CSP allows `worker-src 'self'` for admin push.
+
+## Chapters and routing
+1 Carmel–Gilboa · 2 Kinneret–Golan · 3 Upper Galilee · 4 northern ring · 5 Nes Harim & Beit Guvrin · 6 Jordan Valley. Cache keys `route:v4`, `elev:v4`, `steps:v2`.
+
+## Business and launch
+- Plan doc: https://claude.ai/artifact/VRcrkLdMD3SnckamEmpbMd · HQ board: https://claude.ai/artifact/8fSTGLQZPBrYZ4o2b7tNp7
+- Google Play: personal account opened 2026-11-06; identity verification done, device verification pending: needs a physical Android phone (Android 10+) with the Play Console app (no emulator, iPhone can't do it). Eli to borrow or buy a cheap used one, which is also needed to test the Android app. Next: create app, package `app.blueronin.navigator`, AAB via PWABuilder, `/.well-known/assetlinks.json`, closed test 12 testers × 14 days.
+
+## Open items
+- If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
+- Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).
+- `README.md` still describes the early north-only app and TomTom; refresh it.
+- Env var changes need a production rebuild before functions see them, and `/api/config` is cached ~10 min.
+- HERE coverage in Israel (checked 2026-11-07): incidents are rich; flow data is sparse on rural roads on a Saturday morning. Watch on weekdays before promising traffic in Pro marketing.
+- Eli: turn on admin push alerts in "בקרה" on his phone.
+- First real rides: journal, replay, ride plan against reality.
+- Watch the monitor for the iPhone intro-stuck report.
+- Moto garages depend on OSM tagging, which is thin in Israel: consider a curated list or rider submissions.
+- Re-issue the HERE key (it was pasted in chat) and update the env var.

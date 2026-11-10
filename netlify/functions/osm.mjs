@@ -1,5 +1,5 @@
 /* GET /api/osm — cached north layers. Served from Netlify's CDN; refreshed daily by osm-refresh. */
-import { getCached, refresh } from "./lib/osm.mjs";
+import { getCached, refresh, inIL } from "./lib/osm.mjs";
 const MAX_AGE = 3 * 864e5;
 const headers = { "content-type": "application/json", "cache-control": "public, max-age=900", "netlify-cdn-cache-control": "public, durable, s-maxage=900, stale-while-revalidate=86400" };
 
@@ -10,6 +10,8 @@ export default async (req, context) => {
     try { data = await refresh(); }
     catch (e) { return Response.json({ error: "overpass unavailable" }, { status: 503, headers: { "cache-control": "no-store" } }); }
   }
+  /* data stored before the outline filter existed may still hold points across the border */
+  data = Object.assign({}, data); for (const k of ["fuel", "cams", "views", "cafes", "moto"]) if (Array.isArray(data[k])) data[k] = data[k].filter(p => inIL(p.lat, p.lon));
   const h = data.cafes ? headers : Object.assign({}, headers, { "netlify-cdn-cache-control": "public, s-maxage=60" });
   return new Response(JSON.stringify(data), { headers: h });
 };

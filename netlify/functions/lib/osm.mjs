@@ -13,6 +13,10 @@ const MIRRORS = ["https://overpass-api.de/api/interpreter", "https://overpass.ku
 export const store = () => getStore({ name: "brn-osm", consistency: "strong" });
 
 const yes = v => v === "yes" ? true : v === "no" ? false : null;
+/* coarse outline of the area riders use (Israel, the Golan, the Jordan Valley roads), lon/lat. The query boxes are
+   rectangles that spill into Jordan, Egypt, Lebanon and Syria; anything outside this outline is dropped. */
+const IL_POLY = [[35.10, 33.10], [35.50, 33.10], [35.53, 33.20], [35.545, 33.255], [35.565, 33.282], [35.575, 33.295], [35.84, 33.34], [35.90, 33.12], [35.84, 32.82], [35.72, 32.71], [35.66, 32.675], [35.60, 32.655], [35.585, 32.64], [35.578, 32.40], [35.555, 32.20], [35.53, 32.05], [35.56, 31.76], [35.53, 31.40], [35.44, 31.10], [35.38, 30.90], [35.17, 30.45], [35.08, 30.05], [34.96, 29.54], [34.89, 29.48], [34.27, 31.22], [34.20, 31.32], [34.47, 31.60], [34.74, 32.20], [34.88, 32.60], [34.96, 32.90], [35.07, 33.09]];
+export function inIL(lat, lon) { let c = false; for (let i = 0, j = IL_POLY.length - 1; i < IL_POLY.length; j = i++) { const [xi, yi] = IL_POLY[i], [xj, yj] = IL_POLY[j]; if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) c = !c; } return c; }
 function normalize(j) {
   const t = n => n.tags || {};
   const pick = n => {
@@ -27,7 +31,7 @@ function normalize(j) {
     if (o95 !== null) o.o95 = o95; if (o98 !== null) o.o98 = o98; if (d !== null) o.diesel = d;
     return o;
   };
-  const els = (j.elements || []).filter(n => n.lat != null || n.center);
+  const els = (j.elements || []).filter(n => n.lat != null || n.center).filter(n => inIL(n.lat ?? n.center.lat, n.lon ?? n.center.lon));
   return {
     ts: Date.now(),
     cams: els.filter(n => t(n).highway === "speed_camera").map(pick),

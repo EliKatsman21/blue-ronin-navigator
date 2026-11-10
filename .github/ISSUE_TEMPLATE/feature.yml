@@ -1,14 +1,28 @@
 name: פיצ'ר / שיפור
 description: רעיון, בקשה או שינוי באפליקציה
-labels: [enhancement]
+labels:
+- enhancement
 body:
-  - type: textarea
-    id: what
-    attributes: { label: מה רוצים?, description: במילים שלך. מה הרוכב יוכל לעשות שהוא לא יכול היום }
-    validations: { required: true }
-  - type: dropdown
-    id: tier
-    attributes: { label: חינמי או Pro?, options: [חינמי, Pro, עוד לא החלטתי] }
-  - type: dropdown
-    id: when
-    attributes: { label: עדיפות, options: [לסבב הבא, בהמשך, רעיון לעתיד] }
+- type: textarea
+  id: what
+  attributes:
+    label: מה רוצים?
+    description: 'במילים שלך: מה הרוכב יוכל לעשות שהוא לא יכול היום'
+  validations:
+    required: true
+- type: dropdown
+  id: tier
+  attributes:
+    label: חינמי או Pro?
+    options:
+    - חינמי
+    - Pro
+    - עוד לא החלטתי
+- type: dropdown
+  id: when
+  attributes:
+    label: עדיפות
+    options:
+    - לסבב הבא
+    - בהמשך
+    - רעיון לעתיד

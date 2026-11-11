@@ -30,7 +30,7 @@
     pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
   };
-  const VIEWS = [["overview", "סקירה", I.gauge], ["monitor", "בקרה", I.pulse], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["pro", "Pro", I.star], ["system", "מערכת", I.shield]];
+  const VIEWS = [["overview", "סקירה", I.gauge], ["monitor", "בקרה", I.pulse], ["notice", "הודעות", I.mega], ["chapters", "פרקים", I.route], ["hazards", "מפגעים", I.haz], ["inbox", "תיבה", I.inbox], ["fuel", "דלק", I.fuel], ["pro", "Pro", I.star], ["join", "המתנה", I.inbox], ["system", "מערכת", I.shield]];
   const S = { authed: false, view: location.hash.slice(1) || "overview", content: null, draft: null, stats: null, feedback: null, fuel: null, audit: null, map: null };
   if (!VIEWS.some(v => v[0] === S.view)) S.view = "overview";
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -96,7 +96,7 @@
   function show(v) {
     S.view = v; history.replaceState(null, "", "#" + v);
     $("nav").querySelectorAll("[data-v]").forEach(b => { if (b.dataset.v !== v) b.removeAttribute("aria-current"); else b.setAttribute("aria-current", "page"); });
-    ({ overview, monitor, notice, chapters, hazards, inbox, fuel, pro, system })[v]();
+    ({ overview, monitor, notice, chapters, hazards, inbox, fuel, pro, join, system })[v]();
     scrollTo({ top: 0 });
   }
   const V = html => { $("views").innerHTML = `<section class="view">${html}</section>`; return $("views"); };
@@ -265,6 +265,27 @@
   }
 
   /* ---------- Blue Ronin Pro: codes, trials, demand ---------- */
+  /* ---------- waitlist ---------- */
+  async function join() {
+    V(`<div class="head"><h2>רשימת ההמתנה</h2></div><div class="small muted">טוען…</div>`);
+    let d; try { d = await api("GET", "join"); } catch (e) { return; }
+    const SRC = { ig: "אינסטגרם", yt: "יוטיוב", wa: "וואטסאפ", tt: "טיקטוק", fb: "פייסבוק", app: "האפליקציה", qr: "מדבקת QR", press: "עיתונות", friend: "חבר", site: "ישיר" };
+    const bySrc = {}; d.items.forEach(x => bySrc[x.src] = (bySrc[x.src] || 0) + 1);
+    const earned = d.items.filter(x => x.refs >= d.need).length, week = d.items.filter(x => Date.now() - x.t < 7 * 864e5).length;
+    const el = V(`<div class="head"><h2>רשימת ההמתנה</h2><span class="small muted">נרשמים דרך blueronin.app/join. ${d.need} חברים שהצטרפו = חודש Pro בהשקה</span></div>
+      <div class="kpis"><div class="kpi"><span class="k">נרשמו</span><div class="v">${d.items.length}</div></div><div class="kpi"><span class="k">השבוע</span><div class="v">${week}</div></div><div class="kpi"><span class="k">הגיעו דרך חבר</span><div class="v">${d.items.filter(x => x.ref).length}</div></div><div class="kpi"><span class="k">זכאים לחודש Pro</span><div class="v">${earned}</div></div></div>
+      <div class="card scroll"><h3>מאיפה מגיעים</h3><table class="tbl"><thead><tr><th>ערוץ</th><th>כניסות לדף הקישורים החודש</th><th>נרשמו</th></tr></thead><tbody>
+      ${Object.keys(SRC).map(k => `<tr><td>${SRC[k]}</td><td>${d.go[k] || 0}</td><td>${bySrc[k] || 0}</td></tr>`).join("")}</tbody></table></div>
+      <div class="card scroll"><h3>הנרשמים</h3><div class="row"><button type="button" class="btn sm" id="jCsv">הורדת CSV</button><button type="button" class="btn sm" id="jMail">העתקת כל המיילים</button></div>
+      <table class="tbl"><thead><tr><th>מתי</th><th>מייל</th><th>שם</th><th>ערוץ</th><th>הזמין</th><th></th></tr></thead><tbody>
+      ${d.items.length ? d.items.map(x => `<tr><td>${fmt(x.t)}</td><td class="mono" dir="ltr">${esc(x.email)}</td><td>${esc(x.name || "")}</td><td>${SRC[x.src] || ""}${x.ref ? " · דרך חבר" : ""}</td><td>${x.refs}${x.refs >= d.need ? " ★" : ""}</td><td><button type="button" class="btn sm danger" data-jd="${esc(x.k)}">מחיקה</button></td></tr>`).join("") : `<tr><td colspan="6" class="muted">עוד אין נרשמים</td></tr>`}</tbody></table></div>
+      <p class="small muted">המיילים נשמרים רק כדי לשלוח את ההזמנה להשקה. מי שמבקש להימחק: כפתור המחיקה בשורה שלו.</p>`);
+    $("jCsv").onclick = () => { const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`; const csv = "\uFEFF" + ["time,email,name,source,via_friend,invited,code"].concat(d.items.map(x => [new Date(x.t).toISOString(), x.email, x.name, x.src, x.ref ? "yes" : "", x.refs, x.code].map(q).join(","))).join("\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "blue-ronin-waitlist.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+    $("jMail").onclick = () => navigator.clipboard.writeText(d.items.map(x => x.email).join(", ")).then(() => toast("הועתק")).catch(() => toast("ההעתקה נכשלה"));
+    el.querySelectorAll("[data-jd]").forEach(b => b.onclick = async () => { if (!confirmInline(b, "למחוק?")) return; try { await api("POST", "join/delete", { k: b.dataset.jd }); toast("נמחק"); join(); } catch (e) { toast(e.message); } });
+  }
+
   async function pro() {
     V(`<div class="head"><h2>Blue Ronin Pro</h2></div><div class="small muted">טוען…</div>`);
     let d; try { d = await api("GET", "pro"); } catch (e) { return; }

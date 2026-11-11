@@ -83,6 +83,26 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - Plan doc: https://claude.ai/artifact/VRcrkLdMD3SnckamEmpbMd · HQ board: https://claude.ai/artifact/8fSTGLQZPBrYZ4o2b7tNp7
 - Google Play: personal account opened 2026-11-06; identity verification done, device verification pending: needs a physical Android phone (Android 10+) with the Play Console app (no emulator, iPhone can't do it). Eli to borrow or buy a cheap used one, which is also needed to test the Android app. Next: create app, package `app.blueronin.navigator`, AAB via PWABuilder, `/.well-known/assetlinks.json`, closed test 12 testers × 14 days.
 
+## Marketing and launch (plan written 2026-11-11)
+- Plan doc (Hebrew, editable): https://claude.ai/artifact/6V7PFQk33MePZ75pyptWf1 . HQ items g00–g33 (area "שיווק"). Pre-registration on Play stays locked until the closed test passes, so the waitlist lives on blueronin.app.
+- Channels (handle `blueroninapp` everywhere; blueronin.app was taken on one platform): YouTube @blueroninapp and Instagram blueroninapp (the existing channels, renamed 2026-11-11; Instagram is a business account), WhatsApp channel "Blue Ronin · תדריך סופ״ש" https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m (opened 2026-11-11). TikTok and a Facebook Page: Eli opens them with the guides in the plan doc.
+- Slogan: "כל הארץ. שני גלגלים. דרך אחת." Brand line: "הרונין לא ממהר. הוא חוזר הביתה."
+- Logo on every channel = the app icon (sun + road), drawn by `media/brand/build.py`. The old rider/R9 logo is retired.
+- Eli stays anonymous for now; he will appear as the founder once the product is stable (his call, 2026-11-11).
+- Old riding videos that show fast or risky riding go Private, not deleted. Footage policy checklist in the plan doc.
+- Engines: weekly brief on WhatsApp (Thu 18:00), 3D chapter fly-throughs as Reels/TikTok/Shorts, "12 הרונינים" closed-test campaign (recruit 20), waitlist with referrals, 6-chapter countdown from 2027-02-01, launch ride on chapter 1 on Sat 2027-03-13, store launch about 2027-03-15.
+- Bio links: Instagram `blueronin.app/go?src=ig`, YouTube `?src=yt`, WhatsApp `?src=wa`, TikTok `?src=tt`, Facebook `?src=fb` (after the release that ships `/go`; until then plain blueronin.app).
+
+## On `dev`, not released yet (2026-11-11, issue #12)
+- `/join` (`site/join.html` + `join.js`): launch waitlist. Email, optional name, consent checkbox, honeypot. After signup the rider gets a personal link `blueronin.app/join?r=CODE`; 3 friends who join through it = one month of Pro at launch (granted by hand with admin Pro codes). The code is remembered on the device (`brn:join` in LS) so a return visit shows progress.
+- `/go` (`site/go.html` + `go.js`): one link for every social bio (waitlist, app, WhatsApp channel, Instagram, YouTube). `?src=ig|yt|wa|tt|fb|qr|press` counts a visit per channel (ops counter `go:<src>`, a number only) and carries the source into `/join`.
+- `/api/join` (`netlify/functions/join.mjs`, rules in `lib/join-core.mjs`, storage in `lib/join.mjs`, store `brn-join`): one blob per signup, throttled 5/hour per hashed IP. Admin: view "המתנה" (totals, per-channel visits and signups, list, CSV, copy emails, delete one) via `GET join` / `POST join/delete`.
+- Privacy policy: two new rows (waitlist email, link-hub counter) and how to be removed. Needs the lawyer's eye with the rest (HQ s03).
+- App, tools tab: card "נשארים בקשר" (WhatsApp channel, waitlist, Instagram, YouTube).
+- `site/icons/og.jpg`: 1200x630 link preview for the two pages. `media/brand/build.py` draws the profile pictures, banners and og image as vectors from the app icon.
+- Tests: unit (waitlist rules, landing pages have no inline scripts) and e2e `landing.spec.mjs`.
+- Netlify serves `/join` and `/go` from `join.html` / `go.html` (pretty URLs). Verify both on the live site after the release, and one real signup end to end.
+
 ## Open items
 - If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
 - Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).

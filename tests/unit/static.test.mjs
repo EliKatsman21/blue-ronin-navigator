@@ -65,3 +65,26 @@ test("netlify.toml keeps the old-host redirects and never builds non-production 
   assert.match(t, /blueronin-north-map\.netlify\.app\/\*"\s*\n\s*to = "https:\/\/blueronin\.app\/:splat"/);
   assert.match(t, /ignore = .*CONTEXT.*production/);
 });
+
+test("waitlist: email cleaning, referral codes and sources", async () => {
+  const mod = await import(join(FN, "lib", "join-core.mjs"));
+  assert.equal(mod.cleanEmail("  Rider@Example.CO.il "), "rider@example.co.il");
+  for (const bad of ["", "a@b", "no at.com", "x@@y.com", "a..b@c.com", "<s>@x.com", "a@b.com,c@d.com"]) assert.equal(mod.cleanEmail(bad), null, bad);
+  for (let i = 0; i < 200; i++) assert.ok(mod.isRef(mod.newRef()));
+  assert.ok(!mod.isRef("ABC10O") && !mod.isRef("abc234") && !mod.isRef("ABCDE"));
+  assert.equal(mod.cleanSrc("ig"), "ig"); assert.equal(mod.cleanSrc("<x>"), "site");
+  assert.equal(mod.cleanName(" <b>רוכב</b>\u202E "), "bרוכב/b");
+  // the page and the server agree on the sources and the code shape
+  const page = read(join(SITE, "join.js"));
+  for (const s of mod.SRCS) assert.ok(page.includes(`"${s}"`), `join.js is missing source ${s}`);
+  assert.ok(page.includes("[A-HJKMNP-Z2-9]{6}"));
+});
+
+test("landing pages: no inline scripts (CSP) and their files exist", () => {
+  for (const f of ["join.html", "go.html"]) {
+    const html = read(join(SITE, f));
+    assert.ok(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), `${f} has an inline script, the CSP blocks it`);
+    assert.ok(!/\son[a-z]+=/.test(html), `${f} has an inline event handler`);
+    for (const m of html.matchAll(/(?:src|href)="((?!https?:|\.\/|#)[^"?]+\.(?:js|png|jpg|html))"/g)) assert.ok(existsSync(join(SITE, m[1])), `${f} links missing ${m[1]}`);
+  }
+});

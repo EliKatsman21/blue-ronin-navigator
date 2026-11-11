@@ -1,0 +1,27 @@
+name: סרטון / תוכן
+description: סרטון, ריל, פוסט או חומר שיווקי לאפליקציה או לערוץ
+labels:
+- video
+body:
+- type: textarea
+  id: idea
+  attributes:
+    label: הרעיון
+    description: מה רואים, למי זה מיועד ומה המטרה
+  validations:
+    required: true
+- type: dropdown
+  id: format
+  attributes:
+    label: פורמט
+    options:
+    - ריל אנכי 9:16
+    - יוטיוב 16:9
+    - פוסט תמונה
+    - סטורי
+    - חנות אפליקציות (צילומי מסך / וידאו)
+- type: input
+  id: source
+  attributes:
+    label: חומרי גלם
+    description: קישור לתיקייה ב־Drive / שם הרכיבה / פרק

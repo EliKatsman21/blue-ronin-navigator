@@ -1,0 +1,25 @@
+name: check
+on:
+  push:
+    branches: [dev, "fix/**", "feat/**"]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: tests/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+        working-directory: tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests
+      - run: scripts/check.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-results, path: tests/test-results, retention-days: 7 }

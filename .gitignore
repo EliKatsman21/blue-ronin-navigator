@@ -1,2 +1,7 @@
 node_modules/
 .netlify/
+tests/test-results/
+tests/playwright-report/
+media/renders/
+*.mp4
+*.mov

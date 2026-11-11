@@ -1,6 +1,9 @@
 [build]
   publish = "site"
   command = "echo 'static site, functions bundled by Netlify'"
+  # Only production (main) builds. Pushes to dev, other branches and PR previews are skipped,
+  # so day-to-day work spends no Netlify credits. Exit 0 = skip, exit 1 = build.
+  ignore = "test \"$CONTEXT\" != \"production\""
 
 [functions]
   directory = "netlify/functions"

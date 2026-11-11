@@ -1,0 +1,15 @@
+{
+  "name": "blue-ronin-tests",
+  "private": true,
+  "description": "Test harness for Blue Ronin Navigator. Kept out of the root package.json so Netlify builds stay lean.",
+  "scripts": {
+    "test": "bash ../scripts/check.sh",
+    "unit": "node --test unit/*.test.mjs",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "maplibre-gl": "4.7.1",
+    "suncalc": "1.9.0"
+  }
+}

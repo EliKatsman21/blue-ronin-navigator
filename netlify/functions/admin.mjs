@@ -10,6 +10,7 @@ import { proStore, newCode } from "./lib/pro.mjs";
 import { sendAll, validSub, keyOf } from "./lib/push.mjs";
 import { opsStore, usage } from "./lib/ops.mjs";
 import { runScan, notifyAdmins, PLAYBOOK, fingerprint } from "./lib/health.mjs";
+import { joinStore, SRCS, NEED, refsOf } from "./lib/join.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
@@ -157,6 +158,19 @@ export default async req => {
   if (route === "POST pro/revoke") {
     const ps = proStore(); const codes = (await ps.get("codes", { type: "json" })) || {}; if (!codes[b.code]) return json({ error: "not found" }, 404);
     codes[b.code].revoked = true; await ps.setJSON("codes", codes); await audit("pro-revoke", { code: b.code }); return json({ ok: true });
+  }
+  if (route === "GET join") {
+    const js = joinStore(); const { blobs } = await js.list({ prefix: "e:" }); const items = [];
+    for (const x of blobs) { const v = await js.get(x.key, { type: "json" }); if (v) items.push({ k: x.key.slice(2), t: v.t, email: v.email, name: v.name, code: v.code, ref: v.ref, src: v.src, refs: 0 }); }
+    const by = {}; for (const it of items) if (it.ref) by[it.ref] = (by[it.ref] || 0) + 1; for (const it of items) it.refs = by[it.code] || 0;
+    const go = {}; for (const k of SRCS) go[k] = await usage("go:" + k);
+    return json({ need: NEED, go, items: items.sort((a, b) => b.t - a.t) });
+  }
+  if (route === "POST join/delete") {
+    const js = joinStore(); if (!/^[a-f0-9]{24}$/.test(b.k || "")) return json({ error: "bad" }, 400);
+    const v = await js.get("e:" + b.k, { type: "json" }); if (!v) return json({ error: "not found" }, 404);
+    await js.delete("e:" + b.k); await js.delete("c:" + v.code); if (v.ref) await js.delete(`r:${v.ref}:${b.k}`).catch(() => { });
+    await audit("join-delete"); return json({ ok: true });
   }
   if (route === "GET audit") return json({ items: ((await s.get("audit", { type: "json" })) || []).slice().reverse().slice(0, 150) });
   if (route === "POST password") {

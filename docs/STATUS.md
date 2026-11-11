@@ -122,3 +122,6 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - Watch the monitor for the iPhone intro-stuck report.
 - Moto garages depend on OSM tagging, which is thin in Israel: consider a curated list or rider submissions.
 - Re-issue the HERE key (it was pasted in chat) and update the env var.
+- Field check of 2.7.0 (Eli, next ride): no repeated "מחשב מסלול מחדש" on a straight road, the blue guide line is clear under the bike, landscape board readable in both rotation directions, and a real house number found in search. Field errors and reroutes show in "בקרה".
+- One real signup on https://blueronin.app/join end to end (appears in the admin "המתנה" view), then switch every bio link to `blueronin.app/go?src=…`.
+- Repo: `dev` began as its own root; release 2.7.0 (a9d0068) joined it to `main`, so future releases are ordinary merges.

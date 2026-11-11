@@ -6,6 +6,7 @@ Everything needed to make Blue Ronin videos and store assets, except the heavy f
 - `storyboards/`: shot-by-shot plans, timing, on-screen text (Hebrew), music notes.
 - `shotlists/`: what to film on a ride (location, chapter stop, angle, lens, time of day).
 - `assets/`: small reusable files only: logo SVGs, lower-thirds, LUT/preset names, fonts list. Keep each file under ~2 MB.
+- `tips/`: the weekly safety-tips series "הרונין לא ממהר" (12 episodes, pages, narration, workflow). Start at `tips/README.md`.
 - `renders/`: local render output. Ignored by git (as are all `.mp4` / `.mov`). Finished videos go to Google Drive;
   link them from the script file and from the issue.
 

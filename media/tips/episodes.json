@@ -1,0 +1,1370 @@
+{
+ "series": "הרונין לא ממהר",
+ "format": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 30
+ },
+ "episodes": [
+  {
+   "n": 1,
+   "slug": "first-rain",
+   "date": "2026-11-24",
+   "title": "גשם ראשון",
+   "hook": "כביש מבריק = כביש שמחליק",
+   "cta": "wa",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "גשם ראשון",
+     "vo": "כביש שמבריק אחרי גשם הוא כביש שמחליק.",
+     "art": "Wet asphalt at dusk, top-down; a rainbow oil sheen spreads across the lane as the title lands.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "כל הקיץ: שמן, אבק, גומי",
+     "vo": "כל הקיץ מצטברים על האספלט שמן, אבק ושאריות גומי. הגשם מרים אותם לשכבה דקה וחלקה. ובישראל, עם ההפסקות הארוכות בין הגשמים, כמעט כל גשם מתנהג כמו גשם ראשון.",
+     "art": "Lane seen from above: small sun icons tick by (months), dark specks build up; rain drops fall and the specks melt into one glossy film.",
+     "src": [
+      {
+       "id": "rain_ice",
+       "title": "ice: הגשם הראשון ונתוני אור ירוק",
+       "url": "https://www.ice.co.il/auto/news/article/1134175"
+      },
+      {
+       "id": "rain_ynet",
+       "title": "ynet: כביש מבריק אחרי גשם",
+       "url": "https://www.ynet.co.il/wheels/article/hyvmb5zst"
+      }
+     ],
+     "t0": 3,
+     "t1": 11
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "רוכבים בפסי הגלגלים",
+     "vo": "רכבו בפסים שהגלגלים של המכוניות ניקו, ולא באמצע הנתיב, שם השמן מטפטף.",
+     "art": "Lane with a dark oily stripe down the middle and two clean tyre tracks; the app's bike icon slides from the centre into a tyre track.",
+     "t0": 11,
+     "t1": 18,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "פסי צבע · מכסי ביוב · תיקוני זפת",
+     "vo": "פסי צבע, מכסי ביוב ותיקוני זפת מחליקים עוד יותר. חצו אותם כשהאופנוע זקוף, בלי לבלום ובלי להטות.",
+     "art": "Three hazards highlighted in sun-orange: zebra stripe, round manhole, shiny tar seam. Bike crosses upright, a small 'no brake' icon.",
+     "t0": 18,
+     "t1": 25,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "2 שניות, ועוד 1 לכל תנאי",
+     "vo": "ושמרו מרחק: שתי שניות ביום יבש, ועוד שנייה על כביש רטוב, עוד אחת בגשם חזק, ועוד אחת בלילה.",
+     "art": "Bike behind a car, a gap counter grows 2 → 3 → 4 → 5 seconds as icons appear: wet road, heavy rain, moon.",
+     "src": [
+      {
+       "id": "rain_walla",
+       "title": "וואלה רכב: מרחק לפי תנאים בגשם",
+       "url": "https://cars.walla.co.il/item/3471576"
+      }
+     ],
+     "t0": 25,
+     "t1": 33
+    },
+    {
+     "dur": 5,
+     "kind": "app",
+     "text": "מזג האוויר על המסלול לפני שיוצאים",
+     "vo": "בתדריך הסופ״ש של Blue Ronin רואים מראש מה מזג האוויר על המסלול.",
+     "art": "Screen capture: the סופ״ש tab, the forecast card and the chapter list (no speedometer).",
+     "t0": 33,
+     "t1": 38,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 38,
+     "t1": 42,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "rain_ice",
+     "title": "ice: הגשם הראשון ונתוני אור ירוק",
+     "url": "https://www.ice.co.il/auto/news/article/1134175"
+    },
+    {
+     "id": "rain_ynet",
+     "title": "ynet: כביש מבריק אחרי גשם",
+     "url": "https://www.ynet.co.il/wheels/article/hyvmb5zst"
+    },
+    {
+     "id": "rain_walla",
+     "title": "וואלה רכב: מרחק לפי תנאים בגשם",
+     "url": "https://cars.walla.co.il/item/3471576"
+    }
+   ],
+   "app_tie": "סופ״ש: תחזית לפרק לפני היציאה",
+   "caption": "גשם ראשון: למה כביש מבריק הוא כביש שמחליק, ואיך רוכבים עליו 🌧️ שמרו את הסרטון לחורף.",
+   "tags": [
+    "רכיבהבטוחה",
+    "אופנוע",
+    "גשםראשון",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 42,
+   "vo_words": 100,
+   "cta_text": "תדריך סופ״ש בוואטסאפ",
+   "cta_links": {
+    "ig": "blueronin.app/go?src=ig",
+    "tt": "blueronin.app/go?src=tt",
+    "yt": "blueronin.app/go?src=yt",
+    "fb": "blueronin.app/go?src=fb"
+   }
+  },
+  {
+   "n": 2,
+   "slug": "they-didnt-see-you",
+   "date": "2026-12-01",
+   "title": "הנהג שלא ראה אותך",
+   "hook": "הוא הסתכל עליכם. הוא לא ראה אתכם.",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "הוא הסתכל עליכם.\nהוא לא ראה אתכם.",
+     "vo": "הוא הסתכל עליכם. הוא לא ראה אתכם.",
+     "art": "Driver's eyes in a side mirror, a motorcycle passes through the reflection unnoticed.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "stat",
+     "text": "26%",
+     "vo": "בארצות הברית, רכב שפונה שמאלה מול אופנוע שבא ממולו הוא סוג התאונה הקטלנית הנפוץ ביותר בין אופנוע לרכב: יותר מאחת מכל ארבע.",
+     "art": "Big number 26%; under it a tiny junction pictogram: car turning left across an oncoming bike. Source line small at the bottom.",
+     "src": [
+      {
+       "id": "iihs_left",
+       "title": "IIHS, Teoh 2023: Left-turn crashes and motorcycle safety",
+       "url": "https://www.iihs.org/topics/bibliography/ref/2253"
+      }
+     ],
+     "t0": 3,
+     "t1": 11
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "אופנוע צר. קל לפספס.",
+     "vo": "המוח של הנהג מחפש מכוניות. אופנוע צר, ומתקרב מהר יותר ממה שנראה.",
+     "art": "Junction from above: the driver's view cone sweeps the road; the bike is half hidden behind a van and the cone skips it.",
+     "t0": 11,
+     "t1": 17,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "בצומת: אצבעות על הבלם, עמדה שרואים",
+     "vo": "בכל צומת עם רכב שממתין לפנות: האטו, הניחו אצבעות על ידית הבלם, ותפסו מקום בנתיב שבו הנהג רואה אתכם, לא מאחורי רכב אחר.",
+     "art": "Same junction: bike slows (speed arrow shrinks), shifts sideways out of the van's shadow into the driver's cone; small hand-on-lever icon.",
+     "t0": 17,
+     "t1": 25,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "מסתכלים על הגלגל, לא על הנהג",
+     "vo": "ואל תסמכו על קשר עין. הסתכלו על הגלגל הקדמי שלו: אם הוא מתחיל להסתובב, הוא יוצא.",
+     "art": "Close-up pictogram of a car's front wheel; a rotation arrow lights up orange.",
+     "t0": 25,
+     "t1": 31,
+     "src": []
+    },
+    {
+     "dur": 5,
+     "kind": "diagram",
+     "text": "אור דולק, ציוד בולט",
+     "vo": "פנס דולק ביום וציוד בצבע בולט עוזרים לנהג לזהות אתכם מוקדם יותר.",
+     "art": "Two riders side by side: dark gear and no light fades into the road; bright helmet and headlight stands out.",
+     "src": [
+      {
+       "id": "hurt_pdf",
+       "title": "Hurt Report, DOT HS-5-01160",
+       "url": "https://rosap.ntl.bts.gov/view/dot/6450/dot_6450_DS1.pdf"
+      }
+     ],
+     "t0": 31,
+     "t1": 36
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 36,
+     "t1": 40,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "iihs_left",
+     "title": "IIHS, Teoh 2023: Left-turn crashes and motorcycle safety",
+     "url": "https://www.iihs.org/topics/bibliography/ref/2253"
+    },
+    {
+     "id": "hurt_pdf",
+     "title": "Hurt Report, DOT HS-5-01160",
+     "url": "https://rosap.ntl.bts.gov/view/dot/6450/dot_6450_DS1.pdf"
+    }
+   ],
+   "app_tie": "",
+   "caption": "הסוג הנפוץ ביותר של תאונה קטלנית בין אופנוע לרכב, ושלושה הרגלים שמורידים את הסיכון 👀",
+   "tags": [
+    "רכיבהבטוחה",
+    "אופנוע",
+    "צומת",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 40,
+   "vo_words": 98,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 3,
+   "slug": "winter-cold",
+   "date": "2026-12-08",
+   "title": "קור ורטיבות",
+   "hook": "10 מעלות ב־90 קמ״ש מרגישות כמו 4",
+   "cta": "wa",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "10° ב־90 קמ״ש\nמרגישות כמו 4°",
+     "vo": "עשר מעלות, בתשעים קמ״ש, מרגישות כמו ארבע.",
+     "art": "Thermometer drops from 10° to 4° as speed lines stream past.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "רוח הנסיעה מקררת",
+     "vo": "הרוח של הנסיעה מורידה את הטמפרטורה שהגוף מרגיש. ככל שמהירים יותר, קר יותר.",
+     "art": "Rider silhouette with wind lines; a small gauge pairs speed 30/60/90 with felt temperature 8°/6°/4°.",
+     "src": [
+      {
+       "id": "windchill",
+       "title": "Wind chill: NWS/Environment Canada formula (חישוב)",
+       "url": "https://www.weather.gov/safety/cold-wind-chill-chart"
+      }
+     ],
+     "t0": 3,
+     "t1": 10
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "אצבעות קפואות בולמות לאט",
+     "vo": "וזה לא רק עניין של נוחות. ידיים קפואות מאבדות תחושה וזריזות, ובלימה דורשת אצבעות שמגיבות מהר.",
+     "art": "Gloved hand on a brake lever, frost creeping on the fingers; a small timer shows the reaction getting longer.",
+     "t0": 10,
+     "t1": 18,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "שכבות + חסימת רוח",
+     "vo": "התלבשו בשכבות, עם שכבה עליונה שחוסמת רוח. כפפות חורף אטומות, ומגן צוואר, כי משם הקור נכנס.",
+     "art": "Exploded layers: base layer, mid layer, windproof shell, waterproof gloves, neck tube, each labelled in Hebrew.",
+     "src": [
+      {
+       "id": "winter_ynet",
+       "title": "ynet: הכנה לחורף לרוכבים",
+       "url": "https://www.ynet.co.il/wheels/article/5370967"
+      }
+     ],
+     "t0": 18,
+     "t1": 26
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "משקף מתערפל? מגן אדים",
+     "vo": "בבוקר קר המשקף מתערפל. מגן אדים או תכשיר נגד אדים שומרים על ראות.",
+     "art": "Helmet visor fogging over; a clear insert slides in and the view clears.",
+     "t0": 26,
+     "t1": 32,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "app",
+     "text": "תחושת הקור ומה ללבוש, לכל עצירה",
+     "vo": "בתוכנית הרכיבה של Blue Ronin רואים לכל עצירה את הטמפרטורה ואת תחושת הקור ברכיבה, וגם מה כדאי ללבוש.",
+     "art": "Screen capture: ride plan (תוכנית הרכיבה) with per-stop temperature, riding wind-chill and the 'what to wear' line. Pro badge visible.",
+     "t0": 32,
+     "t1": 38,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 38,
+     "t1": 42,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "windchill",
+     "title": "Wind chill: NWS/Environment Canada formula (חישוב)",
+     "url": "https://www.weather.gov/safety/cold-wind-chill-chart"
+    },
+    {
+     "id": "winter_ynet",
+     "title": "ynet: הכנה לחורף לרוכבים",
+     "url": "https://www.ynet.co.il/wheels/article/5370967"
+    }
+   ],
+   "app_tie": "Pro: תוכנית הרכיבה, תחושת קור ומה ללבוש",
+   "caption": "למה 10 מעלות על אופנוע מרגישות כמו 4, ואיך מתלבשים לרכיבת חורף 🧤",
+   "tags": [
+    "רכיבתחורף",
+    "אופנוע",
+    "ציודרכיבה",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 42,
+   "vo_words": 89,
+   "cta_text": "תדריך סופ״ש בוואטסאפ",
+   "cta_links": {
+    "ig": "blueronin.app/go?src=ig",
+    "tt": "blueronin.app/go?src=tt",
+    "yt": "blueronin.app/go?src=yt",
+    "fb": "blueronin.app/go?src=fb"
+   }
+  },
+  {
+   "n": 4,
+   "slug": "emergency-braking",
+   "date": "2026-12-15",
+   "title": "בלימת חירום",
+   "hook": "רוב הרוכבים בולמים חזק מאחור וחלש מקדימה",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "בולמים הפוך?",
+     "vo": "רוב הרוכבים בולמים בדיוק הפוך ממה שצריך.",
+     "art": "Two brake levers, rear glowing red, front barely lit.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "המשקל עובר קדימה",
+     "vo": "כשבולמים, המשקל עובר לגלגל הקדמי, ולכן הבלם הקדמי עושה את רוב העבודה. בבהלה רוכבים לוחצים חזק מדי מאחור, נועלים את הגלגל, ומשאירים את הבלם הקדמי כמעט בלי שימוש.",
+     "art": "Bike side view braking: a weight arrow slides to the front tyre, the front contact patch grows; a skid mark appears behind a locked rear wheel.",
+     "src": [
+      {
+       "id": "hurt",
+       "title": "Hurt Report, USC 1981 (webBikeWorld)",
+       "url": "https://www.webbikeworld.com/the-hurt-study/"
+      }
+     ],
+     "t0": 3,
+     "t1": 11
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "ABS: לוחצים חזק ולא משחררים",
+     "vo": "עם ABS: לחיצה חזקה ורציפה על שני הבלמים, גם כשמרגישים את הדפיקות בידית. המערכת דואגת שהגלגל לא יינעל.",
+     "art": "Brake lever pulsing with small vibration marks; tyre keeps rolling, ABS pictogram.",
+     "t0": 11,
+     "t1": 18,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "stat",
+     "text": "22%–31%",
+     "vo": "לפי המכון האמריקאי לבטיחות בדרכים, אופנועים עם ABS מעורבים בפחות תאונות קטלניות מאותם דגמים בלי ABS.",
+     "art": "Big range 22%–31% with label 'פחות תאונות קטלניות עם ABS'; source line.",
+     "src": [
+      {
+       "id": "iihs_abs",
+       "title": "IIHS, Teoh 2013: ABS and motorcycle fatal crash rates",
+       "url": "https://iihs.org/api/datastoredocument/bibliography/2042"
+      },
+      {
+       "id": "iihs_abs_2023",
+       "title": "IIHS–HLDI petition 2023: 22% lower fatal crash rates with ABS",
+       "url": "https://iihs-prod.iihs.org/media/00527cff-1631-40be-ae72-83c36b30fbac/2LbGtw/Petitions/petition_2023-11-09.pdf"
+      }
+     ],
+     "t0": 18,
+     "t1": 25
+    },
+    {
+     "dur": 9,
+     "kind": "diagram",
+     "text": "מתרגלים במגרש ריק",
+     "vo": "בלי ABS: לוחצים בהדרגה, וחזק יותר ככל שהמשקל עובר קדימה. ובכל מקרה, תרגלו עצירות חירום במגרש ריק, כדי שהידיים יידעו מה לעשות לפני שהראש מספיק לחשוב.",
+     "art": "Empty parking lot from above with cones; the bike stops shorter on each pass (three ghost bikes).",
+     "t0": 25,
+     "t1": 34,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 34,
+     "t1": 38,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "hurt",
+     "title": "Hurt Report, USC 1981 (webBikeWorld)",
+     "url": "https://www.webbikeworld.com/the-hurt-study/"
+    },
+    {
+     "id": "iihs_abs",
+     "title": "IIHS, Teoh 2013: ABS and motorcycle fatal crash rates",
+     "url": "https://iihs.org/api/datastoredocument/bibliography/2042"
+    },
+    {
+     "id": "iihs_abs_2023",
+     "title": "IIHS–HLDI petition 2023: 22% lower fatal crash rates with ABS",
+     "url": "https://iihs-prod.iihs.org/media/00527cff-1631-40be-ae72-83c36b30fbac/2LbGtw/Petitions/petition_2023-11-09.pdf"
+    }
+   ],
+   "app_tie": "",
+   "caption": "הטעות הנפוצה בבלימת חירום, ומה ABS באמת עושה 🛑 שלחו למי שקנה עכשיו אופנוע.",
+   "tags": [
+    "בלימה",
+    "ABS",
+    "רכיבהבטוחה",
+    "אופנוע",
+    "BlueRonin"
+   ],
+   "total": 38,
+   "vo_words": 101,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 5,
+   "slug": "animals-at-night",
+   "date": "2026-12-22",
+   "title": "בעלי חיים בלילה",
+   "hook": "חזיר בר לא מסתכל לצדדים",
+   "cta": "wa",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "חזיר בר\nלא מסתכל לצדדים",
+     "vo": "חזיר בר לא מסתכל לצדדים.",
+     "art": "Two eyes glint in a headlight beam at the edge of a dark road.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "כרמל · גליל · גולן",
+     "vo": "בכרמל, בגליל ובחיפה עצמה חזירי בר חוצים כבישים, בעיקר בחושך. ובגולן גם בקר עלול לעמוד על הכביש.",
+     "art": "Simple map of the north with small boar and cow pictograms on the Carmel, Galilee and Golan; a night road in front.",
+     "src": [
+      {
+       "id": "boar",
+       "title": "ישראל היום: רוכב אופנוע פגע בחזיר בר בחיפה",
+       "url": "https://www.israelhayom.co.il/news/local/article/12109231"
+      }
+     ],
+     "t0": 3,
+     "t1": 11
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "מחוץ לעיר בלילה: לאט יותר, אור גבוה",
+     "vo": "מחוץ לעיר בלילה: האטו, והשתמשו באור גבוה כשאין רכב ממול.",
+     "art": "Night road from above: the headlight cone lengthens when switched to high beam; speed arrow shrinks.",
+     "t0": 11,
+     "t1": 17,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "סורקים את השוליים",
+     "vo": "סרקו את השוליים, לא רק את הנתיב. השתקפות של עיניים בפנס היא הסימן הראשון.",
+     "art": "Scan arcs sweep left and right across the shoulders; two small reflections light up.",
+     "t0": 17,
+     "t1": 23,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "בולמים בקו ישר",
+     "vo": "אם יש חיה לפניכם: בלמו חזק בקו ישר, והסתכלו לכיוון שאליו אתם רוצים לעבור, לא על החיה.",
+     "art": "Bike braking straight, a dashed path showing the gaze line past the animal, not at it.",
+     "t0": 23,
+     "t1": 30,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "app",
+     "text": "שקיעה ומפגעים במצב רכיבה",
+     "vo": "במצב רכיבה Blue Ronin מזכיר מתי השמש שוקעת, ומפגעים שדווחו מופיעים על המפה.",
+     "art": "Screen capture: ride mode HUD with the sunset reminder message, map showing a hazard marker.",
+     "t0": 30,
+     "t1": 36,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 36,
+     "t1": 40,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "boar",
+     "title": "ישראל היום: רוכב אופנוע פגע בחזיר בר בחיפה",
+     "url": "https://www.israelhayom.co.il/news/local/article/12109231"
+    }
+   ],
+   "app_tie": "מצב רכיבה: תזכורת שקיעה, מפגעים במפה",
+   "caption": "רוכבים בצפון בלילה? כך נמנעים מפגישה עם חזיר בר 🐗",
+   "tags": [
+    "רכיבתלילה",
+    "חזירבר",
+    "צפון",
+    "אופנוע",
+    "BlueRonin"
+   ],
+   "total": 40,
+   "vo_words": 82,
+   "cta_text": "תדריך סופ״ש בוואטסאפ",
+   "cta_links": {
+    "ig": "blueronin.app/go?src=ig",
+    "tt": "blueronin.app/go?src=tt",
+    "yt": "blueronin.app/go?src=yt",
+    "fb": "blueronin.app/go?src=fb"
+   }
+  },
+  {
+   "n": 6,
+   "slug": "look-through-the-curve",
+   "date": "2026-12-29",
+   "title": "מבט מוביל בפניות",
+   "hook": "האופנוע הולך לאן שהעיניים הולכות",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "האופנוע הולך\nלאן שהעיניים הולכות",
+     "vo": "האופנוע הולך לאן שהעיניים הולכות.",
+     "art": "A helmet turns; the bike's path bends to follow the gaze line.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "stat",
+     "text": "38%",
+     "vo": "בעשור האחרון, 38 אחוז מרוכבי האופנוע שנהרגו בישראל נהרגו בתאונה עצמית, בלי רכב אחר.",
+     "art": "Big number 38% with 'מההרוגים: תאונה עצמית, בלי רכב נוסף'; source line.",
+     "src": [
+      {
+       "id": "ironi",
+       "title": "הרלב״ד: עלון מגמות 2025 (auto.co.il)",
+       "url": "https://www.auto.co.il/articles/car-news/local-news/road-safety-2025/"
+      }
+     ],
+     "t0": 3,
+     "t1": 10
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "מסתכלים על המעקה? מגיעים למעקה",
+     "vo": "כשמסתכלים על המכשול, הידיים מובילות אליו. זה נקרא קיבעון מבט.",
+     "art": "Curve from above: gaze line fixed on the guardrail, the bike drifts toward it (red).",
+     "t0": 10,
+     "t1": 16,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "לאט פנימה, מבט ליציאה",
+     "vo": "את ההאטה מסיימים לפני הפנייה. בתוך הפנייה מסובבים את הראש ומסתכלים לנקודה הכי רחוקה שרואים, לכיוון היציאה.",
+     "art": "Same curve: braking zone shaded before the entry; gaze line jumps to the exit; bike follows a clean arc (blue).",
+     "t0": 16,
+     "t1": 24,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "פנייה עיוורת: נשארים בחוץ",
+     "vo": "בפנייה שלא רואים את סופה, הישארו בצד החיצוני של הנתיב זמן ארוך יותר. כך רואים מוקדם יותר מה מחכה.",
+     "art": "Blind bend behind a rock wall: a wide line reveals an oncoming car earlier than a tight line does (two sight-line wedges).",
+     "t0": 24,
+     "t1": 31,
+     "src": []
+    },
+    {
+     "dur": 5,
+     "kind": "app",
+     "text": "התראה לפני קטע מפותל",
+     "vo": "Blue Ronin מתריע לפני קטע מפותל, כדי שתגיעו אליו כבר במהירות הנכונה.",
+     "art": "Screen capture: ride HUD with 'מפותל בעוד 0.5 ק״מ' message and the blue route line ahead.",
+     "t0": 31,
+     "t1": 36,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 36,
+     "t1": 40,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "ironi",
+     "title": "הרלב״ד: עלון מגמות 2025 (auto.co.il)",
+     "url": "https://www.auto.co.il/articles/car-news/local-news/road-safety-2025/"
+    }
+   ],
+   "app_tie": "מצב רכיבה: התראת פיתולים",
+   "caption": "קיבעון מבט: למה רוכבים מגיעים בדיוק למקום שממנו פחדו, ואיך מסתכלים נכון בפנייה 👁️",
+   "tags": [
+    "פניות",
+    "רכיבהבטוחה",
+    "אופנוע",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 40,
+   "vo_words": 83,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 7,
+   "slug": "two-minutes-before",
+   "date": "2027-01-05",
+   "title": "לפני שיוצאים",
+   "hook": "שתי דקות לפני שמתניעים",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "שתי דקות\nלפני שמתניעים",
+     "vo": "שתי דקות לפני שמתניעים.",
+     "art": "A stopwatch ring closes around the bike icon.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 9,
+     "kind": "diagram",
+     "text": "צמיגים · בלמים · אורות · שרשרת · דלק",
+     "vo": "לפני כל רכיבה: צמיגים, ידיות בלם שמרגישות נכון, פנס ואיתותים, שרשרת משומנת ומתוחה, ודלק לכל המסלול.",
+     "art": "Bike side view; five checkpoints light up in turn with a tick: tyres, brakes, lights, chain, fuel.",
+     "t0": 3,
+     "t1": 12,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "לחץ אוויר בודקים קר",
+     "vo": "את לחץ האוויר בודקים כשהצמיג קר, לפי המספרים של היצרן. צמיג חסר משנה את ההתנהגות בפניות.",
+     "art": "Tyre gauge on a cold tyre (snowflake), the target number from the manufacturer's sticker.",
+     "t0": 12,
+     "t1": 19,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "שמישהו יידע איפה אתם",
+     "vo": "ועוד בדיקה אחת שלא קשורה לאופנוע: שמישהו יידע לאן אתם רוכבים ומתי אתם אמורים לחזור.",
+     "art": "Phone pictogram sends a route and an ETA to a contact card.",
+     "t0": 19,
+     "t1": 26,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "app",
+     "text": "מיקום חי ואנשי קשר לחירום, בחינם",
+     "vo": "ב־Blue Ronin אפשר לשתף מיקום חי עם אנשי קשר לחירום, ותוכנית הדלק מחושבת לפי הדגם שלכם. כלי הבטיחות תמיד בחינם.",
+     "art": "Screen capture: emergency contacts and live location in 'שלי', then the fuel gauge for a chosen bike model.",
+     "t0": 26,
+     "t1": 34,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 34,
+     "t1": 38,
+     "src": []
+    }
+   ],
+   "sources": [],
+   "app_tie": "בטיחות (חינם): מיקום חי, מעגל חירום; תוכנית דלק",
+   "caption": "הבדיקה של שתי דקות שכל רוכב צריך לעשות לפני רכיבה ✅ שמרו לפעם הבאה.",
+   "tags": [
+    "לפנירכיבה",
+    "אופנוע",
+    "רכיבהבטוחה",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 38,
+   "vo_words": 77,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 8,
+   "slug": "sun-glare",
+   "date": "2027-01-12",
+   "title": "השמש בעיניים",
+   "hook": "השמש מסנוורת אתכם. היא מסנוורת גם אותו.",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "השמש מסנוורת אתכם.\nגם אותו.",
+     "vo": "השמש מסנוורת אתכם. היא מסנוורת גם אותו.",
+     "art": "Low sun flares behind a rider; an oncoming driver squints into it.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "שמש מאחוריכם = הנהג ממול לא רואה",
+     "vo": "בשעה הראשונה אחרי הזריחה ובשעה האחרונה לפני השקיעה, השמש נמוכה. כשהיא מאחוריכם, הנהגים שמולכם מסונוורים ולא רואים אתכם.",
+     "art": "Road from above with the sun low on one side; the oncoming car's view cone is washed white where the bike is.",
+     "t0": 3,
+     "t1": 11,
+     "src": []
+    },
+    {
+     "dur": 9,
+     "kind": "diagram",
+     "text": "שמש מלפנים: מאטים, משקף נקי",
+     "vo": "כשהשמש מולכם: האטו, הגדילו מרחק, והשתמשו בשמשייה הפנימית של הקסדה. משקף מלוכלך או שרוט מפזר את האור ומחמיר את הסנוור, אז נקו אותו לפני שיוצאים.",
+     "art": "Helmet with the inner sun visor dropping; a dirty visor scatters a star of light, a clean one does not.",
+     "t0": 11,
+     "t1": 20,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "כבישים ממזרח למערב, בוקר וערב",
+     "vo": "הכי קשה בכבישים שרצים ממזרח למערב: בבוקר כשנוסעים מזרחה, ובערב כשנוסעים מערבה.",
+     "art": "Compass and an east–west road; morning sun on the east end, evening sun on the west end, with two clock faces.",
+     "t0": 20,
+     "t1": 27,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "app",
+     "text": "מתי השמש בעיניים, לכל קטע",
+     "vo": "Blue Ronin מחשב לכל קטע במסלול מתי השמש תהיה בעיניים, לפי הכיוון והשעה, ועוזר לבחור שעת יציאה טובה יותר.",
+     "art": "Screen capture: ride plan with the sun-glare warnings per leg and the departure-time slider. Pro badge visible.",
+     "t0": 27,
+     "t1": 34,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 34,
+     "t1": 38,
+     "src": []
+    }
+   ],
+   "sources": [],
+   "app_tie": "Pro: סנוור שמש לפי דקה, סרגל שעת יציאה",
+   "caption": "רכיבה בזריחה ובשקיעה: מה רואה הנהג שמולכם, ואיך יוצאים בשעה הנכונה ☀️",
+   "tags": [
+    "סנוורשמש",
+    "רכיבהבטוחה",
+    "אופנוע",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 38,
+   "vo_words": 87,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 9,
+   "slug": "new-riders",
+   "date": "2027-01-19",
+   "title": "רוכבים חדשים",
+   "hook": "החודשים הראשונים הם המסוכנים ביותר",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "החודשים הראשונים\nהם המסוכנים ביותר",
+     "vo": "החודשים הראשונים על אופנוע הם המסוכנים ביותר.",
+     "art": "Calendar pages flip; the first months are tinted orange.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 8,
+     "kind": "stat",
+     "text": "מעל 50%",
+     "vo": "במחקר הקלאסי על תאונות אופנוע, ליותר ממחצית הרוכבים שנפגעו היו פחות מחמישה חודשים על האופנוע שעליו נפגעו, גם אם רכבו שנים לפני כן.",
+     "art": "Big 'מעל 50%' with 'פחות מ־5 חודשים על האופנוע הזה'; source line.",
+     "src": [
+      {
+       "id": "hurt",
+       "title": "Hurt Report, USC 1981 (webBikeWorld)",
+       "url": "https://www.webbikeworld.com/the-hurt-study/"
+      }
+     ],
+     "t0": 3,
+     "t1": 11
+    },
+    {
+     "dur": 8,
+     "kind": "stat",
+     "text": "1 מכל 3",
+     "vo": "ובישראל, בערך שליש מרוכבי האופנוע שנפגעו קשה ב־2025 רכבו בלי רישיון, או בלי רישיון שמתאים לכלי.",
+     "art": "Big '1 מכל 3' with 'נפגעו קשה ב־2025: בלי רישיון מתאים'; source line.",
+     "src": [
+      {
+       "id": "ironi",
+       "title": "הרלב״ד: עלון מגמות 2025 (auto.co.il)",
+       "url": "https://www.auto.co.il/articles/car-news/local-news/road-safety-2025/"
+      }
+     ],
+     "t0": 11,
+     "t1": 19
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "מתקדמים בשלבים",
+     "vo": "אופנוע חדש, גם לרוכב ותיק, דורש היכרות. התחילו בכבישים שקטים, הוסיפו מהירות ותנועה בהדרגה, ואל תיקחו נוסע עד שהאופנוע מרגיש כמו חלק מכם.",
+     "art": "Stair steps: empty lot → quiet road → traffic → highway → passenger, the bike icon climbing one step at a time.",
+     "t0": 19,
+     "t1": 27,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "קורס רכיבה מתקדם",
+     "vo": "קורס רכיבה מתקדם במגרש סגור מלמד בכמה שעות מה שהכביש מלמד בדרך הקשה.",
+     "art": "Training ground from above with cones and a figure-eight track.",
+     "t0": 27,
+     "t1": 33,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 33,
+     "t1": 37,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "hurt",
+     "title": "Hurt Report, USC 1981 (webBikeWorld)",
+     "url": "https://www.webbikeworld.com/the-hurt-study/"
+    },
+    {
+     "id": "ironi",
+     "title": "הרלב״ד: עלון מגמות 2025 (auto.co.il)",
+     "url": "https://www.auto.co.il/articles/car-news/local-news/road-safety-2025/"
+    }
+   ],
+   "app_tie": "",
+   "caption": "קניתם אופנוע חדש? למה החודשים הראשונים הם המסוכנים ביותר, ואיך עוברים אותם נכון 🏍️ תייגו מישהו שרק התחיל.",
+   "tags": [
+    "רוכבחדש",
+    "רישיוןאופנוע",
+    "אופנוע",
+    "רכיבהבטוחה",
+    "BlueRonin"
+   ],
+   "total": 37,
+   "vo_words": 88,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 10,
+   "slug": "traffic-and-shoulders",
+   "date": "2027-01-26",
+   "title": "פקקים ושוליים",
+   "hook": "בין הנתיבים, אף אחד לא מצפה לכם",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "בין הנתיבים,\nאף אחד לא מצפה לכם",
+     "vo": "בין הנתיבים, אף אחד לא מצפה לכם.",
+     "art": "Two lanes of stopped cars from above; a narrow gap between them.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "נהג שעובר נתיב מסתכל על מכוניות",
+     "vo": "בפקק, נהג שעובר נתיב מחפש מכוניות, לא את הרווח שביניהן. רכב שזז חצי מטר או דלת שנפתחת, וזה נגמר.",
+     "art": "A car noses sideways into the gap just as the bike arrives; a door swings open further ahead.",
+     "t0": 3,
+     "t1": 10,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "text",
+     "text": "השתחלות לא מוסדרת בחוק.\nבתאונה, האחריות עלולה להתחלק.",
+     "vo": "בישראל השתחלות בין נתיבים לא מוסדרת בחוק, וכשיש תאונה, בית המשפט עלול לקבוע שגם הרוכב התרשל.",
+     "art": "Clean text card with a small scales-of-justice pictogram.",
+     "src": [
+      {
+       "id": "lane_law",
+       "title": "וואלה רכב: השתחלות ואחריות בתאונה",
+       "url": "https://cars.walla.co.il/item/2954717"
+      }
+     ],
+     "t0": 10,
+     "t1": 17
+    },
+    {
+     "dur": 8,
+     "kind": "diagram",
+     "text": "אם בכל זאת: הפרש מהירות קטן",
+     "vo": "מי שבוחר לעבור בפקק: הפרש מהירות קטן מהתנועה, לא ליד מחלפים ויציאות, שם מכוניות קופצות בין נתיבים, ואצבעות על הבלם כל הזמן.",
+     "art": "Speed arrows: the bike's arrow only slightly longer than the cars'; an interchange area shaded red as a no-go.",
+     "t0": 17,
+     "t1": 25,
+     "src": []
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "השוליים הם לא נתיב",
+     "vo": "והשוליים הם לא נתיב. יש בהם חצץ, לכלוך ורכבים עומדים, ונהגים שיורדים אליהם בלי להסתכל במראה.",
+     "art": "Shoulder from above with gravel, debris and a parked car; a car drifts into it without signalling.",
+     "src": [
+      {
+       "id": "shoulder",
+       "title": "וואלה רכב: רכיבה בשוליים",
+       "url": "https://cars.walla.co.il/item/2728918"
+      }
+     ],
+     "t0": 25,
+     "t1": 31
+    },
+    {
+     "dur": 5,
+     "kind": "app",
+     "text": "עומסים בזמן אמת",
+     "vo": "Blue Ronin מראה עומסים בזמן אמת, כך שאפשר לבחור מסלול או שעה עם פחות פקקים.",
+     "art": "Screen capture: navigation tab with live traffic on the route and the ETA with traffic.",
+     "t0": 31,
+     "t1": 36,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 36,
+     "t1": 40,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "lane_law",
+     "title": "וואלה רכב: השתחלות ואחריות בתאונה",
+     "url": "https://cars.walla.co.il/item/2954717"
+    },
+    {
+     "id": "shoulder",
+     "title": "וואלה רכב: רכיבה בשוליים",
+     "url": "https://cars.walla.co.il/item/2728918"
+    }
+   ],
+   "app_tie": "ניווט: תנועה חיה וזמן הגעה",
+   "caption": "השתחלות בפקקים ורכיבה בשוליים: מה הסיכון האמיתי ומה אומר החוק 🚗🏍️",
+   "tags": [
+    "פקקים",
+    "השתחלות",
+    "אופנוע",
+    "רכיבהבטוחה",
+    "BlueRonin"
+   ],
+   "total": 40,
+   "vo_words": 101,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 11,
+   "slug": "group-riding",
+   "date": "2027-03-09",
+   "title": "רכיבה בקבוצה",
+   "hook": "בקבוצה, כל אחד רוכב לבד",
+   "cta": "join",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "בקבוצה,\nכל אחד רוכב לבד",
+     "vo": "בקבוצה, כל אחד רוכב לבד.",
+     "art": "A column of bike icons on a mountain road at golden hour.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 9,
+     "kind": "diagram",
+     "text": "מבנה מדורג בכביש ישר",
+     "vo": "בכביש ישר רוכבים במבנה מדורג: אחד בצד שמאל של הנתיב, הבא בצד ימין. שנייה מהרוכב שלפניכם באלכסון, ושתי שניות מהרוכב שבאותו צד.",
+     "art": "Lane from above, bikes staggered left-right; dashed lines label 1 s diagonal and 2 s same side.",
+     "t0": 3,
+     "t1": 12,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "בפניות: טור, כל אחד בקצב שלו",
+     "vo": "בפניות עוברים לטור יחיד, וכל אחד בוחר את הקצב והקו שלו. לא רודפים אחרי מי שלפניכם.",
+     "art": "Twisty road: bikes in single file, each with its own arc; a red 'chasing' arrow crossed out.",
+     "t0": 12,
+     "t1": 19,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "מוביל, סוגר ונקודת מפגש",
+     "vo": "קבעו מראש מי מוביל, מי סוגר, ואיפה מתכנסים אם הקבוצה מתפרקת. ככה אף אחד לא נלחץ להדביק פער.",
+     "art": "First and last bikes get small badges (מוביל, סוגר); a flag marks the meeting point ahead.",
+     "t0": 19,
+     "t1": 26,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "app",
+     "text": "רכיבה קבוצתית על מפה אחת",
+     "vo": "ברכיבה קבוצתית ב־Blue Ronin כולם רואים את כולם על המפה, יש נקודת מפגש, ו־SOS שמגיע לכל הקבוצה.",
+     "art": "Screen capture: group ride with member markers, the meeting point and the group SOS button.",
+     "t0": 26,
+     "t1": 33,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 33,
+     "t1": 37,
+     "src": []
+    }
+   ],
+   "sources": [],
+   "app_tie": "רכיבה קבוצתית: קוד הצטרפות, נקודת מפגש, SOS קבוצתי",
+   "caption": "איך רוכבים בקבוצה בלי ללחוץ אחד את השני: מבנה, תפקידים ונקודת מפגש 🏍️🏍️🏍️ נתראה ברכיבת ההשקה ב־13.3.",
+   "tags": [
+    "רכיבהקבוצתית",
+    "אופנוע",
+    "רכיבהבטוחה",
+    "אופנוענים",
+    "BlueRonin"
+   ],
+   "total": 37,
+   "vo_words": 84,
+   "cta_text": "רשימת ההמתנה להשקה",
+   "cta_links": {
+    "ig": "blueronin.app/join?src=ig",
+    "tt": "blueronin.app/join?src=tt",
+    "yt": "blueronin.app/join?src=yt",
+    "fb": "blueronin.app/join?src=fb"
+   }
+  },
+  {
+   "n": 12,
+   "slug": "heat-and-gear",
+   "date": "2027-04-27",
+   "title": "חום, שתייה וציוד",
+   "hook": "צמאים? כבר התחלתם להתייבש",
+   "cta": "wa",
+   "scenes": [
+    {
+     "dur": 3,
+     "kind": "title",
+     "text": "צמאים?\nכבר התחלתם להתייבש",
+     "vo": "צמאים? כבר התחלתם להתייבש.",
+     "art": "Heat haze over a desert road; a water drop icon drains.",
+     "t0": 0,
+     "t1": 3,
+     "src": []
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "רוח חמה מייבשת בלי שמרגישים",
+     "vo": "בחום, הרוח של הנסיעה מייבשת אתכם בלי שתרגישו. התייבשות פוגעת בריכוז ובזמן התגובה עוד לפני שמרגישים צמא.",
+     "art": "Rider with hot wind lines; a focus ring around the eyes slowly narrows.",
+     "src": [
+      {
+       "id": "heat",
+       "title": "Visordown: riding in hot weather",
+       "url": "https://www.visordown.com/news/general/6-ways-keep-cool-when-riding-your-motorbike-summer"
+      }
+     ],
+     "t0": 3,
+     "t1": 10
+    },
+    {
+     "dur": 7,
+     "kind": "diagram",
+     "text": "שותים לפי השעון",
+     "vo": "שתו לפני שיוצאים, ובחום כבד עצרו כל שעה עד שעה וחצי. חצי ליטר בכל עצירה.",
+     "art": "Timeline of the ride with water-bottle stops every 60–90 minutes.",
+     "src": [
+      {
+       "id": "hydr",
+       "title": "Legendary USA: hydration schedule",
+       "url": "https://legendaryusa.com/blogs/news/motorcycle-hydration-heat-summer-riding-guide"
+      }
+     ],
+     "t0": 10,
+     "t1": 17
+    },
+    {
+     "dur": 8,
+     "kind": "text",
+     "text": "החוק מחייב רק קסדה רכוסה.\nהחום לא סיבה לוותר על השאר.",
+     "vo": "בישראל החוק מחייב רק קסדה רכוסה, ובחום הרבה מוותרים על כל השאר. מעיל רשת עם מגנים, כפפות ומגפיים מגנים גם מהשמש, וגם כשנופלים.",
+     "art": "Mesh jacket with armour, summer gloves and boots, each with a small tick.",
+     "src": [
+      {
+       "id": "gear_law",
+       "title": "וואלה רכב: החוק מחייב רק קסדה רכוסה",
+       "url": "https://cars.walla.co.il/item/1838554"
+      }
+     ],
+     "t0": 17,
+     "t1": 25
+    },
+    {
+     "dur": 6,
+     "kind": "diagram",
+     "text": "כאב ראש · סחרחורת · התכווצויות = עוצרים",
+     "vo": "כאב ראש, סחרחורת או התכווצויות הם סימן לעצור בצל ולשתות, לא לדחוף עד היעד.",
+     "art": "Three warning icons, then a shaded stop with a tree and a bottle.",
+     "src": [
+      {
+       "id": "heat",
+       "title": "Visordown: riding in hot weather",
+       "url": "https://www.visordown.com/news/general/6-ways-keep-cool-when-riding-your-motorbike-summer"
+      }
+     ],
+     "t0": 25,
+     "t1": 31
+    },
+    {
+     "dur": 6,
+     "kind": "app",
+     "text": "הפסקה מומלצת ועצירות על המפה",
+     "vo": "תוכנית הרכיבה של Blue Ronin מציעה מתי לעצור להפסקה, והעצירות לאורך המסלול מסומנות על המפה.",
+     "art": "Screen capture: ride plan break suggestion and the stops tab (cafes, fuel, viewpoints).",
+     "t0": 31,
+     "t1": 37,
+     "src": []
+    },
+    {
+     "dur": 4,
+     "kind": "close",
+     "text": "הרונין לא ממהר.\nהוא חוזר הביתה.",
+     "vo": "הרונין לא ממהר. הוא חוזר הביתה.",
+     "art": "Ronin silhouette on the brand sun-and-road mark; slogan types in; channel handle @blueroninapp and the CTA line under it.",
+     "t0": 37,
+     "t1": 41,
+     "src": []
+    }
+   ],
+   "sources": [
+    {
+     "id": "heat",
+     "title": "Visordown: riding in hot weather",
+     "url": "https://www.visordown.com/news/general/6-ways-keep-cool-when-riding-your-motorbike-summer"
+    },
+    {
+     "id": "hydr",
+     "title": "Legendary USA: hydration schedule",
+     "url": "https://legendaryusa.com/blogs/news/motorcycle-hydration-heat-summer-riding-guide"
+    },
+    {
+     "id": "gear_law",
+     "title": "וואלה רכב: החוק מחייב רק קסדה רכוסה",
+     "url": "https://cars.walla.co.il/item/1838554"
+    }
+   ],
+   "app_tie": "Pro: הפסקה מומלצת; עצירות ודלק",
+   "caption": "רכיבה בחום הישראלי: כמה לשתות, מתי לעצור ולמה לא מוותרים על הציוד ☀️💧",
+   "tags": [
+    "רכיבהבקיץ",
+    "חום",
+    "ציודרכיבה",
+    "אופנוע",
+    "BlueRonin"
+   ],
+   "total": 41,
+   "vo_words": 94,
+   "cta_text": "תדריך סופ״ש בוואטסאפ",
+   "cta_links": {
+    "ig": "blueronin.app/go?src=ig",
+    "tt": "blueronin.app/go?src=tt",
+    "yt": "blueronin.app/go?src=yt",
+    "fb": "blueronin.app/go?src=fb"
+   }
+  }
+ ]
+}

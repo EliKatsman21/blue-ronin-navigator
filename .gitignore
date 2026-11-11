@@ -5,3 +5,4 @@ tests/playwright-report/
 media/renders/
 *.mp4
 *.mov
+__pycache__/

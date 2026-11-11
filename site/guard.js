@@ -5,7 +5,7 @@
    3. If the app did not finish starting, a recovery card offers "try again" and "repair" (clears the app's
       cached files, never the rider's data). */
 (() => {
-  const VER = "2.6.0", t0 = Date.now(), crumbs = [], sent = new Set(); let nSent = 0;
+  const VER = "2.7.0", t0 = Date.now(), crumbs = [], sent = new Set(); let nSent = 0;
   const G = window.BRG = { crumb: c => { crumbs.push(((Date.now() - t0) / 1000).toFixed(1) + "s " + String(c).slice(0, 50)); if (crumbs.length > 30) crumbs.shift(); }, booted: false, report };
   const sa = () => { try { return matchMedia("(display-mode: standalone)").matches || !!navigator.standalone; } catch (e) { return false; } };
   function report(kind, msg, src, line, stack) {

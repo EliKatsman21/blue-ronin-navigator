@@ -4,7 +4,7 @@ Source of truth for the project's state. Rules for working on the code are in `/
 `docs/WORKFLOW.md`. A copy of this file lives in the claude.ai Project as `claude/blue-ronin-navigator.md` and is
 refreshed at the end of every round.
 
-Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.6.0 (deployed 2026-11-10), SW shell v16.
+Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.7.0 (deployed 2026-11-11), SW shell v17.
 
 ## How it ships
 - Code: GitHub `EliKatsman21/blue-ronin-navigator` (public). Netlify site `blueronin-north-map` (id 4bff772c-…) builds production from `main` only; `netlify.toml` `ignore` skips every non-production build (since 2026-11-10).
@@ -20,6 +20,14 @@ Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" si
 - `netlify/functions/`: `osm*`, `fuel`, `brief*`, `vapid`, `subscribe`, `test-push`, `config`, `traffic` (HERE), `traffic-tile` (retired, 410), `wx` (weather proxy), `health-scan` (every 30 min), `photos`, `admin`, `content`, `feedback`, `ping`, `pro`, `live`, `sos`, `group`, `xfer`, `errlog`, `geo`. Shared: `lib/admin.mjs`, `lib/push.mjs`, `lib/pro.mjs`, `lib/safety.mjs`, `lib/ops.mjs` (ops log + usage counters, store `brn-ops`), `lib/health.mjs` (scanner + playbook + admin alerts), `lib/osm.mjs`, `lib/brief.mjs`.
 - `tests/`, `scripts/`, `docs/`, `media/`, `.github/`: see `CLAUDE.md`.
 - Tabs: ניווט · סופ״ש (the former תדריך שבת) · מסלול · עצירות ודלק · שלי · כלים. Opening tab: a #hash wins; else סופ״ש on Fri/Sat and ניווט Sun–Thu.
+
+## Release 2.7.0 (2026-11-11)
+From Eli's first real ride with everyday navigation, plus the launch pages.
+- Reroute loop fixed. Root cause: `nearestOn` measured the distance to the nearest route *vertex*. OSRM leaves vertices hundreds of metres apart on straight roads, so a rider exactly on the road read as 250 m+ "off route", rerouted, and did it again every few fixes ("מחשב מסלול מחדש" over and over). Now `L.nearestOnLine` projects onto the segments (km along the route is interpolated too), and `L.offRoute` decides with hysteresis: threshold from the fix's accuracy (65 m at 20 m accuracy, 50–200 m), 3 off fixes spanning ≥ 6 s, 25 s cooldown after a reroute, never while standing. The voice says it at most once per 2 minutes; a failed reroute waits for the cooldown and shows one note instead of retrying every fix. Unit tests in `tests/unit/ride.test.mjs`.
+- Ride guide line: source `br-guide` (lineMetrics) with layers `br-guide-casing` + `br-guide`: a thick blue line (white casing on the dark map, navy on light) for the route ahead, the ridden part faded through `line-gradient` updated per fix. While riding, the chapter line, curve colours and glare step aside (`GUIDE_HIDE`), restored with the rider's layer choices after. The line follows reroutes (it used to keep showing the old route).
+- Ride board: speed uses the body face (the display face drew 0 as a slotted bar). New `#hudArr` tile (arrival time, km and minutes left). Landscape phone: speed and arrival tiles side by side, card as tall as its content (`bottom:auto`), "מפה" = tiles + destination + full-width SOS, turn card never runs under the board, map padding measured from the real card. Portrait: arrival line `הגעה 18:32 · 76 ק״מ · 52 דק׳` in larger type. Orientation: `screen.orientation` change too, `map.resize()`, the map credits fold into (i) on ride start and rotation. E2E `tests/e2e/ridehud.spec.mjs` checks the landscape layout in all three sizes.
+- Search: `L.normQuery` (one quote style, ת"א/פ"ת/ב"ש/ר"ג/ראשל"צ/י-ם spelled out, "רחוב/רח'" dropped). `/api/geo` calls HERE geocode next to autosuggest when the text has a number (exact house numbers first, 2 calls count against `HERE_GEO_CAP`). Client: Photon results keep the house number, OSM hits are dropped only when they are the same place (40 m, or same name within 150 m), Nominatim is asked when an address query still has < 2 results. The home/work example no longer shows a real address.
+- Released here: `/join`, `/go`, the "נשארים בקשר" card, now with TikTok and Facebook (see the section below).
 
 ## Release 2.6.0 (2026-11-10)
 - Address search: `/api/geo` (HERE Geocoding & Search autosuggest, `in=countryCode:ISR`, Hebrew) finds house numbers, commercial centres and businesses; runs in parallel with Photon/Nominatim, HERE first, OSM duplicates within 150 m dropped. Queries are not logged or stored. Budget `HERE_GEO_CAP` (default 9,000/month, counter `heregeo`), health check "geo", admin usage meter.
@@ -85,20 +93,20 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 
 ## Marketing and launch (plan written 2026-11-11)
 - Plan doc (Hebrew, editable): https://claude.ai/artifact/6V7PFQk33MePZ75pyptWf1 . HQ items g00–g33 (area "שיווק"). Pre-registration on Play stays locked until the closed test passes, so the waitlist lives on blueronin.app.
-- Channels (handle `blueroninapp` everywhere; blueronin.app was taken on one platform): YouTube @blueroninapp and Instagram blueroninapp (the existing channels, renamed 2026-11-11; Instagram is a business account), WhatsApp channel "Blue Ronin · תדריך סופ״ש" https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m (opened 2026-11-11). TikTok and a Facebook Page: Eli opens them with the guides in the plan doc.
+- Channels (handle `blueroninapp` everywhere; blueronin.app was taken on one platform): YouTube @blueroninapp and Instagram blueroninapp (the existing channels, renamed 2026-11-11; Instagram is a business account), WhatsApp channel "Blue Ronin · תדריך סופ״ש" https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m (opened 2026-11-11). TikTok https://www.tiktok.com/@blueroninapp (personal account: switching to business asks for company registration documents, so it waits for the עוסק, HQ m03) and Facebook Page https://www.facebook.com/blueroninapp/ (opened 2026-11-11, linked to Instagram in Meta Business Suite, website set). New logo, banners and bios on all channels; YouTube channel keywords set.
 - Slogan: "כל הארץ. שני גלגלים. דרך אחת." Brand line: "הרונין לא ממהר. הוא חוזר הביתה."
 - Logo on every channel = the app icon (sun + road), drawn by `media/brand/build.py`. The old rider/R9 logo is retired.
 - Eli stays anonymous for now; he will appear as the founder once the product is stable (his call, 2026-11-11).
 - Old riding videos that show fast or risky riding go Private, not deleted. Footage policy checklist in the plan doc.
 - Engines: weekly brief on WhatsApp (Thu 18:00), 3D chapter fly-throughs as Reels/TikTok/Shorts, "12 הרונינים" closed-test campaign (recruit 20), waitlist with referrals, 6-chapter countdown from 2027-02-01, launch ride on chapter 1 on Sat 2027-03-13, store launch about 2027-03-15.
-- Bio links: Instagram `blueronin.app/go?src=ig`, YouTube `?src=yt`, WhatsApp `?src=wa`, TikTok `?src=tt`, Facebook `?src=fb` (after the release that ships `/go`; until then plain blueronin.app).
+- Bio links: Instagram `blueronin.app/go?src=ig`, YouTube `?src=yt`, WhatsApp `?src=wa`, TikTok `?src=tt`, Facebook `?src=fb` (live from 2.7.0).
 
-## On `dev`, not released yet (2026-11-11, issue #12)
+## Waitlist and link hub (released in 2.7.0, issue #12)
 - `/join` (`site/join.html` + `join.js`): launch waitlist. Email, optional name, consent checkbox, honeypot. After signup the rider gets a personal link `blueronin.app/join?r=CODE`; 3 friends who join through it = one month of Pro at launch (granted by hand with admin Pro codes). The code is remembered on the device (`brn:join` in LS) so a return visit shows progress.
 - `/go` (`site/go.html` + `go.js`): one link for every social bio (waitlist, app, WhatsApp channel, Instagram, YouTube). `?src=ig|yt|wa|tt|fb|qr|press` counts a visit per channel (ops counter `go:<src>`, a number only) and carries the source into `/join`.
 - `/api/join` (`netlify/functions/join.mjs`, rules in `lib/join-core.mjs`, storage in `lib/join.mjs`, store `brn-join`): one blob per signup, throttled 5/hour per hashed IP. Admin: view "המתנה" (totals, per-channel visits and signups, list, CSV, copy emails, delete one) via `GET join` / `POST join/delete`.
 - Privacy policy: two new rows (waitlist email, link-hub counter) and how to be removed. Needs the lawyer's eye with the rest (HQ s03).
-- App, tools tab: card "נשארים בקשר" (WhatsApp channel, waitlist, Instagram, YouTube).
+- App, tools tab: card "נשארים בקשר" (WhatsApp channel, waitlist, Instagram, YouTube, TikTok, Facebook). `/go` has all five channels.
 - `site/icons/og.jpg`: 1200x630 link preview for the two pages. `media/brand/build.py` draws the profile pictures, banners and og image as vectors from the app icon.
 - Tests: unit (waitlist rules, landing pages have no inline scripts) and e2e `landing.spec.mjs`.
 - Netlify serves `/join` and `/go` from `join.html` / `go.html` (pretty URLs). Verify both on the live site after the release, and one real signup end to end.

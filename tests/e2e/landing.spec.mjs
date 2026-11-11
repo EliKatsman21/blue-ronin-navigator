@@ -30,6 +30,8 @@ test("join: a successful signup shows the personal link", async ({ page, pageErr
 test("go: links carry the channel", async ({ page, pageErrors }) => {
   await page.goto("/go.html?src=yt");
   await expect(page.locator("#gJoin")).toHaveAttribute("href", "join?src=yt");
-  await expect(page.locator("a.btn")).toHaveCount(5);
+  await expect(page.locator("a.btn")).toHaveCount(7);
+  for (const u of ["whatsapp.com/channel/", "instagram.com/blueroninapp", "youtube.com/@blueroninapp", "tiktok.com/@blueroninapp", "facebook.com/blueroninapp"])
+    await expect(page.locator(`a.btn[href*="${u}"]`), u).toHaveCount(1);
   expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
 });

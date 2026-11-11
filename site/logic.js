@@ -14,6 +14,48 @@
   }
   const angDiff = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
 
+  /* Distance from a point to the route LINE, not to its vertices. OSRM puts vertices hundreds of metres apart on
+     straight roads, so the nearest vertex can be far from a rider who is exactly on the road (that read as "off
+     route" and triggered reroute after reroute). Searches a window around the last index first, then the whole
+     line. Returns { i, km, d }: i = start of the nearest segment, km = distance along the route at the projected
+     point, d = km from the line. Local flat projection: exact enough at these distances. */
+  function nearestOnLine(c, cum, idx, p, back = 150, ahead = 2500) {
+    const n = c.length; if (!n) return { i: 0, km: 0, d: 1e9 }; if (n < 2) return { i: 0, km: 0, d: hav(c[0], p) };
+    const kx = 111.32 * Math.cos(p[1] * Math.PI / 180), ky = 110.57;
+    const scan = (a, z, b) => {
+      for (let i = a; i < z; i++) {
+        const ax = (c[i][0] - p[0]) * kx, ay = (c[i][1] - p[1]) * ky, dx = (c[i + 1][0] - c[i][0]) * kx, dy = (c[i + 1][1] - c[i][1]) * ky, l2 = dx * dx + dy * dy;
+        let t = l2 > 0 ? -(ax * dx + ay * dy) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const qx = ax + t * dx, qy = ay + t * dy, d = Math.sqrt(qx * qx + qy * qy); if (d < b.d) { b.d = d; b.i = i; b.t = t; }
+      }
+      return b;
+    };
+    const k = Math.max(0, Math.min(n - 2, idx | 0));
+    let b = scan(Math.max(0, k - back), Math.min(n - 1, k + ahead), { d: 1e9, i: k, t: 0 });
+    if (b.d > 0.4) b = scan(0, n - 1, { d: 1e9, i: k, t: 0 });
+    return { i: b.i, km: cum[b.i] + (cum[b.i + 1] - cum[b.i]) * b.t, d: b.d };
+  }
+  /* Off-route decision with hysteresis, so GPS jitter never triggers a reroute: the threshold grows with the fix's
+     reported accuracy (65 m at 20 m accuracy, capped at 200 m), it takes 3 off fixes in a row spanning at least
+     6 s, and never within 25 s of the previous reroute. `s` is the ride's state object: { n, since, lastAt }. */
+  function offThreshold(accM) { return Math.max(0.05, Math.min(0.2, 0.035 + (accM > 0 ? accM : 20) * 1.5 / 1000)); }
+  function offRoute(s, d, accM, now, moving) {
+    if (!moving || d <= offThreshold(accM)) { s.n = 0; s.since = 0; return false; }
+    s.n = (s.n || 0) + 1; if (!s.since) s.since = now;
+    return s.n >= 3 && now - s.since >= 6000 && now - (s.lastAt || 0) >= 25000;
+  }
+  /* Search text as Israelis type it, made readable for the geocoders: one kind of quote mark, common city
+     abbreviations spelled out (ת"א, פ"ת, ב"ש…), the "רחוב/רח'" prefix dropped, spaces collapsed. */
+  const ABBR = [[/(^|[\s,])ת"?א(?:-?יפו)?(?=$|[\s,])/g, "$1תל אביב"], [/(^|[\s,])פ"ת(?=$|[\s,])/g, "$1פתח תקווה"], [/(^|[\s,])ב"ש(?=$|[\s,])/g, "$1באר שבע"],
+    [/(^|[\s,])ר"ג(?=$|[\s,])/g, "$1רמת גן"], [/(^|[\s,])ראשל"צ(?=$|[\s,])/g, "$1ראשון לציון"], [/(^|[\s,])רמה"ש(?=$|[\s,])/g, "$1רמת השרון"],
+    [/(^|[\s,])ק"ש(?=$|[\s,])/g, "$1קריית שמונה"], [/(^|[\s,])י-?ם(?=$|[\s,])/g, "$1ירושלים"], [/(^|[\s,])תל-אביב/g, "$1תל אביב"]];
+  function normQuery(q) {
+    let t = String(q || "").replace(/[\u05F4\u201C\u201D\u201E]/g, '"').replace(/[\u05F3\u2018\u2019`]/g, "'").replace(/\u05BE/g, " ").replace(/\s+/g, " ").trim();
+    t = t.replace(/^(רחוב|רח'|רח\.?|רח)\s+/, "").replace(/(^|\s)שד'\s*/g, "$1שדרות ");
+    for (const [re, to] of ABBR) t = t.replace(re, to);
+    return t.replace(/\s+/g, " ").trim();
+  }
+  const looksLikeAddress = q => /\d/.test(q) && /[\u0590-\u05FFA-Za-z]{2}/.test(q);
   function cumulative(c) { const out = [0]; for (let i = 1; i < c.length; i++) out.push(out[i - 1] + hav(c[i - 1], c[i])); return out; }
 
   function pointAt(c, cum, km) {
@@ -349,5 +391,5 @@
     return { pts: sm, head, step: st, km: L, n };
   }
 
-  g.BRL = { burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  g.BRL = { normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

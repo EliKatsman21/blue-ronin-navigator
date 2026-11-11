@@ -4,7 +4,7 @@
   const { CHAPTERS, CAFES, ENF, NORTH_BOUNDS, CENTER_BOUNDS, REGIONS, LIVE_BOARD } = window.BRD;
   const GL = window.BR_GREENLINE || null;
   const BUILT_IN = CHAPTERS.length;
-  const APP_VER = "2.6.0";
+  const APP_VER = "2.7.0";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -454,6 +454,7 @@
 
   /* ================= notifications center ================= */
   const CHANGELOG = [
+    { v: "2.7.0", d: "2026-11-11", items: ["מצב רכיבה: המסלול מסומן בקו כחול עבה ובולט, והקטע שכבר עברתם מתעמעם", "תוקן: ״מחשב מסלול מחדש״ חזר שוב ושוב כשהייתם על המסלול. עכשיו מודדים מרחק מהכביש עצמו, ומחשבים מחדש רק אחרי סטייה אמיתית", "טלפון לרוחב: מהירות ושעת הגעה גדולות זו לצד זו, והלוח בגובה התוכן בלבד (גם ב״מפה״), בשני צדי הסיבוב", "שעת ההגעה, הקילומטרים והדקות שנותרו בולטים יותר גם לאורך", "חיפוש כתובות: יותר כתובות נמצאות, כולל קיצורים כמו ת״א, ב״ש ופ״ת", "רשימת המתנה להשקה עם קישור אישי: 3 חברים מצטרפים, חודש Pro במתנה", "נשארים בקשר: וואטסאפ, אינסטגרם, יוטיוב, טיקטוק ופייסבוק בלשונית כלים"] },
     { v: "2.6.0", d: "2026-11-10", items: ["חיפוש כתובות מדויק עד מספר הבית, כולל מרכזים מסחריים ועסקים", "זמן הגעה מדויק יותר: התנועה החיה נמדדת רק בכיוון הנסיעה שלכם", "״עזרה בדרך״: מוסכי אופנועים קרובים עם חיוג וניווט, ומספר הגרר של הביטוח במקום אחד. המוסכים מופיעים גם על המפה", "בית ועבודה: עריכה, החלפה והסרה בלחיצה על העיפרון", "מצב רכיבה: אופנוע שזז בצורה חלקה על המפה, ותצוגה שמתאימה את עצמה כשמסובבים את הטלפון", "סיכום רכיבה עם המהירות המרבית", "סופ״ש: היציאה מחושבת מהמיקום שלכם, והתזכורת ליומן תמיד לשישי הקרוב", "מפה נקייה יותר: תחנות, בתי קפה, תצפיות ומצלמות מופיעים כשמתקרבים לאזור", "״במפה״ ברכיבה שמורה מציג רק את הרכיבה, בלי שכבות", "כפתור הבית מציג תמיד את כל הארץ", "Pro: בחירת מסלול אחד בכל פעם, ולחיצה נוספת מבטלת", "טקסט המשוב נשמר גם כשעוברים לשונית"] },
     { v: "2.5.0", d: "2026-11-08", items: ["ניווט יומיומי בכל הארץ: לשונית ״ניווט״ עם חיפוש יעד (גם בקול), בית, עבודה ויעדים אחרונים, זמן הגעה עם תנועה חיה ומזג האוויר ביעד", "לשונית ״סופ״ש״ לתכנון רכיבת סוף שבוע: התדריך, הפרקים והתוכנית, כמו שהיו", "Blue Ronin · ישראל: האפליקציה לכל רוכבי הדו־גלגלי בארץ", "קישור למסלול נפתח ישר על המסלול, נשמר אצלכם ומסומן ״משיתוף״", "פרק 6 קוצר: בלי הקטע הלוך־חזור לים המלח, כדי שהדלק יספיק לכל הלולאה"] },
     { v: "2.4.0", d: "2026-11-07", items: ["תוכנית הרכיבה (Pro): בוחרים שעת יציאה ורואים מתי מגיעים לכל עצירה, מה מזג האוויר שם באותה שעה, כמה קר ברכיבה, מתי השמש בעיניים, איפה לעצור להפסקה ומה ללבוש", "תנועה חיה בישראל: כבישים איטיים וסגורים על המפה, ותאונות וחסימות על המסלול", "מצב רכיבה: שלושה גדלים ללוח (מלא, מצומצם, מפה), תוויות לכל כפתור, וכפתורי המפה תמיד מעל הלוח", "הדגמה של שחזור 3D בלשונית ״שלי״, עוד לפני הרכיבה הראשונה", "במפה נפתח חלון מידע אחד בכל פעם", "הכתובת הקודמת מעבירה אוטומטית ל־blueronin.app"] },
@@ -573,6 +574,12 @@
     if (!map.getSource("br-fuelline")) map.addSource("br-fuelline", { type: "geojson", lineMetrics: true, data: FC() });
     map.addLayer({ id: "br-fuelline", type: "line", source: "br-fuelline", layout: { "line-cap": "round", "line-join": "round", visibility: "none" }, paint: { "line-width": ["interpolate", ["linear"], ["zoom"], 7, 4, 13, 8], "line-color": c("--go") } }, sym);
     map.addLayer({ id: "br-fly", type: "line", source: "br-fly", paint: { "line-color": "#fff", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 14, 5], "line-opacity": 0.85, "line-blur": 0.5 }, layout: { "line-cap": "round", "line-join": "round" } });
+    /* ride-mode guide line: the route still ahead, bold and bright, over a contrasting casing; the part already
+       ridden fades out. Shown only while riding (the chapter line and curve colours step aside). */
+    if (!map.getSource("br-guide")) map.addSource("br-guide", { type: "geojson", lineMetrics: true, data: FC() });
+    map.addLayer({ id: "br-guide-casing", type: "line", source: "br-guide", layout: { visibility: "none", "line-cap": "round", "line-join": "round" }, paint: { "line-width": ["interpolate", ["exponential", 1.4], ["zoom"], 9, 7, 13, 12, 16, 20, 18, 30], "line-gradient": guideGrad(0, true) } }, sym);
+    map.addLayer({ id: "br-guide", type: "line", source: "br-guide", layout: { visibility: "none", "line-cap": "round", "line-join": "round" }, paint: { "line-width": ["interpolate", ["exponential", 1.4], ["zoom"], 9, 4, 13, 7.5, 16, 13, 18, 20], "line-gradient": guideGrad(0, false) } }, sym);
+    if (st.ride) guideShow(st.ride.G);
     map.addLayer({ id: "br-ride-casing", type: "line", source: "br-ride", paint: { "line-color": c("--bg"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 9] }, layout: { "line-cap": "round", "line-join": "round" } });
     map.addLayer({ id: "br-ride", type: "line", source: "br-ride", paint: { "line-color": c("--sun"), "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5] }, layout: { "line-cap": "round", "line-join": "round" } });
     map.addLayer({ id: "br-walk", type: "line", source: "br-walk", paint: { "line-color": c("--accent"), "line-width": 4, "line-dasharray": [1, 1.6] }, layout: { "line-cap": "round" } });
@@ -624,9 +631,38 @@
     for (const k in LAYER_MAP) LAYER_MAP[k].forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", st.layers[k] ? "visible" : "none"); });
     if (map.getLayer("br-route-solid")) map.setLayoutProperty("br-route-solid", "visibility", st.layers.curves ? "none" : "visible");
     if (map.getLayer("br-fuelline")) map.setLayoutProperty("br-fuelline", "visibility", st.layers.fuelline && !st.fly ? "visible" : "none");
+    if (st.ride && map.getLayer("br-guide")) GUIDE_HIDE.forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", "none"));
     renderMarkers();
   }
   function setSrc(id, data) { const s = map.getSource(id); if (s) s.setData(data); }
+  /* ---------- ride guide line ---------- */
+  const GUIDE_HIDE = ["br-route-dim", "br-route-casing", "br-route-solid", "br-curves", "br-glare"];
+  function guideGrad(f, casing) {
+    const dk = isDark(), ahead = casing ? (dk ? "rgba(236,242,252,0.95)" : "rgba(10,38,96,0.92)") : (dk ? "#4F8BFF" : "#1E5BFF");
+    const done = casing ? (dk ? "rgba(236,242,252,0.18)" : "rgba(10,38,96,0.18)") : (dk ? "rgba(140,157,179,0.55)" : "rgba(86,104,122,0.5)");
+    const x = Math.max(0.0002, Math.min(0.9997, f || 0));
+    return ["interpolate", ["linear"], ["line-progress"], 0, done, x, done, x + 0.0002, ahead, 1, ahead];
+  }
+  function guideShow(G) {
+    if (!map.getSource("br-guide") || !G) return;
+    setSrc("br-guide", FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: G.coords } }])); G.gf = -1;
+    ["br-guide-casing", "br-guide"].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", "visible"));
+    GUIDE_HIDE.forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", "none"));
+    guideProgress(G, G.cum[G.idx] || 0);
+  }
+  function guideProgress(G, km) {
+    if (!map.getLayer("br-guide")) return; const tot = G.cum[G.cum.length - 1] || 1, f = Math.max(0, Math.min(1, km / tot));
+    if (Math.abs(f - (G.gf ?? -1)) < 0.0015) return; G.gf = f;
+    try { map.setPaintProperty("br-guide-casing", "line-gradient", guideGrad(f, true)); map.setPaintProperty("br-guide", "line-gradient", guideGrad(f, false)); } catch (e) { }
+  }
+  function guideHide() {
+    if (!map.getSource("br-guide")) return; setSrc("br-guide", FC());
+    ["br-guide-casing", "br-guide"].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", "none"));
+    ["br-route-dim", "br-route-casing"].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", "visible"));
+    applyLayerVis();
+  }
+  /* the map's credits fold into the (i) button during a ride, so they never cover the ride buttons */
+  function foldAttrib() { document.querySelectorAll(".maplibregl-ctrl-attrib.maplibregl-compact-show").forEach(x => x.classList.remove("maplibregl-compact-show")); }
   function pushSources() {
     if (!map.getSource("br-route")) return;
     setSrc("br-route", FC(CHAPTERS.filter(c => st.routes[c.id] && (!c.hidden || c.id === st.chap) && (!c.combo || c.id === st.chap) && (c.region === chap().region || c.id === st.chap)).map(c => ({ type: "Feature", properties: { chap: c.id, active: c.id === st.chap }, geometry: { type: "LineString", coordinates: st.routes[c.id].coords } }))));
@@ -1500,22 +1536,35 @@
   /* Search: HERE (exact addresses with house numbers, businesses, junctions) and OSM/Photon (outdoor places,
      viewpoints) in parallel; HERE first, duplicates within 150 m dropped. Either one alone is enough. */
   async function remoteSearch(q, near) {
+    q = L.normQuery(q);
     const ctl = new AbortController(); remoteSearch.ctl && remoteSearch.ctl.abort(); remoteSearch.ctl = ctl;
     const c = near ? { lat: near.lat, lng: near.lon } : map.getCenter();
     const here = st.cfg.geo ? fetch(`/api/geo?q=${encodeURIComponent(q)}&at=${c.lat.toFixed(3)},${c.lng.toFixed(3)}`, { signal: ctl.signal }).then(r => r.ok ? r.json() : { items: [] }).then(j => j.items || []).catch(e => { if (e.name === "AbortError") throw e; return []; }) : Promise.resolve([]);
     const osm = remoteSearchOsm(q, c, ctl).catch(e => { if (e.name === "AbortError") throw e; return []; });
     const [a, b] = await Promise.all([here, osm]);
-    return a.concat(b.filter(x => !a.some(y => L.hav([x.lon, x.lat], [y.lon, y.lat]) < 0.15))).slice(0, 10);
+    /* an OSM hit is dropped only when it is the same place: within 40 m, or the same name within 150 m (two house
+       numbers on one street are both kept) */
+    const same = (x, y) => { const d = L.hav([x.lon, x.lat], [y.lon, y.lat]); return d < 0.04 || (d < 0.15 && x.name === y.name); };
+    let out = a.concat(b.filter(x => !a.some(y => same(x, y))));
+    /* an address nobody found yet: one more try with Nominatim before saying "not found" */
+    if (out.length < 2 && L.looksLikeAddress(q) && st.cfg.geo) { const nm = await osmNominatim(q, ctl); out = out.concat(nm.filter(x => !out.some(y => same(x, y)))); }
+    return out.slice(0, 10);
   }
+  /* OSM side: Photon (fast, outdoor places), and for address-looking text Nominatim too, which knows house numbers
+     Photon sometimes lacks. A Photon failure falls back to Nominatim. */
   async function remoteSearchOsm(q, c, ctl) {
-    try {
-      const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=34.2,29.4,35.95,33.45`, { signal: ctl.signal });
-      const j = await r.json();
-      return j.features.map(f => { const p = f.properties; const [lon, lat] = f.geometry.coordinates; const sub = [p.street, p.city || p.county, p.state].filter(Boolean).join(", "); return { name: p.name || p.street || p.city, sub, lat, lon, k: p.osm_value === "fuel" ? "דלק" : p.osm_key === "highway" ? "כביש" : p.osm_key === "place" ? "יישוב" : "מקום" }; }).filter(x => x.name);
-    } catch (e) {
-      if (e.name === "AbortError") throw e;
-      try { const j = await (await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&countrycodes=il,ps&accept-language=he&limit=8`, { signal: ctl.signal })).json(); return j.map(x => ({ name: x.name || x.display_name.split(",")[0], sub: x.display_name.split(",").slice(1, 3).join(","), lat: +x.lat, lon: +x.lon, k: "מקום" })); } catch (e2) { return []; }
-    }
+    if (L.looksLikeAddress(q) && !st.cfg.geo) { const [ph, nm] = await Promise.all([osmPhoton(q, c, ctl).catch(e => { if (e.name === "AbortError") throw e; return []; }), osmNominatim(q, ctl)]); return nm.concat(ph.filter(x => !nm.some(y => L.hav([x.lon, x.lat], [y.lon, y.lat]) < 0.04))); }
+    return osmPhoton(q, c, ctl).catch(e => { if (e.name === "AbortError") throw e; return osmNominatim(q, ctl); });
+  }
+  async function osmPhoton(q, c, ctl) {
+    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=34.2,29.4,35.95,33.45`, { signal: ctl.signal });
+    const j = await r.json();
+    return j.features.map(f => { const p = f.properties; const [lon, lat] = f.geometry.coordinates; const street = p.street ? p.street + (p.housenumber ? " " + p.housenumber : "") : ""; const sub = [p.name && street, p.city || p.county, p.state].filter(Boolean).join(", "); return { name: p.name || street || p.city, sub, lat, lon, k: p.housenumber && !p.name ? "כתובת" : p.osm_value === "fuel" ? "דלק" : p.osm_key === "highway" ? "כביש" : p.osm_key === "place" ? "יישוב" : "מקום" }; }).filter(x => x.name);
+  }
+  function osmNominatim(q, ctl) {
+    return fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&countrycodes=il,ps&accept-language=he&limit=6`, { signal: ctl.signal }).then(r => r.json())
+      .then(j => j.map(x => ({ name: x.name || x.display_name.split(",").slice(0, 2).join(" ").trim(), sub: x.display_name.split(",").slice(1, 3).join(","), lat: +x.lat, lon: +x.lon, k: x.addresstype === "building" || x.type === "house" ? "כתובת" : "מקום" })))
+      .catch(e => { if (e.name === "AbortError") throw e; return []; });
   }
   function refreshResults() { const el = $("bbRes"); if (el) { el.innerHTML = resultsHtml(); el.querySelectorAll("[data-add]").forEach(x => x.onclick = () => { const r = st.build.results[+x.dataset.add]; addPoint(r.name, r.lat, r.lon); }); } }
   function addPoint(name, lat, lon) {
@@ -1709,7 +1758,7 @@
     const HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>', WORK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>', FUEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12M4 10h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3"/></svg>';
     let h = `<div class="go"><div class="gohead"><h2>לאן רוכבים?</h2><span class="small muted">ניווט לאופנוע ולקטנוע בכל הארץ, עם תנועה חיה ומזג אוויר בדרך</span></div>
       ${NAVQ.setFor ? `<div class="setfor"><span>בוחרים כתובת ${NAVQ.setFor === "home" ? "לבית" : "לעבודה"}: חפשו ובחרו מהרשימה</span><button type="button" class="linkbtn" id="setCancel">ביטול</button></div>` : ""}
-      <div class="search"><input id="goQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="${NAVQ.setFor ? "הכתובת המלאה, למשל: המרגנית 42 יקנעם עילית" : "כתובת, מקום, יישוב או צומת"}" value="${esc(NAVQ.q)}" aria-label="חיפוש יעד"><div class="sres" id="goRes">${navResultsHtml()}</div></div>
+      <div class="search"><input id="goQ" type="search" enterkeyhint="search" autocomplete="off" placeholder="${NAVQ.setFor ? "הכתובת המלאה, למשל: שדרות רוטשילד 1, תל אביב" : "כתובת, מקום, יישוב או צומת"}" value="${esc(NAVQ.q)}" aria-label="חיפוש יעד"><div class="sres" id="goRes">${navResultsHtml()}</div></div>
       ${navTripCard()}
       <div class="gquick">${qb("gqHome", HOME, "הביתה", P.home ? esc(P.home.name) : "לחצו להגדרה", P.home ? "home" : "")}${qb("gqWork", WORK, "לעבודה", P.work ? esc(P.work.name) : "לחצו להגדרה", P.work ? "work" : "")}${qb("gqFuel", FUEL, "דלק קרוב", "לפי המיקום")}${qb("gqHelp", WRENCH, "עזרה בדרך", "מוסך, צמיג, גרר")}${st.park ? qb("gqPark", PWI.moto, "לאופנוע", "איפה חניתי") : ""}</div>
       ${rec.length ? `<div class="card"><h3>אחרונים</h3><div class="list golist">${rec.slice(0, 6).map((x, i) => `<button type="button" class="gli" data-rec="${i}"><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.sub || "")}</span></span><span class="small muted">${st.me ? `${Math.round(L.hav([st.me.lon, st.me.lat], [x.lon, x.lat]))} ק״מ` : ""}</span></button>`).join("")}</div></div>` : ""}
@@ -1810,7 +1859,7 @@
     ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונה</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
-    <div class="card"><h3>נשארים בקשר</h3><p class="small muted" style="margin:0">תדריך סופ״ש כל חמישי בוואטסאפ, סרטוני מסלולים, ורשימת ההמתנה להשקה בחנויות.</p><div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m">ערוץ התדריך בוואטסאפ</a><a class="btn" href="join?src=app">רשימת ההמתנה</a><a class="btn" target="_blank" rel="noopener" href="https://www.instagram.com/blueroninapp/">אינסטגרם</a><a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@blueroninapp">יוטיוב</a></div></div>
+    <div class="card"><h3>נשארים בקשר</h3><p class="small muted" style="margin:0">תדריך סופ״ש כל חמישי בוואטסאפ, סרטוני מסלולים, ורשימת ההמתנה להשקה בחנויות.</p><div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m">ערוץ התדריך בוואטסאפ</a><a class="btn" href="join?src=app">רשימת ההמתנה</a><a class="btn" target="_blank" rel="noopener" href="https://www.instagram.com/blueroninapp/">אינסטגרם</a><a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@blueroninapp">יוטיוב</a><a class="btn" target="_blank" rel="noopener" href="https://www.tiktok.com/@blueroninapp">טיקטוק</a><a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/blueroninapp/">פייסבוק</a></div></div>
     <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
     $("p-tools").innerHTML = h;
     $("offGo").onclick = downloadOffline;
@@ -2088,11 +2137,11 @@
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
     say(c.nav ? "יוצאים לדרך. ניווט אל " + c.title : "מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
     unlockAudio(); if (st.sos.crash) askMotion().then(ok => { if (ok && st.ride) fallArm(); }); geoPause(); walkStop();
-    st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, off: 0, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
+    st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, offS: {}, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
     loadSteps(c, r).then(s => { if (st.ride && st.ride.c === c) st.ride.G.steps = s; });
     try { st.ride.lock = await navigator.wakeLock.request("screen"); } catch (e) { }
     if (!st.ride) return;
-    document.body.classList.add("riding"); $("hud").hidden = false; $("hudNextK").textContent = c.nav ? "יעד" : "העצירה הבאה"; requestAnimationFrame(hudMeasure); $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
+    document.body.classList.add("riding"); guideShow(st.ride.G); foldAttrib(); $("hud").hidden = false; $("hudNextK").textContent = c.nav ? "יעד" : "העצירה הבאה"; requestAnimationFrame(hudMeasure); $("fRide").setAttribute("aria-pressed", "true"); $("hudVoice").setAttribute("aria-pressed", String(st.voice));
     if (!st.terrain) toggle3d(true);
     st.ride.watch = navigator.geolocation.watchPosition(onPos, () => toast("אין אות GPS"), { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
   }
@@ -2103,17 +2152,12 @@
     fallDisarm(); try { const R0 = st.ride; if (R0.last && R0.odo > 0.3 && (R0.spd == null || R0.spd < 8)) setPark({ lat: R0.last.p[1], lon: R0.last.p[0], acc: st.meAcc }, true); } catch (e) { }
     if (done) setTimeout(() => rideSummary(done), 500);
     if (st.updWaiting) setTimeout(() => updBar("גרסה חדשה מוכנה", { btn: "עדכון עכשיו", go: () => location.reload() }), done ? 1200 : 300);
-    st.ride = null; geoResume(); if (st.live) { liveFlush("stopped"); setTimeout(() => updBar("שיתוף המיקום החי עדיין פעיל", { btn: "הפסקה", go: () => { $("updbar").hidden = true; liveStop(); }, ms: 20000 }), 2500); } $("hudCenter").hidden = true; $("hudEta").textContent = ""; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
+    st.ride = null; guideHide(); geoResume(); if (st.live) { liveFlush("stopped"); setTimeout(() => updBar("שיתוף המיקום החי עדיין פעיל", { btn: "הפסקה", go: () => { $("updbar").hidden = true; liveStop(); }, ms: 20000 }), 2500); } $("hudCenter").hidden = true; $("hudEta").textContent = ""; $("hudArrT").textContent = "--:--"; $("hudArrL").textContent = ""; document.body.classList.remove("riding"); $("hud").hidden = true; $("turn").hidden = true; $("fRide").setAttribute("aria-pressed", "false"); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); fitChapter();
   }
-  function ridePad() { const land = innerWidth > innerHeight && innerHeight <= 560 && innerWidth <= 1000; if (land && st.ride) return { top: 40, bottom: 40, left: 20, right: Math.min(330, innerWidth * 0.45) + 10 }; const h = $("hud"), wide = innerWidth >= 900, H = h && !h.hidden ? h.getBoundingClientRect().height : 230; return wide ? { top: 120, bottom: 60, left: 20, right: Math.min(innerWidth * 0.45, 500) } : { top: 150, bottom: Math.max(120, Math.min(H - 40, innerHeight * 0.45)), left: 20, right: 20 }; }
-  function nearestOn(G, me) {
-    const n = G.coords.length; let lo = Math.max(0, G.idx - 150), hi = Math.min(n - 1, G.idx + 2500), bi = G.idx, bd = 1e9;
-    const scan = (a, z) => { for (let i = a; i <= z; i++) { const d = L.hav(G.coords[i], me); if (d < bd) { bd = d; bi = i; } } };
-    scan(lo, hi); if (bd > 0.4) { bd = 1e9; scan(0, n - 1); }
-    G.idx = bi; return { km: G.cum[bi], d: bd };
-  }
+  function ridePad() { const land = innerWidth > innerHeight && innerHeight <= 560 && innerWidth <= 1000; if (land && st.ride) { const hw = $("hud") ? $("hud").getBoundingClientRect().width : 330; return { top: 40, bottom: 40, left: 20, right: Math.min(innerWidth * 0.5, hw + 24) }; } const h = $("hud"), wide = innerWidth >= 900, H = h && !h.hidden ? h.getBoundingClientRect().height : 230; return wide ? { top: 120, bottom: 60, left: 20, right: Math.min(innerWidth * 0.45, 500) } : { top: 150, bottom: Math.max(120, Math.min(H - 40, innerHeight * 0.45)), left: 20, right: 20 }; }
+  function nearestOn(G, me) { const r = L.nearestOnLine(G.coords, G.cum, G.idx, me); G.idx = r.i; return { km: r.km, d: r.d }; }
   async function reroute(me) {
-    const R = st.ride; if (!R || R.rerouting) return; R.rerouting = true;
+    const R = st.ride; if (!R || R.rerouting) return; R.rerouting = true; R.offS.lastAt = Date.now();
     const G = R.G, myKm = G.cum[G.idx]; const rest = G.stops.filter((s, i) => G.stopKm[i] > myKm + 0.2).slice(0, 12);
     if (!rest.length) { R.rerouting = false; return; }
     /* keep only the via points still ahead of the rider, or OSRM would send them back */
@@ -2124,9 +2168,12 @@
       const rt = j.routes[0]; const coords = rt.geometry.coordinates; const cum = L.cumulative(coords);
       let from = 0; const stopKm = rest.map(s => { let bi = from, bd = 1e9; for (let i = from; i < coords.length; i++) { const d = (coords[i][0] - s.lon) ** 2 + (coords[i][1] - s.lat) ** 2; if (d < bd) { bd = d; bi = i; } } from = bi; return cum[bi]; });
       const steps = []; let f2 = 0; rt.legs.forEach((lg, li) => lg.steps.forEach(sp => { const m = sp.maneuver; if (m.type === "depart") return; let bi = f2, bd = 1e9; for (let i = f2; i < coords.length; i++) { const d = (coords[i][0] - m.location[0]) ** 2 + (coords[i][1] - m.location[1]) ** 2; if (d < bd) { bd = d; bi = i; } } f2 = bi; steps.push({ km: cum[bi], type: m.type, modifier: m.modifier || "", exit: m.exit || 0, name: sp.name || "", ref: sp.ref || "", last: li === rt.legs.length - 1 }); }));
-      R.G = { coords, cum, stops: rest, stopKm, steps, idx: 0 }; R.spoke = new Set(); R.off = 0;
-      say("מחשב מסלול מחדש"); toast("המסלול חושב מחדש מהמיקום שלך");
-    } catch (e) { } finally { if (st.ride) st.ride.rerouting = false; }
+      R.G = { coords, cum, stops: rest, stopKm, steps, idx: 0 }; R.spoke = new Set(); R.offS = { lastAt: Date.now() }; guideShow(R.G);
+      /* spoken once; a second reroute within two minutes only shows a quiet note */
+      if (Date.now() - (R.rrSaid || 0) > 120000) { R.rrSaid = Date.now(); say("מחשב מסלול מחדש"); }
+      toast("המסלול עודכן מהמיקום שלך", 2200);
+    } catch (e) { if (st.ride && Date.now() - (st.ride.rrFail || 0) > 120000) { st.ride.rrFail = Date.now(); toast("אין חיבור לחישוב מסלול חדש. ממשיכים במסלול המקורי", 3500); } }
+    finally { if (st.ride) st.ride.rerouting = false; }
   }
   /* Ride extras: arrival call-outs, remaining distance and ETA, spoken sharp-curve warnings, sunset race. */
   function rideExtras(R, G, me, myKm, near, spd) {
@@ -2135,7 +2182,9 @@
     const total = G.cum[G.cum.length - 1], left = Math.max(0, total - myKm), r = st.routes[R.c.id];
     const pace = r && r.km > 0 ? r.min / r.km : 1.2, avg = R.moving > 300 && R.odo > 3 ? 60 * R.moving / 3600 / R.odo : pace;
     const mins = left * Math.max(pace * 0.8, Math.min(pace * 1.6, avg)), eta = new Date(Date.now() + mins * 6e4);
-    $("hudEta").textContent = left > 0.2 ? `נותרו ${left < 10 ? left.toFixed(1) : Math.round(left)} ק״מ · הגעה ${fmtT(eta)}` : "";
+    const kmT = `${left < 10 ? left.toFixed(1) : Math.round(left)} ק״מ`, mR = Math.max(1, Math.round(mins)), minT = mR < 60 ? `${mR} דק׳` : `${Math.floor(mR / 60)}:${String(mR % 60).padStart(2, "0")} שע׳`;
+    $("hudEta").innerHTML = left > 0.2 ? `הגעה <b>${fmtT(eta)}</b> · ${kmT} · ${minT}` : "";
+    $("hudArrT").textContent = left > 0.2 ? fmtT(eta) : "הגעתם"; $("hudArrL").textContent = left > 0.2 ? `${kmT} · ${minT}` : "";
     if (G.coords === r.coords) { const seg = (st.curves[R.c.id] || []).find(x => x.cls >= 3 && x.startKm > myKm && x.startKm - myKm < (spd && spd > 70 ? 0.45 : 0.32)); if (seg && !R.alerted.has("cv" + seg.startKm.toFixed(2))) { R.alerted.add("cv" + seg.startKm.toFixed(2)); say(`עיקול חד בעוד ${distSpeak(seg.startKm - myKm)}`); } }
     if (!R.sunChk || Date.now() - R.sunChk > 6e4) { R.sunChk = Date.now(); const ss = SunCalc.getTimes(new Date(), me[1], me[0]).sunset, toSet = (ss - Date.now()) / 6e4; if (toSet > 0 && toSet < 45 && mins > toSet && !R.alerted.has("sun")) { R.alerted.add("sun"); say(`השקיעה בעוד ${Math.round(toSet)} דקות, ונשארו ${Math.round(left)} קילומטר. שימו לב לראות ולהיראות`); } }
   }
@@ -2211,8 +2260,10 @@
       const hf = $("hudFuel"); hf.hidden = false; hf.style.setProperty("--f", pct + "%"); hf.style.setProperty("--fc", fuelColor(litres, sim.tank)); $("hudFuelT").textContent = `${pct}% · ${Math.round(toLow)} ק״מ`;
       if (!msg && toLow < 30) { const sat = shabbatNow(); const nxt = fuelAlong(st.chap, 1.5).find(f => f.km > myKm - 0.3 && (!sat || f.sat !== "closed")); const far = nxt && nxt.km - myKm > litres / rate; msg = nxt ? `דלק: עוד כ־${Math.round(toLow)} ק״מ עד הנורית. ${nxt.label} ${nxt.km - myKm < 0.3 ? "ממש כאן" : `בעוד ${(nxt.km - myKm).toFixed(1)} ק״מ`}${far ? " (מעבר לטווח)" : ""}` : `דלק: עוד כ־${Math.round(toLow)} ק״מ עד הנורית`; cls = "cam"; if (!R.lowWarned) { R.lowWarned = true; say(nxt ? `דלק נמוך. תחנה בעוד ${distSpeak(nxt.km - myKm)}` : "דלק נמוך"); try { navigator.vibrate && navigator.vibrate([400]); } catch (e) { } } }
     }
-    if (near.d > 0.25 && (spd == null || spd > 4)) { R.off++; if (R.off >= 3) reroute(me); } else R.off = 0;
-    if (!msg && near.d > 0.25) msg = `מחוץ למסלול, ${near.d.toFixed(1)} ק״מ`;
+    const acc = p.coords.accuracy;
+    if (L.offRoute(R.offS, near.d, acc, Date.now(), spd == null || spd > 4)) reroute(me);
+    if (!msg && R.offS.n >= 2) msg = `מחוץ למסלול, ${near.d < 1 ? Math.round(near.d * 1000) + " מ׳" : near.d.toFixed(1) + " ק״מ"}`;
+    guideProgress(R.G, myKm);
     if (!msg) { const seg = (st.curves[st.chap] || []).find(s => s.cls >= 2 && s.startKm > myKm && s.startKm - myKm < 1.6); if (seg && G.coords === st.routes[R.c.id].coords) { msg = `${L.CURVE_LABEL[seg.cls]} בעוד ${(seg.startKm - myKm).toFixed(1)} ק״מ`; cls = "curve"; } }
     const m = $("hudMsg"); m.hidden = !msg; if (msg) { m.textContent = msg; m.className = "hudmsg " + cls; }
     if (R.free && Date.now() - R.free < 15000) return; if (R.free) { R.free = 0; $("hudCenter").hidden = true; }
@@ -2579,7 +2630,8 @@
   }
   document.querySelectorAll("[data-hs]").forEach(b => b.onclick = () => hudSize(b.dataset.hs));
   if ("ResizeObserver" in window) new ResizeObserver(hudMeasure).observe($("hud"));
-  addEventListener("orientationchange", () => setTimeout(() => { hudMeasure(); if (st.ride && st.me && !st.ride.free) map.easeTo({ center: [st.me.lon, st.me.lat], duration: 400, padding: ridePad() }); }, 350));
+  const onTurn = () => setTimeout(() => { try { map.resize(); } catch (e) { } hudMeasure(); foldAttrib(); if (st.ride && st.me && !st.ride.free) map.easeTo({ center: [st.me.lon, st.me.lat], duration: 400, padding: ridePad() }); }, 350);
+  addEventListener("orientationchange", onTurn); try { screen.orientation && screen.orientation.addEventListener("change", onTurn); } catch (e) { }
   hudSize(LS.get("hudSize", "compact"));
   $("hudCam").onclick = () => pickPhotos(true);
   $("hudPark").onclick = () => { if (!st.me) return toast("אין מיקום עדיין"); setPark({ lat: st.me.lat, lon: st.me.lon, acc: st.meAcc }); };

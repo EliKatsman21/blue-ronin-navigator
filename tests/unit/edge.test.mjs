@@ -2,7 +2,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { viaEdge, clientIp, edgeGate } from "../../netlify/functions/lib/edge.mjs";
+import { viaEdge, clientIp, edgeGate, edgeReady } from "../../netlify/functions/lib/edge.mjs";
 
 const SECRET = "s3cr3t-s3cr3t-s3cr3t-s3cr3t-42";
 const req = h => new Request("https://blueronin.app/api/join", { headers: h });
@@ -47,4 +47,10 @@ test("every /api function passes through the gate", () => {
   }
   const admin = readFileSync(new URL("lib/admin.mjs", dir), "utf8");
   assert.match(admin, /ipOf = req => clientIp\(req\)/, "lib/admin.mjs must take the address from lib/edge.mjs");
+});
+
+test("edgeReady reports only whether a usable secret is configured", () => {
+  assert.equal(edgeReady(), false);
+  process.env.EDGE_SECRET = SECRET;
+  assert.equal(edgeReady(), true);
 });

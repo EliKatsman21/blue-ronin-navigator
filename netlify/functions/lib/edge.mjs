@@ -13,6 +13,8 @@ export function viaEdge(req) {
   const s = env("EDGE_SECRET"), h = req.headers.get("x-br-edge");
   return s.length >= 24 && !!h && same(h, s);
 }
+/* true when the function can read a usable EDGE_SECRET (the value itself never leaves the server). */
+export const edgeReady = () => env("EDGE_SECRET").length >= 24;
 export function clientIp(req) {
   const cf = viaEdge(req) ? req.headers.get("cf-connecting-ip") : "";
   return (cf && cf.trim()) || req.headers.get("x-nf-client-connection-ip") || req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "0";

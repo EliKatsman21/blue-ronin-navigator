@@ -1,6 +1,7 @@
 /* POST /api/feedback — riders send bugs, ideas, data fixes or a road report. It lands in the admin
    inbox only: nothing a rider sends is shown to other riders until the admin approves it.
    Anonymous; throttled per (hashed) IP. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import { ipHash } from "./lib/admin.mjs";
@@ -15,6 +16,7 @@ const decode = (s, max) => { if (typeof s !== "string" || !s) return null; const
 const KINDS = ["bug", "idea", "data", "hazard", "pro", "other"];
 const clean = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/g, "").trim().slice(0, n);
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   if (req.method !== "POST") return new Response("method", { status: 405 });
   let b; try { const t = await req.text(); if (t.length > 1900000) return new Response("too large", { status: 413 }); b = JSON.parse(t); } catch (e) { return new Response("bad json", { status: 400 }); }
   const kind = KINDS.includes(b.kind) ? b.kind : "other", text = clean(b.text, 1000);

@@ -1,6 +1,7 @@
 /* Weather proxy with a shared cache. Every rider asks us; we ask Open-Meteo once per ~20 minutes per set of
    points, so the free daily quota (counted per IP and per location) is never exhausted by app usage.
    GET /api/wx?p=lat,lon;lat,lon;...   (rounded to 2 decimals, inside Israel, at most 30 points) */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { opsLog, bump } from "./lib/ops.mjs";
 const store = () => getStore({ name: "brn-wx", consistency: "strong" });
@@ -10,6 +11,7 @@ const CURRENT = "temperature_2m,apparent_temperature,weather_code,wind_speed_10m
 const valid = a => Array.isArray(a) && a.length && a.every(x => x && x.hourly && Array.isArray(x.hourly.time) && x.hourly.time.length > 24);
 const J = (o, status, cache) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...(cache ? { "netlify-cdn-cache-control": "public, s-maxage=900, stale-while-revalidate=1800", "cache-control": "public, max-age=300" } : {}) } });
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const raw = new URL(req.url).searchParams.get("p") || "";
   const pts = raw.split(";").filter(Boolean).slice(0, 31).map(s => s.split(",").map(Number)).filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && a > 29 && a < 33.6 && b > 34 && b < 36.2).map(([a, b]) => [+a.toFixed(2), +b.toFixed(2)]);
   if (!pts.length || pts.length > 30) return J({ error: "bad points" }, 400);

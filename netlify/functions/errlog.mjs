@@ -1,10 +1,12 @@
 /* Field error reports from riders' phones (no personal data: message, stack, app version, device type,
    which screen, a few breadcrumbs). About the last 300 kept, one record per report. Admin reads them in System → "תקלות מהשטח". */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { ipHash } from "./lib/admin.mjs";
 const store = () => getStore({ name: "brn-err", consistency: "strong" });
 const s = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").slice(0, n);
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   if (req.method !== "POST") return new Response("method", { status: 405 });
   const t = await req.text(); if (t.length > 8000) return new Response("too large", { status: 413 });
   let b; try { b = JSON.parse(t); } catch (e) { return new Response("bad", { status: 400 }); }

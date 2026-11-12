@@ -125,11 +125,18 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - DNSSEC signed in Cloudflare, DS **not** at the registrar yet. Ask Netlify to add the DS only after the zone is Active:
   `blueronin.app. 3600 IN DS 2371 13 2 F0D80DA5601D8AE7F44073A3337D1CFD6289557F603BF60E61BCF4E0E4DF9DC9`.
 - Alerts by email: L7 DDoS, Universal SSL, security insights.
-- Known gap: `blueronin-north-map.netlify.app` is still reachable directly (it 301s to blueronin.app). Code-level rate limits on functions are the second layer (next release).
+- Edge handshake: a Cloudflare request-header rule (late transform) sets `x-br-edge` to a secret on every request. Netlify env
+  `EDGE_SECRET` holds the same value (Functions scope). `lib/edge.mjs`: only requests carrying it may supply the visitor address via
+  `cf-connecting-ip` (all per-IP throttles use `ipOf` → `clientIp`); without it the Netlify connection IP is used, so the address can't be forged.
+  `EDGE_ENFORCE=1` (set only after the zone is Active and verified, needs a rebuild) makes every `/api` function answer 403 to requests
+  that bypass Cloudflare (direct to netlify.app or a Netlify IP).
+- Netlify's own rate-limit config is deliberately not used: behind a proxy it counts Cloudflare's IPs, so all riders would share one bucket.
+- Order matters: env `EDGE_SECRET` → release with `lib/edge.mjs` → then the nameserver switch. Switching first makes Cloudflare's IP
+  look like one visitor (waitlist "5 per hour per network", admin lockout).
 - If something breaks after the switch: first turn off Bot Fight Mode, then the custom rule that matches (Security → Events shows which).
 
 ## Open items
-- Cloudflare: Netlify support to switch NS → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. Add Netlify code rate limits to sensitive functions (read `CF-Connecting-IP`).
+- Cloudflare: Netlify support to switch NS → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
 - If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
 - Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).
 - `README.md` still describes the early north-only app and TomTom; refresh it.

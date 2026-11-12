@@ -21,7 +21,9 @@ async function mapillary(lat, lon, token, radius) {
   return data.map(x => { const [lo, la] = x.computed_geometry.coordinates; return { src: "mapillary", thumb: x.thumb_1024_url, link: `https://www.mapillary.com/app/?pKey=${x.id}`, author: (x.creator && x.creator.username) || "Mapillary", license: "CC BY-SA 4.0", d: hav(lat, lon, la, lo), ts: x.captured_at }; })
     .sort((a, b) => (a.d - b.d) || (b.ts - a.ts)).slice(0, 3);
 }
+import { edgeGate } from "./lib/edge.mjs";
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const q = new URL(req.url).searchParams; const lat = +q.get("lat"), lon = +q.get("lon"), kind = q.get("kind") || "view";
   if (!(lat > 29 && lat < 34 && lon > 34 && lon < 36.2)) return Response.json({ error: "bad point" }, { status: 400 });
   const token = Netlify.env.get("MAPILLARY_TOKEN"); const street = kind === "fuel" || kind === "cafe";

@@ -1,5 +1,7 @@
 /* GET /api/config — which optional live services are switched on (keys stay on the server). */
-export default async () => {
+import { edgeGate } from "./lib/edge.mjs";
+export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const here = !!Netlify.env.get("HERE_API_KEY");
   return Response.json({ traffic: here, trafficKey: here, trafficSrc: here ? "HERE" : null, geo: here, mapillary: !!Netlify.env.get("MAPILLARY_TOKEN") },
     { headers: { "cache-control": "public, max-age=300", "netlify-cdn-cache-control": "public, s-maxage=600" } });

@@ -3,12 +3,14 @@
    ciphertext, for 24 hours, readable a few times, then it is deleted.
    POST /api/xfer        {ct, iv}  -> {id}
    GET  /api/xfer/<id>             -> {ct, iv} */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { ipHash } from "./lib/admin.mjs";
 const store = () => getStore({ name: "brn-xfer", consistency: "strong" });
 const CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", MAX = 4.5 * 1024 * 1024, TTL = 864e5, READS = 6;
 const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const st = store(), now = Date.now(), ip = await ipHash(req), id = new URL(req.url).pathname.split("/")[3] || "";
   const limit = async (k, n) => { const a = ((await st.get("rl:" + k, { type: "json" })) || []).filter(x => now - x < 36e5); if (a.length >= n) return true; a.push(now); await st.setJSON("rl:" + k, a); return false; };
   if (req.method === "GET") {

@@ -8,6 +8,7 @@
    POST /api/group/meet   {gid, mid, key, lat, lon, label}  (leader)
    POST /api/group/leave  {gid, mid, key}
    POST /api/group/end    {gid, mid, key}  (leader) */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { ipHash } from "./lib/admin.mjs";
 import { verify } from "./lib/pro.mjs";
@@ -17,6 +18,7 @@ const CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", MAXM = 20, TTL = 12 * 36e5;
 const COLORS = ["#5C8DFF", "#FFA24A", "#2BB673", "#E84A8A", "#9B6BFF", "#18B6C9", "#E0C341", "#FF6B5C", "#7AC943", "#C77DFF"];
 const okG = x => typeof x === "string" && /^[A-Z2-9]{6}$/.test(x), okM = x => typeof x === "string" && /^[A-Za-z0-9]{6,16}$/.test(x);
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   if (req.method !== "POST") return J({ error: "method" }, 405);
   const op = new URL(req.url).pathname.split("/")[3] || "", st = store(), now = Date.now();
   let b; try { const t = await req.text(); if (t.length > 4000) return J({ error: "too large" }, 413); b = JSON.parse(t || "{}"); } catch (e) { return J({ error: "bad" }, 400); }

@@ -1,5 +1,6 @@
 /* /api/pro/* — trial, code redemption, status check, and "reserve founder price" interest.
    Everything is anonymous: the device id is the same random id used for fuel votes. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import { proStore, sign, verify, cidOk, TRIAL_DAYS } from "./lib/pro.mjs";
@@ -13,6 +14,7 @@ async function limited(req, key, max, winMs) {
   if (hits.length >= max) return true; hits.push(now); await s.setJSON(k, hits); return false;
 }
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const path = new URL(req.url).pathname.replace(/^\/api\/pro\/?/, "");
   let b = {}; try { const t = await req.text(); if (t.length > 2000) return json({ error: "too large" }, 413); b = t ? JSON.parse(t) : {}; } catch (e) { return json({ error: "bad json" }, 400); }

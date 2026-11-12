@@ -1,5 +1,6 @@
 /* /api/admin/* — the admin API. Everything except session/setup/login needs a valid admin session.
    See lib/admin.mjs for the security model. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import {
@@ -23,6 +24,7 @@ async function body(req, max = 70000) { const t = await req.text(); if (t.length
 const codeOk = (got, envName) => { const want = Netlify.env.get(envName); return !!want && want.length >= 8 && typeof got === "string" && got.length === want.length && got === want; };
 
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const path = new URL(req.url).pathname.replace(/^\/api\/admin\/?/, "").replace(/\/$/, "");
   const route = `${req.method} ${path}`;
   if (!sameOrigin(req)) return json({ error: "origin" }, 403);

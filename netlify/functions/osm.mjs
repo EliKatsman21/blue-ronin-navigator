@@ -1,9 +1,11 @@
 /* GET /api/osm — cached north layers. Served from Netlify's CDN; refreshed daily by osm-refresh. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getCached, refresh, inIL } from "./lib/osm.mjs";
 const MAX_AGE = 3 * 864e5;
 const headers = { "content-type": "application/json", "cache-control": "public, max-age=900", "netlify-cdn-cache-control": "public, durable, s-maxage=900, stale-while-revalidate=86400" };
 
 export default async (req, context) => {
+  const gate = edgeGate(req); if (gate) return gate;
   let data = await getCached();
   if (data && (Date.now() - data.ts > MAX_AGE || !data.cafes || !data.moto)) context.waitUntil(fetch(new URL("/.netlify/functions/osm-refresh-background", req.url), { method: "POST" }).catch(e => console.log("bg trigger failed", e.message)));
   if (!data) {

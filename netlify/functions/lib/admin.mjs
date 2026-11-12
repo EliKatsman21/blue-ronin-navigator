@@ -10,6 +10,7 @@
    - Every write needs a custom header and a same-origin Origin, so cross-site forms can't post.
    - Login and setup are throttled per IP (hashed, never stored raw) and globally.
    - Every admin action lands in an append-only audit log (last 400 entries). */
+import { clientIp } from "./edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { createHmac, randomBytes, scrypt as _scrypt, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
@@ -31,7 +32,7 @@ export async function secret() {
   if (!k) { k = b64u(randomBytes(32)); await s.set("secret", k); }
   return k;
 }
-export const ipOf = req => req.headers.get("x-nf-client-connection-ip") || req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "0";
+export const ipOf = req => clientIp(req); // real visitor address, Cloudflare-aware (lib/edge.mjs)
 export async function ipHash(req) { return createHash("sha256").update((await secret()) + "|" + ipOf(req)).digest("hex").slice(0, 16); }
 
 /* ---------- passwords ---------- */

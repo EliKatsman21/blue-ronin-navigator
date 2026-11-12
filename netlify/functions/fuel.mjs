@@ -1,6 +1,7 @@
 /* Rider-verified fuel info per OSM station: "open on Shabbat?" and "has 98 / 95?".
    Each rider (anonymous client id) holds at most one vote per question; sending the same
    vote again from the app clears it ("clear"), so mistakes can be undone. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 const store = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const TTL = 120 * 864e5, MAX_RIDERS = 60;
@@ -31,6 +32,7 @@ function summarize(st) {
 }
 
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const s = store();
   if (req.method === "GET") {
     const all = (await s.get("all", { type: "json" })) || {};

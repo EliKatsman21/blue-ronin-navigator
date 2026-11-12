@@ -3,11 +3,13 @@
    GET  ?c=CODE                                      → how many friends joined through that code (no personal data).
    POST { hit:"go", src }                            → anonymous visit counter for /go (which channel sends riders).
    Throttled per hashed IP. Nothing here is shown to other riders. */
+import { edgeGate } from "./lib/edge.mjs";
 import { ipHash, json } from "./lib/admin.mjs";
 import { bump, opsLog } from "./lib/ops.mjs";
 import { joinStore, NEED, cleanSrc, cleanEmail, cleanName, newRef, isRef, emailHash, count, refsOf } from "./lib/join.mjs";
 const HOUR = 36e5;
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const s = joinStore();
   if (req.method === "GET") {
     const c = new URL(req.url).searchParams.get("c");

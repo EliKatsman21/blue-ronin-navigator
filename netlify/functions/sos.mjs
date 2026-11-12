@@ -9,6 +9,7 @@
    POST /api/sos/list   {circle,key}                -> {guardians}
    POST /api/sos/remove {circle,key,gid}            -> {ok}
    POST /api/sos/alert  {circle,key,kind,lat,lon,acc,live,name,phone} -> {sent, total} */
+import { edgeGate } from "./lib/edge.mjs";
 import { sosStore, rid, hashKey, keyOk, clean, okId, inIL, body, J } from "./lib/safety.mjs";
 import { ipHash } from "./lib/admin.mjs";
 import { validSub, sendOne } from "./lib/push.mjs";
@@ -17,6 +18,7 @@ const MAXG = 5, INV_DAYS = 7, INV_CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const invCode = () => { const b = rid(16); let o = ""; for (let i = 0; i < 8; i++) o += INV_CH[b.charCodeAt(i) % INV_CH.length]; return o; };
 const normInv = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const u = new URL(req.url), seg = u.pathname.replace(/^\/api\/sos\/?/, "").split("/").filter(Boolean), s = sosStore(), now = Date.now();
   if (req.method === "GET" && seg[0] === "invite") {
     const inv = normInv(seg[1]); const I = inv.length === 8 && await s.get("i:" + inv, { type: "json" });

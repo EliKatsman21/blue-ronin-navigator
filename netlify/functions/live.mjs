@@ -6,10 +6,12 @@
    POST /api/live/update  {id, key, pts, state}   -> {ok}
    POST /api/live/stop    {id, key}               -> {ok}
    GET  /api/live/<id>                            -> share as viewers see it */
+import { edgeGate } from "./lib/edge.mjs";
 import { liveStore, rid, hashKey, keyOk, clean, okId, inIL, body, J } from "./lib/safety.mjs";
 import { ipHash } from "./lib/admin.mjs";
 const MAX_H = 12, KEEP_PTS = 400, STATES = ["riding", "stopped", "sos", "ended"];
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const u = new URL(req.url), seg = u.pathname.replace(/^\/api\/live\/?/, "").split("/").filter(Boolean), s = liveStore(), now = Date.now();
   if (req.method === "GET") {
     const id = seg[0]; if (!okId(id)) return J({ error: "not found" }, 404);

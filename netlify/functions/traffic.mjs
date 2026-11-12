@@ -5,6 +5,7 @@
      segs — slow / jammed / closed road segments in the area, as lines for the map
      inc  — accidents, closures and roadworks, flagged when they sit on the route
    Shared cache (Blobs + CDN, 5 minutes) and a monthly budget guard so the free allowance is never exceeded. */
+import { edgeGate } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { opsLog, bump, usage } from "./lib/ops.mjs";
 const MAX = 30, FRESH = 5 * 6e4, STALE = 60 * 6e4;
@@ -25,6 +26,7 @@ async function here(path, bbox, key) {
 }
 const J = (o, s = 200, cache) => Response.json(o, { status: s, headers: cache ? { "cache-control": "public, max-age=60", "netlify-cdn-cache-control": "public, s-maxage=240, stale-while-revalidate=120" } : { "cache-control": "no-store" } });
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const key = Netlify.env.get("HERE_API_KEY");
   if (!key) return J({ error: "traffic not configured" }, 404);
   const raw = new URL(req.url).searchParams.get("pts") || "";

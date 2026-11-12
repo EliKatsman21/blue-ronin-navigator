@@ -5,11 +5,13 @@
    falls back to its own search.
    Two HERE endpoints in parallel when the text looks like an address (has a number): autosuggest (businesses,
    streets, places as you type) and geocode (the exact house number). Geocode hits come first. */
+import { edgeGate } from "./lib/edge.mjs";
 import { opsLog, bump, usage } from "./lib/ops.mjs";
 const J = (o, s = 200) => Response.json(o, { status: s, headers: { "cache-control": "no-store" } });
 let used = { t: 0, n: 0 }; /* usage is counted per call; re-read the monthly total at most every 10 minutes */
 const KIND = { houseNumber: "כתובת", street: "רחוב", locality: "יישוב", place: "מקום", administrativeArea: "אזור", intersection: "צומת", addressBlock: "כתובת", chainQuery: "רשת" };
 export default async req => {
+  const gate = edgeGate(req); if (gate) return gate;
   const key = Netlify.env.get("HERE_API_KEY"); if (!key) return J({ error: "not configured" }, 404);
   const u = new URL(req.url), q = (u.searchParams.get("q") || "").replace(/[\u0000-\u001F]/g, " ").trim().slice(0, 120);
   if (q.length < 2) return J({ items: [] });

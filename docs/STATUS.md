@@ -4,7 +4,7 @@ Source of truth for the project's state. Rules for working on the code are in `/
 `docs/WORKFLOW.md`. A copy of this file lives in the claude.ai Project as `claude/blue-ronin-navigator.md` and is
 refreshed at the end of every round.
 
-Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.7.0 (deployed 2026-11-11), SW shell v17.
+Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.7.1 (deployed 2026-11-12), SW shell v18.
 
 ## How it ships
 - Code: GitHub `EliKatsman21/blue-ronin-navigator` (public). Netlify site `blueronin-north-map` (id 4bff772c-…) builds production from `main` only; `netlify.toml` `ignore` skips every non-production build (since 2026-11-10).
@@ -139,7 +139,7 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - If something breaks after the switch: first turn off Bot Fight Mode, then the custom rule that matches (Security → Events shows which).
 
 ## Open items
-- Cloudflare: Netlify support to switch NS → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
+- Cloudflare: send the NS request to Netlify support (text in chat 2026-11-12; not sent yet, the browser pane was offline) → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
 - If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
 - Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).
 - `README.md` still describes the early north-only app and TomTom; refresh it.

@@ -21,6 +21,9 @@ Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" si
 - `tests/`, `scripts/`, `docs/`, `media/`, `.github/`: see `CLAUDE.md`.
 - Tabs: ניווט · סופ״ש (the former תדריך שבת) · מסלול · עצירות ודלק · שלי · כלים. Opening tab: a #hash wins; else סופ״ש on Fri/Sat and ניווט Sun–Thu.
 
+## Release 2.7.1 (2026-11-12)
+- Security only: `lib/edge.mjs` (Cloudflare edge handshake, Cloudflare-aware client IP, optional origin lock), every `/api` function gated. Env `EDGE_SECRET` set (Production). See "Cloudflare edge".
+
 ## Release 2.7.0 (2026-11-11)
 From Eli's first real ride with everyday navigation, plus the launch pages.
 - Reroute loop fixed. Root cause: `nearestOn` measured the distance to the nearest route *vertex*. OSRM leaves vertices hundreds of metres apart on straight roads, so a rider exactly on the road read as 250 m+ "off route", rerouted, and did it again every few fixes ("מחשב מסלול מחדש" over and over). Now `L.nearestOnLine` projects onto the segments (km along the route is interpolated too), and `L.offRoute` decides with hysteresis: threshold from the fix's accuracy (65 m at 20 m accuracy, 50–200 m), 3 off fixes spanning ≥ 6 s, 25 s cooldown after a reroute, never while standing. The voice says it at most once per 2 minutes; a failed reroute waits for the cooldown and shows one note instead of retrying every fix. Unit tests in `tests/unit/ride.test.mjs`.

@@ -139,7 +139,7 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - If something breaks after the switch: first turn off Bot Fight Mode, then the custom rule that matches (Security → Events shows which).
 
 ## Open items
-- Cloudflare: send the NS request to Netlify support (text in chat 2026-11-12; not sent yet, the browser pane was offline) → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
+- Cloudflare: NS request sent and confirmed 2026-11-12 (Netlify ticket #1191302, thread in Eli's Gmail). When the zone is Active: release the `GET /api/ping` handshake check (on `dev`), confirm `{"edge":true,"ready":true}` through blueronin.app → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
 - If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
 - Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).
 - `README.md` still describes the early north-only app and TomTom; refresh it.

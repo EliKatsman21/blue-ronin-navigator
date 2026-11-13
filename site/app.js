@@ -93,11 +93,19 @@
     Object.assign(st.flags, ct.flags || {});
     CHAPTERS.slice(0, BUILT_IN).forEach(c => { const x = (ct.chapters || {})[c.id] || {}; c.hidden = !!x.hidden; c.alertMsg = x.alert || ""; c.featured = ct.featured === c.id; c.stops.forEach(s => { const n = (ct.notes || {})[c.id + ":" + s.id]; s.note = n || s._note0; }); });
     st.hazards = Array.isArray(ct.hazards) ? ct.hazards : [];
-    if (CHAPTERS.find(c => c.id === st.chap)?.hidden) st.chap = (CHAPTERS.find(c => !c.hidden) || CHAPTERS[0]).id;
+    if (CHAPTERS.find(c => c.id === st.chap)?.hidden) setCurrentRoute((CHAPTERS.find(c => !c.hidden) || CHAPTERS[0]).id, { persist: false });
   }
   applyContent(LS.get("content", null));
   if (!CHAPTERS.some(c => c.id === st.chap)) st.chap = "c1";
   const chap = () => CHAPTERS.find(c => c.id === st.chap);
+  /* The current route has one writer. A real choice is remembered (never the route being built or a navigation
+     trip); every change is announced as "br:route" {id, prev} so the weekend brief, the weather points and the
+     other consumers follow the route tab instead of each catching up on its own. */
+  function setCurrentRoute(id, { persist = true } = {}) {
+    const prev = st.chap; st.chap = id;
+    if (persist && id !== "draft" && id !== "nav") LS.set("chap", id);
+    if (prev !== id) try { dispatchEvent(new CustomEvent("br:route", { detail: { id, prev } })); } catch (e) { }
+  }
   const isDark = () => st.theme === "dark" || (st.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   function applyTheme() { if (st.theme === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", st.theme); document.querySelector('meta[name="theme-color"]').content = css("--bg") || "#0A111E"; }
   applyTheme();
@@ -298,7 +306,7 @@
     const techBefore = km => ins.tech.reduce((a, t) => a + Math.max(0, Math.min(km, t.from + t.km) - t.from), 0);
     const moveH = km => km / v + techBefore(km) * (1 / (v * 0.68) - 1 / v);
     const DWELL = { view: 8, cafe: 30 }; let dwell = 0;
-    const wpts = wxPoints().map((p, i) => ({ p, i })).filter(x => x.p.chap === cid || (c.combo && c.combo.includes(x.p.chap)));
+    const wpts = wxPts().map((p, i) => ({ p, i })).filter(x => x.p.chap === cid || (c.combo && c.combo.includes(x.p.chap)));
     const wxNear = s => { if (!st.wx || !wpts.length) return -1; let bi = -1, bd = 1e9; wpts.forEach(x => { const d = L.hav([x.p.lon, x.p.lat], [s.lon, s.lat]); if (d < bd) { bd = d; bi = x.i; } }); return bi; };
     const stops = c.stops.map((s, i) => {
       const km = r.stopKm[i] || 0, eta = new Date(dep.getTime() + (moveH(km) * 60 + dwell) * 6e4); const leave = new Date(eta.getTime() + (DWELL[s.kind] || 0) * 6e4); dwell += DWELL[s.kind] || 0;
@@ -714,7 +722,7 @@
       e.onclick = ev => { ev.stopPropagation(); stopPopup(s, n); };
       mk.push(new maplibregl.Marker({ element: e }).setLngLat(lonlat(s)).addTo(map));
     }));
-    if (st.layers.wx && st.wx && !st.fly) wxPoints().forEach((p, i) => {
+    if (st.layers.wx && st.wx && !st.fly) wxPts().forEach((p, i) => {
       const h = satHour(i, 8); if (!h) return;
       const e = document.createElement("div"); e.className = "mkw"; e.innerHTML = `${wxIcon(h.code)}${Math.round(h.t)}°`;
       mk.push(new maplibregl.Marker({ element: e, anchor: "bottom" }).setLngLat([p.lon, p.lat]).addTo(map));
@@ -840,6 +848,9 @@
     return pts;
   }
   const wxSig = () => wxPoints().map(p => p.lat.toFixed(2) + p.lon.toFixed(2)).join("");
+  /* the points the stored forecast belongs to: lookups go through these, never through today's list, so a route
+     change can't hand one route's weather to another (an old cache without them counts only while it matches) */
+  const wxPts = () => (st.wx && st.wx.meta) || (st.wx && st.wx.sig === wxSig() ? wxPoints() : []);
   const WX_Q = "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,visibility,cloud_cover" +
     "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation&forecast_days=9&timezone=Asia%2FJerusalem&wind_speed_unit=kmh";
   async function wxFromServer(pts) {
@@ -862,20 +873,20 @@
       const pts = wxPoints(), sig = wxSig(); let arr = null;
       try { arr = await wxFromServer(pts); } catch (e) { try { arr = await wxDirect(pts); } catch (e2) { if (window.BRG) BRG.report("weather", String((e2 && e2.message) || e2) + " / " + String((e && e.message) || e)); } }
       st.wxFail = !arr; st.wxFailTs = arr ? 0 : Date.now();
-      if (arr) { st.wx = { ts: Date.now(), sat: st.sat.iso, sig, pts: arr.map(x => ({ h: x.hourly, cur: x.current })) }; LS.set("wx2", st.wx); }
+      if (arr) { st.wx = { ts: Date.now(), sat: st.sat.iso, sig, meta: pts.map(p => ({ lat: p.lat, lon: p.lon, name: p.name, chap: p.chap })), pts: arr.map(x => ({ h: x.hourly, cur: x.current })) }; LS.set("wx2", st.wx); }
       else if (st.wx && st.wx.sig !== sig) { /* the cached forecast is for other points: keep it only if it still lines up */ if (st.wx.pts.length !== pts.length) st.wx = null; }
       if (!st.wx && force) toast("התחזית לא זמינה כרגע. ננסה שוב בעוד כמה דקות.");
       const s = f => { try { f(); } catch (e) { if (window.BRG) BRG.report("weather-render", String(e && e.stack || e)); } };
       s(renderNow); s(renderMarkers); if (st.tab === "brief") s(renderBrief);
-    })().finally(() => { wxBusy = null; });
+    })().finally(() => { wxBusy = null; /* the route changed while this ran: fetch its points now */ if (st.wx && !st.wxFail && st.wx.sig !== wxSig()) loadWeather(); });
   }
   function satHour(i, hour) {
     const p = st.wx && st.wx.pts[i]; if (!p || !p.h || !Array.isArray(p.h.time)) return null; const iso = `${st.sat.iso}T${String(hour).padStart(2, "0")}:00`; const k = p.h.time.indexOf(iso); if (k < 0) return null;
     return { t: p.h.temperature_2m[k], code: p.h.weather_code[k], p: p.h.precipitation_probability[k], g: p.h.wind_gusts_10m[k], vis: p.h.visibility ? p.h.visibility[k] : null };
   }
-  function wxMid(cid) { const cc = CHAPTERS.find(c => c.id === cid); const id = cc && cc.combo ? cc.combo[Math.floor(cc.combo.length / 2)] : cid; return wxPoints().findIndex(x => x.chap === id) + 1; }
+  function wxMid(cid) { const cc = CHAPTERS.find(c => c.id === cid); const id = cc && cc.combo ? cc.combo[Math.floor(cc.combo.length / 2)] : cid; return wxPts().findIndex(x => x.chap === id) + 1; }
   function chapterWx(cid) {
-    if (!st.wx) return null; const pts = wxPoints(); const rows = []; const cc = CHAPTERS.find(c => c.id === cid); const ids = cc && cc.combo ? cc.combo : [cid];
+    if (!st.wx) return null; const pts = wxPts(); const rows = []; const cc = CHAPTERS.find(c => c.id === cid); const ids = cc && cc.combo ? cc.combo : [cid];
     pts.forEach((p, i) => { if (!ids.includes(p.chap) || !st.wx.pts[i] || !st.wx.pts[i].h || !Array.isArray(st.wx.pts[i].h.time)) return; const w = L.windowStats(st.wx.pts[i].h, `${st.sat.iso}T06:00`, `${st.sat.iso}T12:00`, `${st.sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
     if (!rows.length) return null;
     const agg = { tMin: Math.min(...rows.map(r => r.w.tMin)), tMax: Math.max(...rows.map(r => r.w.tMax)), maxP: Math.max(...rows.map(r => r.w.maxP)), sumMm: Math.max(...rows.map(r => r.w.sumMm)), maxGust: Math.max(...rows.map(r => r.w.maxGust)), minVis: Math.min(...rows.map(r => r.w.minVis)), wet: rows.some(r => r.w.wet), storm: rows.some(r => r.w.storm), fog: rows.some(r => r.w.fog) };
@@ -1529,8 +1540,8 @@
   function syncDraft() {
     const i = CHAPTERS.findIndex(c => c.id === DRAFT); if (i >= 0) CHAPTERS.splice(i, 1);
     ["routes", "curves", "cstats", "glare", "elev", "terr", "traffic"].forEach(k => delete st[k][DRAFT]);
-    const b = st.build; if (!b || b.pts.length < 2) { if (st.chap === DRAFT || !CHAPTERS.some(c => c.id === st.chap)) st.chap = st.prevChap && st.prevChap !== DRAFT && CHAPTERS.some(c => c.id === st.prevChap) ? st.prevChap : "c1"; pushSources(); renderMarkers(); return; }
-    const c = customChapter({ id: DRAFT, title: b.title || "המסלול שלי", stops: b.pts, opts: b.opts }); CHAPTERS.push(c); st.chap = DRAFT;
+    const b = st.build; if (!b || b.pts.length < 2) { if (st.chap === DRAFT || !CHAPTERS.some(c => c.id === st.chap)) setCurrentRoute(st.prevChap && st.prevChap !== DRAFT && CHAPTERS.some(c => c.id === st.prevChap) ? st.prevChap : "c1", { persist: false }); pushSources(); renderMarkers(); return; }
+    const c = customChapter({ id: DRAFT, title: b.title || "המסלול שלי", stops: b.pts, opts: b.opts }); CHAPTERS.push(c); setCurrentRoute(DRAFT);
     clearTimeout(syncDraft.t); syncDraft.t = setTimeout(async () => { const r = await loadRoute(c); if (!CHAPTERS.includes(c)) return; processRoute(c, r); pushSources(); renderMarkers(); renderRoute(); fitChapter(); loadElev(DRAFT).then(() => st.tab === "route" && renderRoute()); }, 350);
   }
   function builderPanel() {
@@ -1714,7 +1725,7 @@
     c.nav = true; c.hidden = true; CHAPTERS.push(c);
     st.navPrev = st.chap !== NAV ? st.chap : st.navPrev; st.nav = { dest, busy: true };
     const rec = navRecent().filter(x => L.hav([x.lon, x.lat], [dest.lon, dest.lat]) > 0.1); rec.unshift({ name: dest.name, sub: dest.sub || "", lat: +dest.lat, lon: +dest.lon, t: Date.now() }); LS.set("navRecent", rec.slice(0, 8));
-    st.chap = NAV; renderGo();
+    setCurrentRoute(NAV); renderGo();
     const r = await loadRoute(c); if (navChapter() !== c) return;
     processRoute(c, r); st.nav.busy = false; st.nav.err = r.real ? null : "השרת של המסלולים לא ענה, זה קו משוער. נסו שוב בעוד רגע";
     pushSources(); renderMarkers(); fitChapter(900); if (innerWidth < 900) setSheet("half"); renderGo();
@@ -1732,7 +1743,7 @@
     const i = CHAPTERS.findIndex(c => c.id === NAV); if (i >= 0) CHAPTERS.splice(i, 1);
     ["routes", "curves", "cstats", "glare", "elev", "terr", "traffic"].forEach(k => delete st[k][NAV]);
     st.nav = null; if (quiet) return;
-    st.chap = st.navPrev && CHAPTERS.some(c => c.id === st.navPrev) ? st.navPrev : LS.get("chap", "c1"); if (!CHAPTERS.some(c => c.id === st.chap)) st.chap = "c1";
+    { const back = st.navPrev && CHAPTERS.some(c => c.id === st.navPrev) ? st.navPrev : LS.get("chap", "c1"); setCurrentRoute(CHAPTERS.some(c => c.id === back) ? back : "c1", { persist: false }); }
     pushSources(); renderMarkers(); renderGo();
   }
   function navSave() {
@@ -3005,7 +3016,12 @@
   }
   const renderTab = () => ({ go: renderGo, brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
-  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; rideFocus(false); if (id !== DRAFT && id !== NAV) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
+  function setChap(id) { stopFly(); st.rideShown = null; rideFocus(false); setCurrentRoute(id); pushSources(); renderMarkers(); renderTab(); fitChapter(); }
+  /* every consumer of the current route that is not redrawn with the tab follows it here */
+  addEventListener("br:route", () => {
+    try { if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); } catch (e) { }
+    try { if (st.tab === "brief") renderBrief(); } catch (e) { }
+  });
   const renderAll = () => { renderTab(); renderMarkers(); };
 
   /* ---------- layers popover ---------- */

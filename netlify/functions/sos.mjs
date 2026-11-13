@@ -12,7 +12,9 @@
 import { edgeGate } from "./lib/edge.mjs";
 import { sosStore, rid, hashKey, keyOk, clean, okId, inIL, body, J } from "./lib/safety.mjs";
 import { ipHash } from "./lib/admin.mjs";
+import { getStore } from "@netlify/blobs";
 import { validSub, sendOne } from "./lib/push.mjs";
+import { refusedHost, noteRefusedHost, PUSH_HOST_MSG } from "./lib/push-core.mjs";
 import { opsLog } from "./lib/ops.mjs";
 import { alertGuardians, applyResults } from "./lib/sos-core.mjs";
 const MAXG = 5, INV_DAYS = 7, INV_CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -39,6 +41,8 @@ export default async req => {
     if (await limit("j:" + ip, 10, 36e5)) return J({ error: "יותר מדי ניסיונות. נסו שוב בעוד שעה" }, 429);
     const inv = normInv(b.inv), I = inv.length === 8 && await s.get("i:" + inv, { type: "json" });
     if (!I || I.exp < now) return J({ error: "הקוד לא בתוקף. בקשו קוד חדש מהרוכב" }, 404);
+    const host = refusedHost(b.sub); /* M1: a push service we do not know is not a missing permission */
+    if (host) { await noteRefusedHost({ rl: getStore({ name: "brn-feedback", consistency: "strong" }), now: () => now, log: opsLog }, host); return J({ error: PUSH_HOST_MSG, code: "push_host" }, 400); }
     if (!validSub(b.sub)) return J({ error: "אין הרשאת התראות במכשיר הזה" }, 400);
     const C = await s.get("c:" + I.circle, { type: "json" }); if (!C) return J({ error: "not found" }, 404);
     const ep = b.sub.endpoint; C.g = C.g.filter(g => g.sub.endpoint !== ep);

@@ -5,27 +5,47 @@
      without this a script could make the server POST to hosts it chose. Hosts (checked 2026-11-13 against the
      browsers' push services): Chrome, Android, Samsung, Opera, Brave and Edge on Android use Firebase Cloud
      Messaging (fcm.googleapis.com); Firefox uses Mozilla autopush (updates.push.services.mozilla.com); Safari on
-     macOS and iOS uses web.push.apple.com; Edge on Windows uses WNS (<node>.notify.windows.com). No userinfo, no
-     port, bounded lengths.
+     macOS and iOS uses web.push.apple.com, and Apple names *.push.apple.com for web push, so any one-label
+     subdomain of push.apple.com is accepted (M1, security review 2026-11-13 final; Apple-owned zone); Edge on
+     Windows uses WNS (<node>.notify.windows.com). No userinfo, no port, bounded lengths.
    - sendAllWith: every send has a timeout (PUSH_TIMEOUT_MS) and at most SEND_CONCURRENCY run at once, so a slow
      endpoint cannot hold the weekend brief until it times out before it reaches real riders.
    - makeSubscribe: a NEW endpoint passes a per-IP hourly throttle (rateGate markers rl:<hour>:sub.<ip>:<rand> in
      the feedback store, pruned by the monitor's feedback sweep) and a cap on stored subscriptions (PUSH_SUBS_CAP,
-     default 20000; the monitor alerts at 90%). Updating an existing endpoint (prefs, chapter) is never throttled. */
+     default 20000; the monitor alerts at 90%). Updating an existing endpoint (prefs, chapter) is never throttled.
+   - refusedHost / noteRefusedHost (M1): an endpoint on a push service we do not know gets its own Hebrew message
+     (PUSH_HOST_MSG, not "no notification permission"), and its HOSTNAME only (never the path: it is a capability URL)
+     goes to the ops log, at most PUSH_HOST_LOG_MAX lines an hour across all IPs, so a new browser push host is noticed. */
 import { createHash } from "node:crypto";
 import { cleanChap } from "./brief-chapter.mjs";
 import { hourOf, listKeys, rateGate } from "./blob-util.mjs";
 
 export const PUSH_TIMEOUT_MS = 5000, SEND_CONCURRENCY = 20, SUB_RATE_MAX = 20, SUBS_CAP = 20000;
 export const PUSH_HOSTS = ["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"];
-const WNS = /^[a-z0-9-]+\.notify\.windows\.com$/;
+const WNS = /^[a-z0-9-]+\.notify\.windows\.com$/, APPLE = /^[a-z0-9-]+\.push\.apple\.com$/;
+export const PUSH_HOST_LOG_MAX = 5;
+export const PUSH_HOST_MSG = "שירות ההתראות של הדפדפן הזה לא נתמך אצלנו. נסו Chrome או Safari";
 
 export function pushHostOk(endpoint) {
   if (typeof endpoint !== "string" || endpoint.length > 2048) return false;
   let u; try { u = new URL(endpoint); } catch (e) { return false; }
   if (u.protocol !== "https:" || u.username || u.password || u.port) return false;
   const h = u.hostname.toLowerCase();
-  return PUSH_HOSTS.includes(h) || WNS.test(h);
+  return PUSH_HOSTS.includes(h) || WNS.test(h) || APPLE.test(h);
+}
+/* the hostname of a subscription refused for its push service ("" when the host is fine or there is no URL) */
+export function refusedHost(sub) {
+  const ep = sub && typeof sub === "object" ? sub.endpoint : null;
+  if (typeof ep !== "string" || pushHostOk(ep)) return "";
+  try { return new URL(ep).hostname.toLowerCase().slice(0, 100); } catch (e) { return ""; }
+}
+/* deps: { rl: store for the markers, now() -> ms, log(service, level, msg) }. Never throws. */
+export async function noteRefusedHost(deps, host) {
+  try {
+    if (!deps || !deps.log || !host) return false;
+    if (!(await rateGate(deps.rl, `rl:${hourOf(deps.now())}:pushhost:`, PUSH_HOST_LOG_MAX, deps.now()))) return false;
+    await deps.log("push", "warn", `push host refused: ${host}`); return true;
+  } catch (e) { return false; }
 }
 export const validSub = s => !!s && typeof s === "object" && pushHostOk(s.endpoint) && !!s.keys && typeof s.keys === "object"
   && typeof s.keys.p256dh === "string" && s.keys.p256dh.length <= 200 && typeof s.keys.auth === "string" && s.keys.auth.length <= 100;
@@ -75,7 +95,8 @@ export async function sendAllWith({ store, send, payload, pref, concurrency = SE
 }
 
 const json = (o, status = 200) => Response.json(o, { status });
-/* deps: { subs: store, rl: store for the throttle markers, ipHash(req), now() -> ms, cap: PUSH_SUBS_CAP or undefined } */
+/* deps: { subs: store, rl: store for the throttle markers, ipHash(req), now() -> ms, cap: PUSH_SUBS_CAP or undefined,
+   log: opsLog (optional, the refused-host line) } */
 export function makeSubscribe(deps) {
   return async req => {
     let body = {}; try { const t = await req.text(); if (t.length > 4000) return new Response("too large", { status: 413 }); body = JSON.parse(t || "{}"); } catch (e) { return new Response("bad json", { status: 400 }); }
@@ -89,6 +110,8 @@ export function makeSubscribe(deps) {
       const key = keyOf(body.endpoint), rec = await subs.get(key, { type: "json" }); if (!rec) return new Response("not found", { status: 404 });
       rec.chap = cleanChap(body.chap); rec.ts = Date.now(); await subs.setJSON(key, rec); return json({ ok: true, chap: rec.chap });
     }
+    const host = refusedHost(body.sub);
+    if (host) { await noteRefusedHost(deps, host); return json({ error: PUSH_HOST_MSG, code: "push_host" }, 400); }
     if (!validSub(body.sub)) return new Response("bad subscription", { status: 400 });
     const old = await subs.get(keyOf(body.sub.endpoint), { type: "json" }).catch(() => null);
     if (!old) {

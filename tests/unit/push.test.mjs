@@ -140,3 +140,38 @@ test("perf: the brief is handed to a background function as a one-time job, sent
   const bg = readFileSync(new URL("../../netlify/functions/brief-send-background.mjs", import.meta.url), "utf8");
   assert.match(bg, /takeJob\(/); assert.match(bg, /sendAll\(briefPayload\(job\), MODES\[job\.mode\]\.pref\)/);
 });
+
+test("M1: Apple's push subdomains are accepted; a refused host gets its own message and only its hostname is logged", async () => {
+  const { refusedHost, noteRefusedHost, PUSH_HOST_MSG, PUSH_HOST_LOG_MAX } = await import("../../netlify/functions/lib/push-core.mjs");
+  for (const ep of ["https://web.push.apple.com/QH1", "https://api.push.apple.com/x", "https://eu-1.push.apple.com/x"]) assert.ok(pushHostOk(ep), ep);
+  for (const ep of ["https://push.apple.com/x", "https://a.b.push.apple.com/x", "https://push.apple.com.evil.example/x", "https://evilpush.apple.com/x".replace("evilpush.apple", "evil.push.apple.com.x"), "http://web.push.apple.com/x"])
+    assert.equal(pushHostOk(ep), false, ep);
+  assert.equal(refusedHost(sub(1)), "");
+  assert.equal(refusedHost({ endpoint: "https://Push.Example.net/secret/token123", keys }), "push.example.net");
+  assert.equal(refusedHost({ endpoint: "not a url" }), ""); assert.equal(refusedHost(null), "");
+  // subscribe: the Hebrew message, a log line with the hostname only, at most PUSH_HOST_LOG_MAX an hour
+  const subs = fakeStore(), rl = fakeStore(), lines = [];
+  const h = makeSubscribe({ subs, rl, ipHash: async () => "ip", now: () => Date.UTC(2026, 10, 13, 9), log: async (...a) => lines.push(a) });
+  for (let i = 0; i < 12; i++) {
+    const r = await h(req({ sub: { endpoint: `https://push.example.net/secret/token${i}`, keys } }));
+    assert.equal(r.status, 400); const j = await r.json(); assert.equal(j.error, PUSH_HOST_MSG); assert.equal(j.code, "push_host");
+  }
+  assert.equal(lines.length, PUSH_HOST_LOG_MAX);
+  assert.deepEqual(lines[0], ["push", "warn", "push host refused: push.example.net"]);
+  assert.ok(lines.every(l => !/secret|token/.test(l.join(" "))), "never the path");
+  assert.equal(subs.m.size, 0);
+  // a malformed subscription on a known host is still the old plain 400, and logs nothing
+  assert.equal((await h(req({ sub: { endpoint: sub(1).endpoint } }))).status, 400); assert.equal(lines.length, PUSH_HOST_LOG_MAX);
+  assert.equal(await noteRefusedHost({ rl, now: () => 0, log: async () => { throw new Error("x"); } }, "h"), false, "never throws");
+  // the SOS join gives the same message for a refused push service, not "no notification permission"
+  const sos = readFileSync(new URL("../../netlify/functions/sos.mjs", import.meta.url), "utf8");
+  assert.match(sos, /const host = refusedHost\(b\.sub\);[^\n]*\n\s+if \(host\) \{ await noteRefusedHost\([^\n]*return J\(\{ error: PUSH_HOST_MSG, code: "push_host" \}, 400\)/);
+  assert.ok(sos.indexOf("refusedHost(b.sub)") < sos.indexOf("if (!validSub(b.sub))"));
+  assert.match(readFileSync(new URL("../../netlify/functions/subscribe.mjs", import.meta.url), "utf8"), /log: opsLog/);
+});
+
+test("M1: the app shows the server's reason when a push subscription is refused", () => {
+  const app = readFileSync(new URL("../../site/app.js", import.meta.url), "utf8");
+  assert.match(app, /if \(!r\.ok\) \{ const j = await r\.json\(\)\.catch\(\(\) => \(\{\}\)\); throw new Error\(j\.error \|\| ""\); \}/);
+  assert.doesNotMatch(app, /if \(!r\.ok\) throw 0; LS\.set\("pushChap"/);
+});

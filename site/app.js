@@ -1437,8 +1437,9 @@
           const perm = await Notification.requestPermission(); if (perm !== "granted") { renderPush(); return; }
           const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(st.vapid) });
           const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs, chap: pushChap() }) });
-          if (!r.ok) throw 0; LS.set("pushChap", pushChap()); toast("ההתראות פעילות"); renderPush();
-        } catch (e) { toast("ההפעלה לא הצליחה. נסו שוב"); }
+          if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ""); } /* M1: e.g. a push service we do not support */
+          LS.set("pushChap", pushChap()); toast("ההתראות פעילות"); renderPush();
+        } catch (e) { toast((e && e.message) || "ההפעלה לא הצליחה. נסו שוב", 5000); }
       };
       return;
     }

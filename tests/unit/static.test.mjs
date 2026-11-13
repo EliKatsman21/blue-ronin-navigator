@@ -125,3 +125,29 @@ test("vendored libraries: cache-first in the service worker and immutable at the
   // every vendored path is versioned, which is what makes immutable safe
   for (const f of JSON.parse(sw.match(/const SHELL_FILES = (\[[^\]]+\])/)[1]).filter(f => f.startsWith("vendor/"))) assert.match(f, /^vendor\/[a-z-]+\/\d+\.\d+\.\d+\//, f);
 });
+
+/* L4 (security review 2026-11-13 final): /vendor/* is immutable for a year and cache-first in the service worker, so
+   a file edited in place under an existing vendor/<lib>/<x.y.z>/ path would stay stale on riders' phones. Every
+   vendored file is pinned by SHA-256 here (no node_modules needed; site/vendor is -text in .gitattributes, so the
+   bytes are exact). A vendor upgrade means a NEW versioned path, new pins, the tests/package.json version, and a
+   SHELL bump in sw.js (release checklist). */
+const VENDOR_SHA256 = {
+  "maplibre-gl/4.7.1/LICENSE.txt": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2",
+  "maplibre-gl/4.7.1/maplibre-gl.css": "576b085fdd9487a65a19215328c1e086c07ce5bf6da09b666b3806d3d008dae9",
+  "maplibre-gl/4.7.1/maplibre-gl.js": "be9633c4d870e26fb37f1cfe5c5a77181667114003ea16207ac7850d8da8add1",
+  "suncalc/1.9.0/LICENSE": "9010b843aad8e450890fc18dae2dfec00e68c10da775515801c42878afbb0da1",
+  "suncalc/1.9.0/suncalc.js": "5bfe4127cb91b7436295135d491e2d8abeccacbc8c4d450fb30771183b1e24d2"
+};
+test("vendored files match their SHA-256 pins, and every vendored file is pinned (L4)", async () => {
+  const { createHash } = await import("node:crypto");
+  const V = join(SITE, "vendor");
+  const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);
+  const files = walk(V).map(f => f.slice(V.length + 1).replace(/\\/g, "/")).sort();
+  assert.deepEqual(files, Object.keys(VENDOR_SHA256).sort(), "a vendored file was added or removed: pin it here (new versioned path)");
+  for (const [f, want] of Object.entries(VENDOR_SHA256))
+    assert.equal(createHash("sha256").update(readFileSync(join(V, f))).digest("hex"), want, `vendor/${f} changed in place: use a new versioned path and bump SHELL`);
+  // the path version is the pinned npm version
+  const pkg = JSON.parse(read(join(ROOT, "tests", "package.json"))).devDependencies;
+  for (const f of files) { const [lib, ver] = f.split("/"); assert.equal(pkg[lib], ver, `vendor/${f}: path version vs tests/package.json`); }
+  assert.match(read(join(ROOT, ".gitattributes")), /site\/vendor\/\*\* -text/);
+});

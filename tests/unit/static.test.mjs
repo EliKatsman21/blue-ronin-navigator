@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SITE = join(ROOT, "site");
@@ -67,7 +67,7 @@ test("netlify.toml keeps the old-host redirects and never builds non-production 
 });
 
 test("waitlist: email cleaning, referral codes and sources", async () => {
-  const mod = await import(join(FN, "lib", "join-core.mjs"));
+  const mod = await import(pathToFileURL(join(FN, "lib", "join-core.mjs")).href);
   assert.equal(mod.cleanEmail("  Rider@Example.CO.il "), "rider@example.co.il");
   for (const bad of ["", "a@b", "no at.com", "x@@y.com", "a..b@c.com", "<s>@x.com", "a@b.com,c@d.com"]) assert.equal(mod.cleanEmail(bad), null, bad);
   for (let i = 0; i < 200; i++) assert.ok(mod.isRef(mod.newRef()));

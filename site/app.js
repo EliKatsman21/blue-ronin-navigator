@@ -3090,6 +3090,8 @@
   function closeLayers() { const p = $("layersPop"); if (p && !p.hidden) { p.hidden = true; $("fLayers").setAttribute("aria-pressed", "false"); } }
   $("fLayers").onclick = () => { const p = $("layersPop"); const open = p.hidden; if (open && innerWidth < 900 && st.sheet !== "peek") setSheet("peek"); p.hidden = !open; $("fLayers").setAttribute("aria-pressed", String(open)); };
   $("layersClose").onclick = closeLayers;
+  /* Escape closes the panel and gives focus back to its button (an open dialog takes Escape first) */
+  addEventListener("keydown", e => { if (e.key !== "Escape" || !$("modal").hidden) return; const p = $("layersPop"); if (p && !p.hidden) { closeLayers(); $("fLayers").focus(); } });
   map.on("click", () => { if (innerWidth < 900) closeLayers(); });
   document.querySelectorAll("#layersPop input").forEach(i => i.onchange = () => {
     st.layers[i.dataset.l] = i.checked; LS.set("layers", Object.assign({}, st.layers, { radar: false }));

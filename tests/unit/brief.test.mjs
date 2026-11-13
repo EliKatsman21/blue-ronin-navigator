@@ -40,9 +40,9 @@ test("the scheduled briefs send per chapter, and the subscription stores the cha
     assert.match(src, /sendAll\(rec => \{ const m = pickMessage\(b\.messages, cleanChap\(rec\.chap\)\)/, f);
     assert.equal((src.match(/computeBrief\(/g) || []).length, 1, `${f} computes the brief once`);
   }
-  const push = read("../../netlify/functions/lib/push.mjs");
+  const push = read("../../netlify/functions/lib/push-core.mjs"); /* the logic moved here (N2) */
   assert.match(push, /prefs: clean, chap: c, ts: Date\.now\(\)/);
-  assert.match(push, /rec\.chap = cleanChap\(chap\)/);
+  assert.match(push, /rec\.chap = cleanChap\(body\.chap\)/);
   const brief = read("../../netlify/functions/lib/brief.mjs");
   assert.match(brief, /for \(const c of chapters\) byChap\[c\.id\] = briefText\(c, mode, ctx\)/);
   // the client sends nothing but the endpoint and the built-in chapter id

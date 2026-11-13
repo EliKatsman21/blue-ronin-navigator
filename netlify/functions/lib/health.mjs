@@ -6,6 +6,7 @@
 import { getStore } from "@netlify/blobs";
 import { opsStore, opsLog, usage } from "./ops.mjs";
 import { sendOne } from "./push.mjs";
+import { subsCap } from "./push-core.mjs";
 import { sweepFeedback, mediaUse } from "./feedback-core.mjs";
 
 const errStore = () => getStore({ name: "brn-err", consistency: "strong" });
@@ -31,7 +32,7 @@ export const PLAYBOOK = {
   boot: ["פתיחת האפליקציה", "critical", "טלפונים לא מצליחים לפתוח את האפליקציה. לבדוק את התקלות האחרונות ולשקול Rollback."],
   ops: ["יומן השרת", "high", "שגיאות בפונקציות השרת. הפירוט ביומן למטה."],
   fbmedia: ["תמונות משוב", "normal", "תמונות והקלטות המשוב של היום הגיעו ל־80% מהמכסה היומית. מעבר למכסה דיווחים מתקבלים בלי תמונות. אם זה רוכבים אמיתיים, אפשר להעלות את FB_MEDIA_DAILY_MB; אם זו הצפה, לבדוק את התיבה ולשקול חסימה ב־Cloudflare."],
-  push: ["התראות", "normal", "אין מפתחות VAPID או שאין אף מנוי. התראות לא יגיעו."]
+  push: ["התראות", "normal", "מספר המנויים להתראות הגיע ל־90% מהתקרה (PUSH_SUBS_CAP, ברירת מחדל 20000). מעבר לתקרה הרשמות חדשות נדחות. אם אלה רוכבים אמיתיים, אפשר להעלות את PUSH_SUBS_CAP; אם זו הצפה, לבדוק ולשקול חסימה ב־Cloudflare."]
 };
 
 async function probe(url, opts = {}) {
@@ -94,7 +95,8 @@ export async function runScan({ manual = false } = {}) {
   try { const sw = await mediaUse({ media: fbStores().media, now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB") });
     const mb = n => (n / 1048576).toFixed(1); add("fbmedia", sw.pct < 0.8, `${mb(sw.used)} מתוך ${mb(sw.cap)} MB היום (${Math.round(sw.pct * 100)}%)`, null, sw.pct >= 1 ? "high" : "normal"); } catch (e) { }
   let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
-  add("push", true, `${subs} מנויים להתראות`);
+  { const cap = subsCap(Netlify.env.get("PUSH_SUBS_CAP")), pct = subs / cap; /* N2: alert at 90% of the cap on subscriptions */
+    add("push", pct < 0.9, `${subs} מנויים להתראות מתוך תקרה של ${cap} (${Math.round(pct * 100)}%)`, null, pct >= 1 ? "high" : "normal"); }
 
   /* incidents: open after two failing scans in a row (one, for critical), close on recovery */
   const alerts = [];

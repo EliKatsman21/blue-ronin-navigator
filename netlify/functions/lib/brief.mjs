@@ -2,6 +2,7 @@
 import logicMod from "../../../site/logic.js";
 import dataMod from "../../../site/data.js";
 import SunCalc from "suncalc";
+import { briefText } from "./brief-chapter.mjs";
 
 const L = logicMod.BRL;
 const { CHAPTERS } = dataMod.BRD;
@@ -40,19 +41,13 @@ export async function computeBrief(mode = "friday") {
   const sunrise = hhmm(t.sunrise), depart = hhmm(new Date(t.sunrise.getTime() + 15 * 6e4));
   const now = wx[wx.length - 1].current || {};
   const temps = c => `${Math.round(c.agg.tMin)}°–${Math.round(c.agg.tMax)}°`;
-  const warn = c => c.fog[0] || (c.ri.why[0] ? c.ri.why[0] : "בלי גשם, ערפל או רוח חריגה");
+  const ctx = { sunrise, depart, now, wmo: L.wmo };
 
-  let title, body;
-  if (!best) { title = "תדריך שבת"; body = "התחזית לשבת עוד לא זמינה."; }
-  else if (mode === "saturday") {
-    title = best.ri.i < 38 ? "בוקר שבת · היום עדיף לוותר" : `בוקר שבת · ${best.title} ${best.ri.i}/100`;
-    body = `עכשיו ${Math.round(now.temperature_2m ?? 0)}° ביוקנעם, ${L.wmo(now.weather_code).t}. ${warn(best)}. זריחה ${sunrise}, יציאה מומלצת ${depart}.`;
-  } else {
-    title = best.ri.i < 38 ? "תדריך שבת · השבת הזאת לא" : `תדריך שבת · ${best.title} ${best.ri.i}/100`;
-    body = `${best.ri.verdict.t}. ${temps(best)} בבוקר. ${warn(best)}. זריחה ${sunrise}.`;
-  }
+  /* the general message (best chapter) and one per chapter, for riders who chose a built-in chapter */
+  const { title, body } = best ? briefText(best, mode, ctx) : { title: "תדריך שבת", body: "התחזית לשבת עוד לא זמינה." };
+  const byChap = {}; for (const c of chapters) byChap[c.id] = briefText(c, mode, ctx);
   return {
-    mode, sat: sat.iso, sunrise, depart, title, body,
+    mode, sat: sat.iso, sunrise, depart, title, body, messages: { best: { title, body }, byChap },
     best: best ? { id: best.id, title: best.title, i: best.ri.i, verdict: best.ri.verdict } : null,
     chapters: chapters.map(c => ({ id: c.id, title: c.title, i: c.ri.i, verdict: c.ri.verdict.t, why: c.ri.why, fog: c.fog, temps: temps(c) }))
   };

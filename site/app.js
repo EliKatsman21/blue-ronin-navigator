@@ -1436,8 +1436,8 @@
         try {
           const perm = await Notification.requestPermission(); if (perm !== "granted") { renderPush(); return; }
           const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(st.vapid) });
-          const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs }) });
-          if (!r.ok) throw 0; toast("ההתראות פעילות"); renderPush();
+          const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs, chap: pushChap() }) });
+          if (!r.ok) throw 0; LS.set("pushChap", pushChap()); toast("ההתראות פעילות"); renderPush();
         } catch (e) { toast("ההפעלה לא הצליחה. נסו שוב"); }
       };
       return;
@@ -1446,7 +1446,7 @@
       <label class="toggle small"><input type="checkbox" id="ppF" ${prefs.friday ? "checked" : ""}> תדריך שבת · שישי אחר הצהריים</label>
       <label class="toggle small"><input type="checkbox" id="ppS" ${prefs.saturday ? "checked" : ""}> עדכון בוקר שבת · לפני הזריחה</label>
       <div class="row"><button type="button" class="btn" id="pushTest">שליחת התראת בדיקה</button><button type="button" class="btn" id="pushOff">כיבוי</button></div>`;
-    const savePrefs = async () => { const p = { friday: $("ppF").checked, saturday: $("ppS").checked }; LS.set("pushPrefs", p); try { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs: p }) }); toast("נשמר"); } catch (e) { toast("לא נשמר, אין חיבור"); } };
+    const savePrefs = async () => { const p = { friday: $("ppF").checked, saturday: $("ppS").checked }; LS.set("pushPrefs", p); try { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs: p, chap: pushChap() }) }); LS.set("pushChap", pushChap()); toast("נשמר"); } catch (e) { toast("לא נשמר, אין חיבור"); } };
     $("ppF").onchange = savePrefs; $("ppS").onchange = savePrefs;
     $("pushTest").onclick = async () => { try { const r = await fetch("/api/test-push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); if (r.status === 404) { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs }) }); toast("נרשם מחדש. לחצו שוב"); return; } toast(r.ok ? "נשלחה. היא תקפוץ בעוד רגע" : "השליחה נכשלה"); } catch (e) { toast("אין חיבור לשרת"); } };
     $("pushOff").onclick = async () => { try { await fetch("/api/subscribe", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); } catch (e) { } await sub.unsubscribe(); toast("ההתראות כבויות"); renderPush(); };
@@ -3066,6 +3066,19 @@
   });
   function setChap(id) { stopFly(); st.rideShown = null; rideFocus(false); setCurrentRoute(id); pushSources(); renderMarkers(); renderTab(); fitChapter(); }
   /* every consumer of the current route that is not redrawn with the tab follows it here */
+  /* The weekend push brief follows the chosen built-in chapter: only its id goes to the server, never a custom
+     route or a nav trip (those keep the last built-in choice). Debounced, and only when it changed. */
+  function pushChap() { const id = LS.get("chap", ""); const i = CHAPTERS.findIndex(c => c.id === id); return i >= 0 && i < BUILT_IN && !CHAPTERS[i].custom ? id : ""; }
+  addEventListener("br:route", () => {
+    clearTimeout(pushChap.t); pushChap.t = setTimeout(async () => {
+      try {
+        const id = pushChap(); if (!id || id === LS.get("pushChap", "") || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+        const reg = await navigator.serviceWorker.ready, sub = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (!sub) return;
+        const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ setChap: true, endpoint: sub.endpoint, chap: id }) });
+        if (r.ok) LS.set("pushChap", id);
+      } catch (e) { }
+    }, 4000);
+  });
   addEventListener("br:route", () => {
     try { if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); } catch (e) { }
     try { if (st.tab === "brief") renderBrief(); } catch (e) { }

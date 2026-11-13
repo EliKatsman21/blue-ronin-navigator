@@ -113,7 +113,9 @@ test("accessibility statement: no personal name and no draft note in the publish
   assert.doesNotMatch(html, /כצמן|Katsman/);
   assert.doesNotMatch(html, /Draft for legal review|טיוטה/);
   assert.match(html, /<li>פניות בנושא נגישות<\/li>/);
-  assert.match(html, /mailto:hello@blueronin\.app/);
+  // hello@ is not live yet (domain transfer pending): until it is, the in-app feedback form is the
+  // accessibility contact (Eli, 2026-11-13). Put the mailto line back when hello@ receives mail.
+  assert.match(html, /"משוב לצוות"/);
   assert.match(html, /מפעיל השירות: Blue Ronin\./);
 });
 

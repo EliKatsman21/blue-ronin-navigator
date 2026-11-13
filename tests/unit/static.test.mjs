@@ -78,6 +78,10 @@ test("waitlist: email cleaning, referral codes and sources", async () => {
   const page = read(join(SITE, "join.js"));
   for (const s of mod.SRCS) assert.ok(page.includes(`"${s}"`), `join.js is missing source ${s}`);
   assert.ok(page.includes("[A-HJKMNP-Z2-9]{6}"));
+  // the weekend brief link in the WhatsApp channel is counted as its own source, by /go and by /join
+  assert.equal(mod.cleanSrc("wa-brief"), "wa-brief");
+  const go = read(join(SITE, "go.js")); for (const s of ["wa", "wa-brief", "ig"]) assert.ok(go.includes(`"${s}"`), `go.js is missing source ${s}`);
+  for (const s of go.match(/SRCS = \[([^\]]*)\]/)[1].match(/"([^"]+)"/g).map(x => x.slice(1, -1))) assert.equal(mod.cleanSrc(s), s, `/go source ${s} is not accepted by /api/join`);
 });
 
 test("landing pages: no inline scripts (CSP) and their files exist", () => {

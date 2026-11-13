@@ -274,7 +274,7 @@
   async function join() {
     V(`<div class="head"><h2>רשימת ההמתנה</h2></div><div class="small muted">טוען…</div>`);
     let d; try { d = await api("GET", "join"); } catch (e) { return; }
-    const SRC = { ig: "אינסטגרם", yt: "יוטיוב", wa: "וואטסאפ", tt: "טיקטוק", fb: "פייסבוק", app: "האפליקציה", qr: "מדבקת QR", press: "עיתונות", friend: "חבר", site: "ישיר" };
+    const SRC = { ig: "אינסטגרם", yt: "יוטיוב", wa: "וואטסאפ", "wa-brief": "תדריך הוואטסאפ", tt: "טיקטוק", fb: "פייסבוק", app: "האפליקציה", qr: "מדבקת QR", press: "עיתונות", friend: "חבר", site: "ישיר" };
     const bySrc = {}; d.items.forEach(x => bySrc[x.src] = (bySrc[x.src] || 0) + 1);
     const earned = d.items.filter(x => x.refs >= d.need).length, week = d.items.filter(x => Date.now() - x.t < 7 * 864e5).length;
     const el = V(`<div class="head"><h2>רשימת ההמתנה</h2><span class="small muted">נרשמים דרך blueronin.app/join. ${d.need} חברים שהצטרפו = חודש Pro בהשקה</span></div>

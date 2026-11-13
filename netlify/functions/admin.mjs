@@ -16,6 +16,7 @@ import { joinStore, SRCS, NEED, refsOf } from "./lib/join.mjs";
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
 import { MEDIA_KEY } from "./lib/fbmedia.mjs";
+import { inboxNow } from "./lib/feedback-core.mjs";
 const fbMedia = () => getStore({ name: "brn-fb-media", consistency: "strong" });
 const dropMedia = async items => { for (const x of items) for (const k of x.media || []) await fbMedia().delete(x.id + "-" + k).catch(() => { }); };
 const statStore = () => getStore({ name: "brn-stats", consistency: "strong" });
@@ -83,7 +84,7 @@ export default async req => {
     const days = (await statStore().get("days", { type: "json" })) || {};
     let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
     const fuel = (await fuelStore().get("all", { type: "json" })) || {}; let votes = 0; for (const st of Object.values(fuel)) votes += Object.keys(st.v || {}).length + (st.r || []).length;
-    const fb = (await fbStore().get("inbox", { type: "json" })) || [];
+    const fb = await inboxNow(fbStore(), fbMedia());
     const auditLog = (await s.get("audit", { type: "json" })) || [];
     return json({ days, subs, stations: Object.keys(fuel).length, votes, feedbackNew: fb.filter(x => x.status === "new").length, feedbackAll: fb.length, lastLogin: auth.lastLogin || null, pwChanged: auth.pwChanged || null, fails24: auditLog.filter(x => x.a.startsWith("fail") && Date.now() - x.t < 864e5).length });
   }
@@ -124,14 +125,14 @@ export default async req => {
     const r = await fbMedia().getWithMetadata(id + "-" + k, { type: "arrayBuffer" }); if (!r) return json({ error: "not found" }, 404);
     return new Response(r.data, { headers: { "content-type": r.metadata && r.metadata.ct || "application/octet-stream", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
   }
-  if (route === "GET feedback") return json({ items: ((await fbStore().get("inbox", { type: "json" })) || []).slice().reverse() });
+  if (route === "GET feedback") return json({ items: (await inboxNow(fbStore(), fbMedia())).slice().reverse() });
   if (route === "POST feedback/status") {
-    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const it = inbox.find(x => x.id === b.id); if (!it) return json({ error: "not found" }, 404);
+    const inbox = await inboxNow(fbStore(), fbMedia()); const it = inbox.find(x => x.id === b.id); if (!it) return json({ error: "not found" }, 404);
     if (b.status === "delete") { inbox.splice(inbox.indexOf(it), 1); await dropMedia([it]); } else if (["new", "open", "done"].includes(b.status)) it.status = b.status; else return json({ error: "bad status" }, 400);
     await fbStore().setJSON("inbox", inbox); await audit("feedback", { id: b.id, s: b.status }); return json({ ok: true });
   }
   if (route === "POST feedback/purge") {
-    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length; await dropMedia(inbox.filter(x => x.status === "done"));
+    const inbox = await inboxNow(fbStore(), fbMedia()); const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length; await dropMedia(inbox.filter(x => x.status === "done"));
     await fbStore().setJSON("inbox", keep); await audit("feedback-purge", { n }); return json({ ok: true, removed: n });
   }
   if (route === "POST broadcast") {

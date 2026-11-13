@@ -6,9 +6,11 @@
 import { getStore } from "@netlify/blobs";
 import { opsStore, opsLog, usage } from "./ops.mjs";
 import { sendOne } from "./push.mjs";
+import { sweepFeedback } from "./feedback-core.mjs";
 
 const errStore = () => getStore({ name: "brn-err", consistency: "strong" });
 const subsStore = () => getStore({ name: "brn-subs", consistency: "strong" });
+const fbStores = () => ({ fb: getStore({ name: "brn-feedback", consistency: "strong" }), media: getStore({ name: "brn-fb-media", consistency: "strong" }) });
 const BASE = () => Netlify.env.get("URL") || "https://blueronin.app";
 const MIN = 6e4, HOUR = 36e5;
 
@@ -87,6 +89,8 @@ export async function runScan({ manual = false } = {}) {
   const own = logs.filter(l => l.service !== "monitor"); /* the monitor's own alerts must not feed back into this check */
   const bad = own.filter(l => l.level === "error" || l.level === "critical"), crit = own.filter(l => l.level === "critical");
   add("ops", !bad.length, bad.length ? `${bad.length} שגיאות: ${[...new Set(bad.map(l => l.service))].join(", ")} · ${bad[bad.length - 1].msg}` : "אין שגיאות", null, crit.length ? "critical" : null);
+  /* feedback storage: orphan media (no inbox entry, older than an hour) and old rate markers are deleted */
+  try { const sw = await sweepFeedback({ ...fbStores(), now }); if (sw.orphans) await opsLog("monitor", "info", `נמחקו ${sw.orphans} קובצי מדיה של משוב בלי דיווח`, sw); } catch (e) { }
   let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
   add("push", true, `${subs} מנויים להתראות`);
 

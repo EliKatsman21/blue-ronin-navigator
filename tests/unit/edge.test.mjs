@@ -2,7 +2,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { viaEdge, clientIp, edgeGate } from "../../netlify/functions/lib/edge.mjs";
+import { viaEdge, clientIp, edgeGate, edgeReady, publicPing, adminPing } from "../../netlify/functions/lib/edge.mjs";
 
 const SECRET = "s3cr3t-s3cr3t-s3cr3t-s3cr3t-42";
 const req = h => new Request("https://blueronin.app/api/join", { headers: h });
@@ -47,4 +47,22 @@ test("every /api function passes through the gate", () => {
   }
   const admin = readFileSync(new URL("lib/admin.mjs", dir), "utf8");
   assert.match(admin, /ipOf = req => clientIp\(req\)/, "lib/admin.mjs must take the address from lib/edge.mjs");
+});
+
+test("edgeReady reports only whether a usable secret is configured", () => {
+  assert.equal(edgeReady(), false);
+  process.env.EDGE_SECRET = SECRET;
+  assert.equal(edgeReady(), true);
+});
+
+test("L4: the public ping tells only whether the request came through the edge; ready is for the admin", () => {
+  process.env.EDGE_SECRET = SECRET;
+  assert.deepEqual(Object.keys(publicPing(req({}))), ["edge"]);
+  assert.deepEqual(publicPing(req({ "x-br-edge": SECRET })), { edge: true });
+  assert.deepEqual(adminPing(req({})), { edge: false, ready: true });
+  const dir = new URL("../../netlify/functions/", import.meta.url);
+  const ping = readFileSync(new URL("ping.mjs", dir), "utf8"), admin = readFileSync(new URL("admin.mjs", dir), "utf8");
+  assert.ok(ping.includes("Response.json(publicPing(req)")); assert.ok(!/edgeReady|ready:/.test(ping), "ping.mjs must not expose ready");
+  // the admin route sits behind the session check
+  assert.ok(admin.indexOf('route === "GET edge"') > admin.indexOf("const me = await session(req, auth); if (!me) return"));
 });

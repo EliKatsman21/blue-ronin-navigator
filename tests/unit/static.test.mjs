@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SITE = join(ROOT, "site");
@@ -28,6 +28,21 @@ test("service worker shell version looks right and every shell file exists", () 
   assert.match(sw, /const SHELL = "brn-shell-v\d+"/);
   const files = JSON.parse(sw.match(/const SHELL_FILES = (\[[^\]]+\])/)[1]);
   for (const f of files) if (f !== "./") assert.ok(existsSync(join(SITE, f)), `sw.js precaches missing file: ${f}`);
+});
+
+test("MapLibre and SunCalc are self-hosted, precached, licensed and match the pinned packages", () => {
+  const sw = read(join(SITE, "sw.js")), toml = read(join(SITE, "..", "netlify.toml"));
+  const libs = [["vendor/maplibre-gl/4.7.1/maplibre-gl.js", "maplibre-gl/dist/maplibre-gl.js"], ["vendor/maplibre-gl/4.7.1/maplibre-gl.css", "maplibre-gl/dist/maplibre-gl.css"], ["vendor/suncalc/1.9.0/suncalc.js", "suncalc/suncalc.js"]];
+  const pkg = JSON.parse(read(join(SITE, "..", "tests", "package.json"))).devDependencies;
+  assert.equal(pkg["maplibre-gl"], "4.7.1"); assert.equal(pkg.suncalc, "1.9.0");
+  for (const [v, nm] of libs) {
+    assert.ok(sw.includes(`"${v}"`), `sw.js shell is missing ${v}`);
+    const nmPath = join(SITE, "..", "tests", "node_modules", nm);
+    if (existsSync(nmPath)) assert.equal(read(join(SITE, v)).replace(/\r/g, ""), read(nmPath).replace(/\r/g, ""), `${v} differs from the npm package`);
+  }
+  assert.ok(existsSync(join(SITE, "vendor/maplibre-gl/4.7.1/LICENSE.txt")) && existsSync(join(SITE, "vendor/suncalc/1.9.0/LICENSE")), "vendor LICENSE files");
+  for (const page of ["index.html", "live.html", "admin.html"]) assert.ok(!/unpkg\.com\/maplibre-gl|suncalc\/1\.9\.0\/suncalc\.min/.test(read(join(SITE, page))), `${page} still loads a map library from a CDN`);
+  assert.ok(!/style-src[^;"]*unpkg/.test(toml), "no stylesheet comes from unpkg any more");
 });
 
 test("every browser script parses", () => {
@@ -67,7 +82,7 @@ test("netlify.toml keeps the old-host redirects and never builds non-production 
 });
 
 test("waitlist: email cleaning, referral codes and sources", async () => {
-  const mod = await import(join(FN, "lib", "join-core.mjs"));
+  const mod = await import(pathToFileURL(join(FN, "lib", "join-core.mjs")).href);
   assert.equal(mod.cleanEmail("  Rider@Example.CO.il "), "rider@example.co.il");
   for (const bad of ["", "a@b", "no at.com", "x@@y.com", "a..b@c.com", "<s>@x.com", "a@b.com,c@d.com"]) assert.equal(mod.cleanEmail(bad), null, bad);
   for (let i = 0; i < 200; i++) assert.ok(mod.isRef(mod.newRef()));
@@ -78,6 +93,10 @@ test("waitlist: email cleaning, referral codes and sources", async () => {
   const page = read(join(SITE, "join.js"));
   for (const s of mod.SRCS) assert.ok(page.includes(`"${s}"`), `join.js is missing source ${s}`);
   assert.ok(page.includes("[A-HJKMNP-Z2-9]{6}"));
+  // the weekend brief link in the WhatsApp channel is counted as its own source, by /go and by /join
+  assert.equal(mod.cleanSrc("wa-brief"), "wa-brief");
+  const go = read(join(SITE, "go.js")); for (const s of ["wa", "wa-brief", "ig"]) assert.ok(go.includes(`"${s}"`), `go.js is missing source ${s}`);
+  for (const s of go.match(/SRCS = \[([^\]]*)\]/)[1].match(/"([^"]+)"/g).map(x => x.slice(1, -1))) assert.equal(mod.cleanSrc(s), s, `/go source ${s} is not accepted by /api/join`);
 });
 
 test("landing pages: no inline scripts (CSP) and their files exist", () => {
@@ -87,4 +106,50 @@ test("landing pages: no inline scripts (CSP) and their files exist", () => {
     assert.ok(!/\son[a-z]+=/.test(html), `${f} has an inline event handler`);
     for (const m of html.matchAll(/(?:src|href)="((?!https?:|\.\/|#)[^"?]+\.(?:js|png|jpg|html))"/g)) assert.ok(existsSync(join(SITE, m[1])), `${f} links missing ${m[1]}`);
   }
+});
+
+test("accessibility statement: no personal name and no draft note in the published page (Eli, 2026-11-13)", () => {
+  const html = readFileSync(join(SITE, "accessibility.html"), "utf8");
+  assert.doesNotMatch(html, /כצמן|Katsman/);
+  assert.doesNotMatch(html, /Draft for legal review|טיוטה/);
+  assert.match(html, /<li>פניות בנושא נגישות<\/li>/);
+  // hello@ is not live yet (domain transfer pending): until it is, the in-app feedback form is the
+  // accessibility contact (Eli, 2026-11-13). Put the mailto line back when hello@ receives mail.
+  assert.match(html, /"משוב לצוות"/);
+  assert.match(html, /מפעיל השירות: Blue Ronin\./);
+});
+
+test("vendored libraries: cache-first in the service worker and immutable at the edge (round 2.8 perf)", () => {
+  const sw = read(join(SITE, "sw.js")), toml = read(join(SITE, "..", "netlify.toml"));
+  assert.match(sw, /u\.origin === self\.location\.origin && u\.pathname\.startsWith\("\/vendor\/"\)\) return e\.respondWith\(cacheFirst\(req, SHELL\)\)/);
+  assert.ok(sw.indexOf('startsWith("/vendor/")') < sw.indexOf("shellFirst(req)"), "the vendor rule comes before the shell-first rule");
+  assert.match(toml, /for = "\/vendor\/\*"\s+\[headers\.values\]\s+Cache-Control = "public, max-age=31536000, immutable"/);
+  // every vendored path is versioned, which is what makes immutable safe
+  for (const f of JSON.parse(sw.match(/const SHELL_FILES = (\[[^\]]+\])/)[1]).filter(f => f.startsWith("vendor/"))) assert.match(f, /^vendor\/[a-z-]+\/\d+\.\d+\.\d+\//, f);
+});
+
+/* L4 (security review 2026-11-13 final): /vendor/* is immutable for a year and cache-first in the service worker, so
+   a file edited in place under an existing vendor/<lib>/<x.y.z>/ path would stay stale on riders' phones. Every
+   vendored file is pinned by SHA-256 here (no node_modules needed; site/vendor is -text in .gitattributes, so the
+   bytes are exact). A vendor upgrade means a NEW versioned path, new pins, the tests/package.json version, and a
+   SHELL bump in sw.js (release checklist). */
+const VENDOR_SHA256 = {
+  "maplibre-gl/4.7.1/LICENSE.txt": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2",
+  "maplibre-gl/4.7.1/maplibre-gl.css": "576b085fdd9487a65a19215328c1e086c07ce5bf6da09b666b3806d3d008dae9",
+  "maplibre-gl/4.7.1/maplibre-gl.js": "be9633c4d870e26fb37f1cfe5c5a77181667114003ea16207ac7850d8da8add1",
+  "suncalc/1.9.0/LICENSE": "9010b843aad8e450890fc18dae2dfec00e68c10da775515801c42878afbb0da1",
+  "suncalc/1.9.0/suncalc.js": "5bfe4127cb91b7436295135d491e2d8abeccacbc8c4d450fb30771183b1e24d2"
+};
+test("vendored files match their SHA-256 pins, and every vendored file is pinned (L4)", async () => {
+  const { createHash } = await import("node:crypto");
+  const V = join(SITE, "vendor");
+  const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);
+  const files = walk(V).map(f => f.slice(V.length + 1).replace(/\\/g, "/")).sort();
+  assert.deepEqual(files, Object.keys(VENDOR_SHA256).sort(), "a vendored file was added or removed: pin it here (new versioned path)");
+  for (const [f, want] of Object.entries(VENDOR_SHA256))
+    assert.equal(createHash("sha256").update(readFileSync(join(V, f))).digest("hex"), want, `vendor/${f} changed in place: use a new versioned path and bump SHELL`);
+  // the path version is the pinned npm version
+  const pkg = JSON.parse(read(join(ROOT, "tests", "package.json"))).devDependencies;
+  for (const f of files) { const [lib, ver] = f.split("/"); assert.equal(pkg[lib], ver, `vendor/${f}: path version vs tests/package.json`); }
+  assert.match(read(join(ROOT, ".gitattributes")), /site\/vendor\/\*\* -text/);
 });

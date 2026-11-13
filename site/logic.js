@@ -391,5 +391,37 @@
     return { pts: sm, head, step: st, km: L, n };
   }
 
-  g.BRL = { normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* Feedback photos: each one is compressed to fit its share of one request budget (the server takes up to
+     4 photos, 600KB each, 1.4MB together: lib/fbmedia.mjs). One photo keeps the old 560KB quality. */
+  const FB_PHOTOS_MAX = 4;
+  function photoBudget(n, total = 1200 * 1024, each = 560 * 1024) { return n > 0 ? Math.min(each, Math.floor(total / n)) : each; }
+
+  /* All-time top speed over the saved rides (ride.vmax already needs two sustained readings, see rideTrack).
+     Demo rides never count. The kept record survives a ride falling off the 60-ride journal, but only while
+     no saved ride beats it; a tie goes to the earlier ride. */
+  function topSpeed(rides, rec) {
+    const ok = v => v > 0 && v < 230; let best = null;
+    for (const r of rides || []) {
+      if (!r || r.demo || r.id === "demo") continue; const v = Math.round(+r.vmax || 0); if (!ok(v)) continue;
+      if (!best || v > best.v || (v === best.v && r.start < best.start)) best = { v, id: r.id, start: r.start, title: r.title || "" };
+    }
+    if (rec && ok(rec.v) && rec.id !== "demo" && (!best || rec.v > best.v) && !(rides || []).some(r => r && r.id === rec.id)) return { v: rec.v, id: rec.id, start: rec.start, title: rec.title || "", gone: true };
+    return best;
+  }
+
+  /* What the SOS reply means, said honestly (security review 2026-11-13 final, H1). res = /api/sos/alert reply
+     {sent, failed, total} (an older server has no failed). test = the test alert (a toast), else the SOS sheet. */
+  function sosReach(res, test) {
+    const sent = +res.sent || 0, failed = +res.failed || 0, total = +res.total || 0, toN = n => n === 1 ? "לאיש קשר אחד" : `ל־${n} אנשי קשר`;
+    if (!sent && !failed && !total) return test ? "אין עדיין אנשי קשר מחוברים לקבלת התראות" : "אין עדיין איש קשר שמחובר לקבלת התראות. התקשרו או שלחו הודעה מכאן:";
+    if (!sent) return test ? "התראת הבדיקה לא הגיעה לאף איש קשר כרגע. נסו שוב בעוד רגע" : "ההתראה לא הגיעה כרגע לאף איש קשר. התקשרו או שלחו הודעה מכאן:";
+    const miss = failed ? ` ${toN(failed)} היא לא הגיעה כרגע.` : "";
+    return test ? `התראת בדיקה נשלחה ${toN(sent)}.${miss}` : `התראה עם המיקום שלך נשלחה ${toN(sent)}.${miss}${failed ? " התקשרו או שלחו הודעה מכאן:" : ""}`;
+  }
+
+  /* A server error is shown to the rider only when it is Hebrew; anything else ("forbidden" from the edge gate, an
+     English stack line) becomes the Hebrew fallback (QA 2026-11-13, m8). */
+  const heText = (t, fallback) => typeof t === "string" && /[\u0590-\u05FF]/.test(t) ? t.slice(0, 200) : fallback;
+
+  g.BRL = { heText, sosReach, FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

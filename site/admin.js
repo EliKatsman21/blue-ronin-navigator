@@ -3,6 +3,9 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  /* a report can carry up to 4 photos: keys p, p1, p2, p3 (lib/fbmedia.mjs). One photo shows large, several as a grid. */
+  const fbPhotos = x => { const ks = (x.media || []).filter(k => /^p[1-3]?$/.test(k)); if (!ks.length) return ""; const u = k => `/api/admin/feedback/media?id=${encodeURIComponent(x.id)}&k=${k}`;
+    return `<div class="fbph${ks.length > 1 ? " grid" : ""}">${ks.map((k, i) => `<a href="${u(k)}" target="_blank" rel="noopener"><img src="${u(k)}" alt="תמונה ${i + 1} מהרוכב" loading="lazy"></a>`).join("")}</div>`; };
   const { CHAPTERS } = window.BRD;
   const TZ = "Asia/Jerusalem";
   const fmt = ts => ts ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(ts)) : "—";
@@ -90,6 +93,8 @@
   function renderNav() {
     const n = S.stats ? S.stats.feedbackNew : 0;
     $("nav").innerHTML = VIEWS.map(([k, t, ic]) => `<button type="button" data-v="${k}" ${k === S.view ? 'aria-current="page"' : ""}>${ic}<span class="t">${t}</span>${k === "inbox" && n ? `<span class="badge">${n}</span>` : ""}</button>`).join("");
+    /* on a phone the nav scrolls sideways: keep the current section in view */
+    { const cur = $("nav").querySelector('[aria-current="page"]'); if (cur && innerWidth <= 860) requestAnimationFrame(() => { try { const nav = $("nav"), r = cur.getBoundingClientRect(), nr = nav.getBoundingClientRect(); nav.scrollLeft += (r.left + r.width / 2) - (nr.left + nr.width / 2); } catch (e) { } }); }
     $("nav").querySelectorAll("[data-v]").forEach(b => b.onclick = () => show(b.dataset.v));
     $("whoTxt").textContent = S.stats && S.stats.lastLogin ? "מנהל · " + fmt(S.stats.lastLogin) : "מנהל";
   }
@@ -231,7 +236,7 @@
   }
 
   /* ---------- inbox ---------- */
-  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר", pro: "Pro" };
+  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר", pro: "Pro", a11y: "נגישות" };
   const STAT = { new: "חדש", open: "בטיפול", done: "טופל" };
   async function inbox(filter = S.inboxFilter || "active") {
     S.inboxFilter = filter;
@@ -240,7 +245,7 @@
     const items = S.feedback.filter(x => filter === "all" || (filter === "active" ? x.status !== "done" : x.status === filter));
     const el = V(`<div class="head"><h2>תיבת דיווחים</h2><div class="row"><button type="button" class="btn sm danger" id="fPurge" hidden></button><select id="fF"><option value="active">פתוחים</option><option value="new">חדשים</option><option value="done">טופלו</option><option value="all">הכול</option></select></div></div>
       <div class="list">${items.length ? items.map(x => `<div class="item"><div class="meta"><span class="tag ${x.kind}">${KIND[x.kind] || x.kind}</span><span class="tag ${x.status === "new" ? "new" : ""}">${STAT[x.status]}</span><span>${fmt(x.t)}</span>${x.chap ? `<span>פרק ${esc(x.chap)}</span>` : ""}${x.ver ? `<span class="mono">v${esc(x.ver)}</span>` : ""}</div>
-        <div style="white-space:pre-wrap">${esc(x.text)}</div>${(x.media || []).includes("p") ? `<a href="/api/admin/feedback/media?id=${x.id}&k=p" target="_blank" rel="noopener"><img src="/api/admin/feedback/media?id=${x.id}&k=p" alt="תמונה מהרוכב" loading="lazy" style="max-width:100%;max-height:260px;border-radius:10px;display:block"></a>` : ""}${(x.media || []).includes("a") ? `<audio controls preload="none" src="/api/admin/feedback/media?id=${x.id}&k=a" style="width:100%"></audio>` : ""}${x.lat ? `<div class="meta"><a class="mono" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lon}">${x.lat}, ${x.lon}</a></div>` : ""}
+        <div style="white-space:pre-wrap">${esc(x.text)}</div>${fbPhotos(x)}${(x.media || []).includes("a") ? `<audio controls preload="none" src="/api/admin/feedback/media?id=${x.id}&k=a" style="width:100%"></audio>` : ""}${x.lat ? `<div class="meta"><a class="mono" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lon}">${x.lat}, ${x.lon}</a></div>` : ""}
         <div class="row">${x.status !== "open" ? `<button type="button" class="btn sm" data-s="${x.id}|open">בטיפול</button>` : ""}${x.status !== "done" ? `<button type="button" class="btn sm" data-s="${x.id}|done">טופל</button>` : ""}${x.lat ? `<button type="button" class="btn sm" data-pub="${x.id}">פרסום כמפגע ל־48 ש׳</button>` : ""}<button type="button" class="btn sm danger" data-del="${x.id}">מחיקה</button></div><div class="row delask" data-ask="${x.id}" hidden><b class="small" style="color:var(--no)">למחוק לצמיתות?</b><button type="button" class="btn sm danger" data-s="${x.id}|delete">כן, למחוק</button><button type="button" class="btn sm" data-no="${x.id}">ביטול</button></div></div>`).join("") : '<div class="card small muted">אין כאן כלום. שקט בכביש.</div>'}</div>`);
     $("fF").value = filter; $("fF").onchange = e => inbox(e.target.value);
     const doneN = S.feedback.filter(x => x.status === "done").length;
@@ -269,7 +274,7 @@
   async function join() {
     V(`<div class="head"><h2>רשימת ההמתנה</h2></div><div class="small muted">טוען…</div>`);
     let d; try { d = await api("GET", "join"); } catch (e) { return; }
-    const SRC = { ig: "אינסטגרם", yt: "יוטיוב", wa: "וואטסאפ", tt: "טיקטוק", fb: "פייסבוק", app: "האפליקציה", qr: "מדבקת QR", press: "עיתונות", friend: "חבר", site: "ישיר" };
+    const SRC = { ig: "אינסטגרם", yt: "יוטיוב", wa: "וואטסאפ", "wa-brief": "תדריך הוואטסאפ", tt: "טיקטוק", fb: "פייסבוק", app: "האפליקציה", qr: "מדבקת QR", press: "עיתונות", friend: "חבר", site: "ישיר" };
     const bySrc = {}; d.items.forEach(x => bySrc[x.src] = (bySrc[x.src] || 0) + 1);
     const earned = d.items.filter(x => x.refs >= d.need).length, week = d.items.filter(x => Date.now() - x.t < 7 * 864e5).length;
     const el = V(`<div class="head"><h2>רשימת ההמתנה</h2><span class="small muted">נרשמים דרך blueronin.app/join. ${d.need} חברים שהצטרפו = חודש Pro בהשקה</span></div>

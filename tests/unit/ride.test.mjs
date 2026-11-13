@@ -66,3 +66,15 @@ test("the search box never shows a real personal address as its example", async 
   const app = readFileSync(new URL("../../site/app.js", import.meta.url), "utf8");
   assert.ok(!app.includes("המרגנית"), "placeholder must not carry a private address");
 });
+
+test("all-time top speed: highest saved ride, demo excluded, record survives the journal cap", () => {
+  const r = (id, vmax, start, extra = {}) => ({ id, vmax, start, title: id, ...extra });
+  const rides = [r("a", 96, 3), r("b", 131, 2), r("demo", 150, 4, { demo: true }), r("c", 131, 5), r("d", 240, 6)];
+  assert.deepEqual(L.topSpeed(rides, null), { v: 131, id: "b", start: 2, title: "b" }, "tie goes to the earlier ride; demo and >230 ignored");
+  assert.equal(L.topSpeed([], null), null);
+  const rec = { v: 140, id: "old", start: 1, title: "old" };
+  assert.equal(L.topSpeed(rides, rec).id, "old", "a record whose ride fell off the 60-ride list is kept");
+  assert.equal(L.topSpeed([r("e", 150, 7)], rec).id, "e", "a faster ride takes the record");
+  assert.equal(L.topSpeed([r("old", 90, 1), r("f", 100, 2)], rec).id, "f", "a ride still in the list is judged by the list (recomputed after a change)");
+  assert.equal(L.topSpeed([r("x", 0, 1)], { v: 120, id: "demo", start: 1 }), null, "a demo record never counts");
+});

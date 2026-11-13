@@ -3,7 +3,7 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
-  const KEY = "brn:join", SRCS = ["ig", "yt", "wa", "tt", "fb", "app", "qr", "press", "friend", "site"];
+  const KEY = "brn:join", SRCS = ["ig", "yt", "wa", "wa-brief", "tt", "fb", "app", "qr", "press", "friend", "site"];
   const ref = /^[A-HJKMNP-Z2-9]{6}$/.test(q.get("r") || "") ? q.get("r") : "";
   const src = SRCS.includes(q.get("src")) ? q.get("src") : ref ? "friend" : "site";
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } };

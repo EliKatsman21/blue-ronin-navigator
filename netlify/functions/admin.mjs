@@ -1,6 +1,6 @@
 /* /api/admin/* — the admin API. Everything except session/setup/login needs a valid admin session.
    See lib/admin.mjs for the security model. */
-import { edgeGate } from "./lib/edge.mjs";
+import { edgeGate, adminPing } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import {
@@ -15,6 +15,8 @@ import { joinStore, SRCS, NEED, refsOf } from "./lib/join.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
+import { MEDIA_KEY, mediaHeaders } from "./lib/fbmedia.mjs";
+import { inboxNow, inboxState, updateInbox } from "./lib/feedback-core.mjs";
 const fbMedia = () => getStore({ name: "brn-fb-media", consistency: "strong" });
 const dropMedia = async items => { for (const x of items) for (const k of x.media || []) await fbMedia().delete(x.id + "-" + k).catch(() => { }); };
 const statStore = () => getStore({ name: "brn-stats", consistency: "strong" });
@@ -82,9 +84,9 @@ export default async req => {
     const days = (await statStore().get("days", { type: "json" })) || {};
     let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
     const fuel = (await fuelStore().get("all", { type: "json" })) || {}; let votes = 0; for (const st of Object.values(fuel)) votes += Object.keys(st.v || {}).length + (st.r || []).length;
-    const fb = (await fbStore().get("inbox", { type: "json" })) || [];
+    const fbs = await inboxState(fbStore(), fbMedia()), fb = fbs.items;
     const auditLog = (await s.get("audit", { type: "json" })) || [];
-    return json({ days, subs, stations: Object.keys(fuel).length, votes, feedbackNew: fb.filter(x => x.status === "new").length, feedbackAll: fb.length, lastLogin: auth.lastLogin || null, pwChanged: auth.pwChanged || null, fails24: auditLog.filter(x => x.a.startsWith("fail") && Date.now() - x.t < 864e5).length });
+    return json({ days, subs, stations: Object.keys(fuel).length, votes, feedbackNew: fb.filter(x => x.status === "new").length, feedbackAll: fb.length, feedbackPending: fbs.pending, lastLogin: auth.lastLogin || null, pwChanged: auth.pwChanged || null, fails24: auditLog.filter(x => x.a.startsWith("fail") && Date.now() - x.t < 864e5).length });
   }
   if (route === "GET fuel") {
     const all = (await fuelStore().get("all", { type: "json" })) || {};
@@ -97,6 +99,7 @@ export default async req => {
     return json({ ok: true });
   }
   /* ---------- monitoring center ---------- */
+  if (route === "GET edge") return json(adminPing(req)); /* the Cloudflare handshake, with "ready" (admin only, L4) */
   if (route === "GET ops") {
     const ops = opsStore(), all = (await ops.list()).blobs.map(x => x.key);
     const get = k => ops.get(k, { type: "json" }).catch(() => null), many = async ks => { const out = []; for (let i = 0; i < ks.length; i += 25) out.push(...await Promise.all(ks.slice(i, i + 25).map(get))); return out.filter(Boolean); };
@@ -119,19 +122,21 @@ export default async req => {
   if (route === "GET errors") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); const keys = blobs.map(b => b.key).sort().reverse().slice(0, 100); const items = []; for (const k of keys) { const v = await es.get(k, { type: "json" }); if (v) items.push(v); } return json({ items }); }
   if (route === "POST errors/clear") { const es = getStore({ name: "brn-err", consistency: "strong" }); const { blobs } = await es.list({ prefix: "e:" }); for (const b of blobs) await es.delete(b.key); await audit("errors.clear"); return json({ ok: true }); }
   if (route === "GET feedback/media") {
-    const q = new URL(req.url).searchParams, id = q.get("id") || "", k = q.get("k"); if (!/^[a-f0-9]{12}$/.test(id) || !["p", "a"].includes(k)) return json({ error: "bad" }, 400);
+    const q = new URL(req.url).searchParams, id = q.get("id") || "", k = q.get("k"); if (!/^[a-f0-9]{12}$/.test(id) || !MEDIA_KEY.test(k || "")) return json({ error: "bad" }, 400);
     const r = await fbMedia().getWithMetadata(id + "-" + k, { type: "arrayBuffer" }); if (!r) return json({ error: "not found" }, 404);
-    return new Response(r.data, { headers: { "content-type": r.metadata && r.metadata.ct || "application/octet-stream", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
+    return new Response(r.data, { headers: mediaHeaders(r.metadata && r.metadata.ct) });
   }
-  if (route === "GET feedback") return json({ items: ((await fbStore().get("inbox", { type: "json" })) || []).slice().reverse() });
+  if (route === "GET feedback") { const st = await inboxState(fbStore(), fbMedia()); return json({ items: st.items.slice().reverse(), pending: st.pending }); }
+  /* status and purge change the inbox through updateInbox (read fresh, change, write), never a copy read earlier */
   if (route === "POST feedback/status") {
-    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const it = inbox.find(x => x.id === b.id); if (!it) return json({ error: "not found" }, 404);
-    if (b.status === "delete") { inbox.splice(inbox.indexOf(it), 1); await dropMedia([it]); } else if (["new", "open", "done"].includes(b.status)) it.status = b.status; else return json({ error: "bad status" }, 400);
-    await fbStore().setJSON("inbox", inbox); await audit("feedback", { id: b.id, s: b.status }); return json({ ok: true });
+    if (b.status !== "delete" && !["new", "open", "done"].includes(b.status)) return json({ error: "bad status" }, 400);
+    if (!(await inboxNow(fbStore(), fbMedia())).some(x => x.id === b.id)) return json({ error: "not found" }, 404);
+    const r = await updateInbox(fbStore(), fbMedia(), cur => b.status === "delete" ? cur.filter(x => x.id !== b.id) : cur.map(x => x.id === b.id ? Object.assign(x, { status: b.status }) : x));
+    await dropMedia(r.removed); await audit("feedback", { id: b.id, s: b.status }); return json({ ok: true });
   }
   if (route === "POST feedback/purge") {
-    const inbox = (await fbStore().get("inbox", { type: "json" })) || []; const keep = inbox.filter(x => x.status !== "done"); const n = inbox.length - keep.length; await dropMedia(inbox.filter(x => x.status === "done"));
-    await fbStore().setJSON("inbox", keep); await audit("feedback-purge", { n }); return json({ ok: true, removed: n });
+    await inboxNow(fbStore(), fbMedia()); const r = await updateInbox(fbStore(), fbMedia(), cur => cur.filter(x => x.status !== "done"));
+    await dropMedia(r.removed); const n = r.removed.length; await audit("feedback-purge", { n }); return json({ ok: true, removed: n });
   }
   if (route === "POST broadcast") {
     const title = String(b.title || "").trim().slice(0, 60), text = String(b.body || "").trim().slice(0, 180);

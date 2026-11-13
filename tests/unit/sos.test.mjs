@@ -95,3 +95,15 @@ test("H1: the rider's app says honestly who the alert reached", () => {
   const app = readFileSync(new URL("../../site/app.js", import.meta.url), "utf8");
   assert.match(app, /L\.sosReach\(res, true\)/); assert.match(app, /L\.sosReach\(res, false\)/);
 });
+
+test("m8: a server error reaches the rider only when it is Hebrew", () => {
+  assert.equal(BRL.heText("קצר מדי", "x"), "קצר מדי");
+  assert.equal(BRL.heText("forbidden", "השליחה נכשלה"), "השליחה נכשלה");
+  assert.equal(BRL.heText("Error: at foo (bar.js:1)", "השליחה נכשלה"), "השליחה נכשלה");
+  assert.equal(BRL.heText(undefined, "f"), "f"); assert.equal(BRL.heText({ a: 1 }, "f"), "f");
+  assert.equal(BRL.heText("א".repeat(500), "f").length, 200);
+  const app = readFileSync(new URL("../../site/app.js", import.meta.url), "utf8");
+  assert.match(app, /: L\.heText\(err, "השליחה נכשלה"\);/, "feedback");
+  assert.match(app, /throw new Error\(L\.heText\(j\.error, ""\)\)/, "push subscribe");
+  assert.match(app, /new Error\(L\.heText\(j\.error, j\.error \? "השליחה נכשלה\. נסו שוב" : "אין חיבור"\)\)/, "post (SOS join, groups)");
+});

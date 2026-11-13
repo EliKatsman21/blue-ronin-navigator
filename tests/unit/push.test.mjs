@@ -177,6 +177,6 @@ test("M1: Apple's push subdomains are accepted; a refused host gets its own mess
 
 test("M1: the app shows the server's reason when a push subscription is refused", () => {
   const app = readFileSync(new URL("../../site/app.js", import.meta.url), "utf8");
-  assert.match(app, /if \(!r\.ok\) \{ const j = await r\.json\(\)\.catch\(\(\) => \(\{\}\)\); throw new Error\(j\.error \|\| ""\); \}/);
+  assert.match(app, /if \(!r\.ok\) \{ const j = await r\.json\(\)\.catch\(\(\) => \(\{\}\)\); try \{ await s\.unsubscribe\(\); \} catch \(e\) \{ \} throw new Error\(L\.heText\(j\.error, ""\)\); \}/);
   assert.doesNotMatch(app, /if \(!r\.ok\) throw 0; LS\.set\("pushChap"/);
 });

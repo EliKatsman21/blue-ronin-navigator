@@ -1437,7 +1437,7 @@
           const perm = await Notification.requestPermission(); if (perm !== "granted") { renderPush(); return; }
           const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(st.vapid) });
           const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs, chap: pushChap() }) });
-          if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || ""); } /* M1: e.g. a push service we do not support */
+          if (!r.ok) { const j = await r.json().catch(() => ({})); try { await s.unsubscribe(); } catch (e) { } throw new Error(L.heText(j.error, "")); } /* M1, m8, m9: the server's Hebrew reason; not left "active" on the device */
           LS.set("pushChap", pushChap()); toast("ההתראות פעילות"); renderPush();
         } catch (e) { toast((e && e.message) || "ההפעלה לא הצליחה. נסו שוב", 5000); }
       };
@@ -1961,7 +1961,7 @@
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   /* the rider is told why the server said no: too large (413) and too many this hour (429) get their own words */
   const fbErrText = (status, err) => status === 413 ? "התמונות או ההקלטה גדולות מדי. נסו לשלוח פחות תמונות"
-    : status === 429 ? "שלחתם הרבה דיווחים בשעה האחרונה. אפשר לנסות שוב בעוד שעה" : (typeof err === "string" && err) || "השליחה נכשלה";
+    : status === 429 ? "שלחתם הרבה דיווחים בשעה האחרונה. אפשר לנסות שוב בעוד שעה" : L.heText(err, "השליחה נכשלה"); /* m8: Hebrew only */
   async function sendFeedback() {
     const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return fieldErr("fbText", "כתבו כמה מילים, לפחות 3 תווים");
     const a = st.fbAtt || {}, ph = fbPhotos(), cap = L.photoBudget(ph.length);
@@ -2397,7 +2397,7 @@
   const gmap = (lat, lon) => `https://maps.google.com/?q=${lat.toFixed(5)},${lon.toFixed(5)}`;
   st.sos = Object.assign({ name: "", phone: "", cName: "", cPhone: "", circle: "", key: "", crash: true, guards: [] }, LS.get("sos", {}) || {});
   const saveSos = () => LS.set("sos", st.sos);
-  const post = async (url, b) => { const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.error || "אין חיבור"), { status: r.status }); return j; };
+  const post = async (url, b) => { const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(L.heText(j.error, j.error ? "השליחה נכשלה. נסו שוב" : "אין חיבור")), { status: r.status }); return j; };
 
   /* ---------- one position feed for everything (ride mode has its own watch and forwards to this) ---------- */
   const geoSubs = new Set(); let geoW = null;

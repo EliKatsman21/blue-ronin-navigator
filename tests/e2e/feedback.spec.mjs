@@ -6,7 +6,9 @@ for (const [status, ctype, body, want] of [
   [413, "text/plain", "too large", /התמונות או ההקלטה גדולות מדי\. נסו לשלוח פחות תמונות/],
   [429, "application/json", '{"error":"rate"}', /שלחתם הרבה דיווחים בשעה האחרונה\. אפשר לנסות שוב בעוד שעה/],
   [400, "application/json", '{"error":"קצר מדי"}', /קצר מדי/],
-  [503, "application/json", "{}", /השליחה נכשלה/]]) {
+  [503, "application/json", "{}", /השליחה נכשלה/],
+  // m8 (QA 2026-11-13): an English error (the edge gate's 403) never reaches the rider
+  [403, "application/json", '{"error":"forbidden"}', /^השליחה נכשלה/]]) {
   test(`feedback: server answers ${status} -> a clear Hebrew message, text kept`, async ({ page, pageErrors }, ti) => {
     test.skip(ti.project.name === "phone" && status !== 413 && status !== 429, "the generic cases once");
     await page.route("**/api/feedback", r => r.fulfill({ status, contentType: ctype, body }));

@@ -419,5 +419,9 @@
     return test ? `התראת בדיקה נשלחה ${toN(sent)}.${miss}` : `התראה עם המיקום שלך נשלחה ${toN(sent)}.${miss}${failed ? " התקשרו או שלחו הודעה מכאן:" : ""}`;
   }
 
-  g.BRL = { sosReach, FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* A server error is shown to the rider only when it is Hebrew; anything else ("forbidden" from the edge gate, an
+     English stack line) becomes the Hebrew fallback (QA 2026-11-13, m8). */
+  const heText = (t, fallback) => typeof t === "string" && /[\u0590-\u05FF]/.test(t) ? t.slice(0, 200) : fallback;
+
+  g.BRL = { heText, sosReach, FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

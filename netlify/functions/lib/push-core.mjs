@@ -52,15 +52,24 @@ export async function saveSubIn(store, sub, prefs, chap, old) {
   return clean;
 }
 
-/* send(sub, payload) resolves true, or throws an error with statusCode (404/410 = the subscription is gone) */
+/* H1 (security review 2026-11-13 final): a send has three outcomes. Only a 404/410 from the push service means the
+   subscription is GONE and may be deleted. A timeout (web-push rejects with no statusCode), a 5xx, a 429, a DNS/TLS
+   or network error is a FAIL: the subscription is kept, whoever stored it (rider, SOS guardian, admin device). */
+export const SEND_OK = "ok", SEND_GONE = "gone", SEND_FAIL = "fail";
+export const isGone = e => !!e && (e.statusCode === 404 || e.statusCode === 410);
+/* send(sub, payload) resolves, or throws an error with statusCode -> "ok" | "gone" | "fail" (never throws) */
+export async function trySend(send, sub, payload) {
+  try { await send(sub, payload); return SEND_OK; } catch (e) { return isGone(e) ? SEND_GONE : SEND_FAIL; }
+}
+
 export async function sendAllWith({ store, send, payload, pref, concurrency = SEND_CONCURRENCY }) {
   const keys = await listKeys(store, ""); let sent = 0, gone = 0, skipped = 0, failed = 0;
   await mapLimit(keys, concurrency, async k => {
     const rec = await store.get(k, { type: "json" }).catch(() => null);
     if (!rec || !rec.sub || (pref && rec.prefs && rec.prefs[pref] === false)) { skipped++; return; }
     const p = typeof payload === "function" ? payload(rec) : payload;
-    try { await send(rec.sub, p); sent++; }
-    catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { await store.delete(k).catch(() => { }); gone++; } else failed++; }
+    const r = await trySend(send, rec.sub, p);
+    if (r === SEND_OK) sent++; else if (r === SEND_GONE) { await store.delete(k).catch(() => { }); gone++; } else failed++;
   });
   return { sent, gone, skipped, failed, total: keys.length };
 }

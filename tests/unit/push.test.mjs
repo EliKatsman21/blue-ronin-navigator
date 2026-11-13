@@ -39,7 +39,7 @@ test("N2: only https endpoints on the browser push services are accepted", () =>
   assert.equal(validSub(null), false);
   // the SOS circle and the admin alerts use the same check through lib/push.mjs
   const push = readFileSync(new URL("../../netlify/functions/lib/push.mjs", import.meta.url), "utf8");
-  assert.match(push, /import \{ validSub, keyOf, sendAllWith, PUSH_TIMEOUT_MS \} from "\.\/push-core\.mjs"/);
+  assert.match(push, /import \{ validSub, keyOf, sendAllWith, trySend, SEND_GONE, SEND_FAIL, PUSH_TIMEOUT_MS \} from "\.\/push-core\.mjs"/);
 });
 
 test("N2: every push is sent with a 5000 ms timeout", () => {

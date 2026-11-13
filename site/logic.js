@@ -409,5 +409,15 @@
     return best;
   }
 
-  g.BRL = { FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* What the SOS reply means, said honestly (security review 2026-11-13 final, H1). res = /api/sos/alert reply
+     {sent, failed, total} (an older server has no failed). test = the test alert (a toast), else the SOS sheet. */
+  function sosReach(res, test) {
+    const sent = +res.sent || 0, failed = +res.failed || 0, total = +res.total || 0, toN = n => n === 1 ? "לאיש קשר אחד" : `ל־${n} אנשי קשר`;
+    if (!sent && !failed && !total) return test ? "אין עדיין אנשי קשר מחוברים לקבלת התראות" : "אין עדיין איש קשר שמחובר לקבלת התראות. התקשרו או שלחו הודעה מכאן:";
+    if (!sent) return test ? "התראת הבדיקה לא הגיעה לאף איש קשר כרגע. נסו שוב בעוד רגע" : "ההתראה לא הגיעה כרגע לאף איש קשר. התקשרו או שלחו הודעה מכאן:";
+    const miss = failed ? ` ${toN(failed)} היא לא הגיעה כרגע.` : "";
+    return test ? `התראת בדיקה נשלחה ${toN(sent)}.${miss}` : `התראה עם המיקום שלך נשלחה ${toN(sent)}.${miss}${failed ? " התקשרו או שלחו הודעה מכאן:" : ""}`;
+  }
+
+  g.BRL = { sosReach, FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

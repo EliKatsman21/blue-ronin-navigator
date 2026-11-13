@@ -2448,11 +2448,11 @@
     if (kind !== "test") { try { await liveStart(true); await liveFlush("sos"); } catch (e) { } if (st.group) gTick(); }
     let res = null, err = "";
     if (st.sos.circle) try { res = await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind, lat, lon, live: st.live ? st.live.id : "", phone: IL(st.sos.phone), name: st.sos.name }); } catch (e) { err = e.message; }
-    if (kind === "test") { toast(res ? (res.sent ? `התראת בדיקה נשלחה ל־${res.sent} אנשי קשר` : "אין עדיין אנשי קשר מחוברים לקבלת התראות") : err || "לא נשלח"); return; }
+    if (kind === "test") { toast(res ? L.sosReach(res, true) : err || "לא נשלח", res && res.failed ? 6000 : undefined); return; }
     try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) { }
     const txt = sosText(kind, lat, lon), c = st.sos;
     openModal(`<div class="sos-sheet"><h2>${kind === "crash" ? "שלחנו התראת נפילה" : "קריאת חירום"}</h2>
-      <p style="margin:0">${res ? (res.sent ? `התראה עם המיקום שלך נשלחה ל־${res.sent} ${res.sent === 1 ? "איש קשר" : "אנשי קשר"}.` : "אין עדיין איש קשר שמחובר לקבלת התראות. התקשרו או שלחו הודעה מכאן:") : `לא הצלחנו לשלוח התראה דרך האפליקציה${err ? " (" + esc(err) + ")" : ""}. התקשרו או שלחו הודעה מכאן:`}</p>
+      <p style="margin:0">${res ? esc(L.sosReach(res, false)) : `לא הצלחנו לשלוח התראה דרך האפליקציה${err ? " (" + esc(err) + ")" : ""}. התקשרו או שלחו הודעה מכאן:`}</p>
       ${lat != null ? `<p class="small muted mono" style="margin:0" dir="ltr">${lat.toFixed(5)}, ${lon.toFixed(5)}</p>` : ""}
       <a class="btn sosbig" href="tel:101">${PWI.phone}מד״א 101</a>
       ${c.cPhone ? `<a class="btn sosbig alt" href="${telOf(c.cPhone)}">${PWI.phone}התקשרות ל${esc(c.cName || "איש הקשר")}</a><div class="row"><a class="btn" target="_blank" rel="noopener" href="${waOf(c.cPhone, txt)}">וואטסאפ עם המיקום</a><a class="btn" href="${smsOf(c.cPhone, txt)}">SMS עם המיקום</a></div>` : `<button type="button" class="btn" id="sosSetup">הגדרת איש קשר לחירום</button>`}

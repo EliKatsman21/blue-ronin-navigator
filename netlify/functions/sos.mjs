@@ -8,12 +8,13 @@
    POST /api/sos/join   {inv, sub, name}            -> {ok}
    POST /api/sos/list   {circle,key}                -> {guardians}
    POST /api/sos/remove {circle,key,gid}            -> {ok}
-   POST /api/sos/alert  {circle,key,kind,lat,lon,acc,live,name,phone} -> {sent, total} */
+   POST /api/sos/alert  {circle,key,kind,lat,lon,acc,live,name,phone} -> {sent, failed, total} */
 import { edgeGate } from "./lib/edge.mjs";
 import { sosStore, rid, hashKey, keyOk, clean, okId, inIL, body, J } from "./lib/safety.mjs";
 import { ipHash } from "./lib/admin.mjs";
 import { validSub, sendOne } from "./lib/push.mjs";
 import { opsLog } from "./lib/ops.mjs";
+import { alertGuardians, applyResults } from "./lib/sos-core.mjs";
 const MAXG = 5, INV_DAYS = 7, INV_CH = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const invCode = () => { const b = rid(16); let o = ""; for (let i = 0; i < 8; i++) o += INV_CH[b.charCodeAt(i) % INV_CH.length]; return o; };
 const normInv = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -65,13 +66,15 @@ export default async req => {
     const T = { sos: `🆘 ${name} שלח קריאת חירום`, crash: `🚨 ${name}: ייתכן שהייתה נפילה`, test: `בדיקה: התראת חירום מ־${name}` }[kind];
     const B = kind === "test" ? "זו רק בדיקה. ככה תיראה התראה אמיתית. לחיצה פותחת את המיקום." : `${kind === "crash" ? "הטלפון זיהה מכה חזקה ועצירה, ולא היה מענה במשך 30 שניות. " : ""}לחצו לפתיחת המיקום${live ? " החי" : ""}. ${b.phone && /^\+?[0-9]{9,15}$/.test(b.phone) ? "טלפון: " + b.phone : ""}`;
     const url = live ? `${base}/live.html#${live}` : (where || base);
-    let sent = 0; const alive = [];
-    for (const g of C.g) { const ok = await sendOne({ sub: g.sub }, { title: T, body: B.trim(), tag: "sos-" + b.circle, url, sos: kind !== "test" }, { urgency: "high", ttl: 3600 }); if (ok) { sent++; alive.push(g); } }
-    if (alive.length !== C.g.length) { C.g = alive; await s.setJSON("c:" + b.circle, C); }
-    C.last = { t: now, kind, sent }; await s.setJSON("c:" + b.circle, C);
+    /* H1: all guardians at once, one quick retry on a failure, removed only when the push service says "gone" */
+    const r = await alertGuardians(C.g, g => sendOne({ sub: g.sub }, { title: T, body: B.trim(), tag: "sos-" + b.circle, url, sos: kind !== "test" }, { urgency: "high", ttl: 3600 }));
+    const F = (await s.get("c:" + b.circle, { type: "json" }).catch(() => null)) || C; /* fresh: keep a join/remove made during the send */
+    F.g = applyResults(F.g, r.results); F.last = { t: now, kind, sent: r.sent, failed: r.failed }; await s.setJSON("c:" + b.circle, F);
+    const { sent, failed } = r, total = F.g.length;
     /* no personal data in the ops log: only that an alert went out and whether it reached anyone */
-    if (kind !== "test") await opsLog("sos", sent ? "warn" : "critical", sent ? `קריאת חירום (${kind}) נשלחה ל־${sent} אנשי קשר` : `קריאת חירום (${kind}) לא הגיעה לאף איש קשר`, { sent, total: C.g.length });
-    return J({ sent, total: C.g.length, where });
+    if (kind !== "test") await opsLog("sos", sent && !failed ? "warn" : sent ? "error" : "critical",
+      sent ? `קריאת חירום (${kind}) נשלחה ל־${sent} מתוך ${sent + failed} אנשי קשר` : `קריאת חירום (${kind}) לא הגיעה לאף איש קשר`, { sent, failed, gone: r.gone, total });
+    return J({ sent, failed, total, where });
   }
   return J({ error: "not found" }, 404);
 };

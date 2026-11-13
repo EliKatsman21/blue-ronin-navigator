@@ -138,8 +138,11 @@ export async function notifyAdmins(alerts) {
   const body = opens.length ? opens.map(a => `${a.c.detail}. ${PLAYBOOK[a.c.id][2]}`).join("\n").slice(0, 300) : closes.map(a => `${a.c.name} תקין שוב אחרי ${a.dur} דק׳`).join("\n");
   let sent = 0;
   for (const b of list) { const rec = await ops.get(b.key, { type: "json" }).catch(() => null); if (!rec) continue;
-    const ok = await sendOne({ sub: rec.sub }, { title, body, tag: "ops-" + (opens[0] ? opens[0].c.id : "ok"), url: "/admin#monitor", sos: crit }, { urgency: crit ? "high" : "normal", ttl: 6 * 3600 }).catch(() => false);
-    if (ok) { sent++; if (rec.fails) { rec.fails = 0; await ops.setJSON(b.key, rec); } } else { rec.fails = (rec.fails || 0) + 1; if (rec.fails >= 5) await ops.delete(b.key).catch(() => { }); else await ops.setJSON(b.key, rec); } }
+    const r = await sendOne({ sub: rec.sub }, { title, body, tag: "ops-" + (opens[0] ? opens[0].c.id : "ok"), url: "/admin#monitor", sos: crit }, { urgency: crit ? "high" : "normal", ttl: 6 * 3600 }).catch(() => "fail");
+    /* H1: an admin device is removed only when the push service says it is gone (404/410), never on a failure */
+    if (r === "ok") { sent++; if (rec.fails) { rec.fails = 0; await ops.setJSON(b.key, rec); } }
+    else if (r === "gone") await ops.delete(b.key).catch(() => { });
+    else { rec.fails = (rec.fails || 0) + 1; await ops.setJSON(b.key, rec).catch(() => { }); } }
   await opsLog("monitor", opens.length ? (crit ? "critical" : "warn") : "info", `${opens.length ? "נפתחה תקלה" : "תקלה נסגרה"}: ${(opens.length ? opens : closes).map(a => a.c.name).join(", ")} · נשלח ל־${sent} מכשירי מנהל`);
   return sent;
 }

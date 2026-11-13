@@ -125,3 +125,19 @@ test("journal stats, free rider: top speed is a locked Pro tile, the value never
   await expect(page.locator("#mbody .pw")).toBeVisible();
   expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
 });
+
+// promoted from QA round 2.8: the replay switch never leaks a second bike or the wrong route over many switches
+test("replay: A, B, A, demo, B five times without a reload, always one bike and the right route", async ({ page, pageErrors }, ti) => {
+  test.skip(ti.project.name !== "desktop", "once; the phone runs the single switches above");
+  test.setTimeout(180_000); // about 80 s alone; margin for a loaded machine
+  await setup(page); await openMe(page);
+  for (let round = 0; round < 5; round++) {
+    for (const [sel, ride] of [['[data-rplay="1"]', A], ['[data-rplay="0"]', B], ['[data-rplay="1"]', A], ["#jDemo", null], ['[data-rplay="0"]', B]]) {
+      await openMe(page); await tap(page, sel);
+      if (ride) await expect.poll(async () => (await state(page)).first, { timeout: 10_000 }).toEqual([ride.trk[0][0], ride.trk[0][1]]);
+      else await expect.poll(async () => (await state(page)).chip, { timeout: 10_000 }).toContain("הדגמה");
+      expect((await state(page)).bikes, `round ${round} ${sel}: exactly one bike`).toBe(1);
+    }
+  }
+  expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
+});

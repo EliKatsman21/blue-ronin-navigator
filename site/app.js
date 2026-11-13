@@ -3069,13 +3069,14 @@
   });
   function setChap(id) { stopFly(); st.rideShown = null; rideFocus(false); setCurrentRoute(id); pushSources(); renderMarkers(); renderTab(); fitChapter(); }
   /* every consumer of the current route that is not redrawn with the tab follows it here */
-  /* The weekend push brief follows the chosen built-in chapter: only its id goes to the server, never a custom
-     route or a nav trip (those keep the last built-in choice). Debounced, and only when it changed. */
-  function pushChap() { const id = LS.get("chap", ""); const i = CHAPTERS.findIndex(c => c.id === id); return i >= 0 && i < BUILT_IN && !CHAPTERS[i].custom ? id : ""; }
+  /* The weekend push brief follows the current route: a built-in chapter sends its id; a custom route, a draft or
+     a nav trip sends "" = the best chapter this weekend (decision B). Only the id goes to the server, never the
+     route. Debounced, and only when it changed. */
+  function pushChap() { const id = st.chap; const i = CHAPTERS.findIndex(c => c.id === id); return i >= 0 && i < BUILT_IN && !CHAPTERS[i].custom ? id : ""; }
   addEventListener("br:route", () => {
     clearTimeout(pushChap.t); pushChap.t = setTimeout(async () => {
       try {
-        const id = pushChap(); if (!id || id === LS.get("pushChap", "") || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+        const id = pushChap(); if (id === LS.get("pushChap", "") || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
         const reg = await navigator.serviceWorker.ready, sub = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (!sub) return;
         const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ setChap: true, endpoint: sub.endpoint, chap: id }) });
         if (r.ok) LS.set("pushChap", id);

@@ -1,6 +1,6 @@
 /* /api/admin/* — the admin API. Everything except session/setup/login needs a valid admin session.
    See lib/admin.mjs for the security model. */
-import { edgeGate } from "./lib/edge.mjs";
+import { edgeGate, adminPing } from "./lib/edge.mjs";
 import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import {
@@ -99,6 +99,7 @@ export default async req => {
     return json({ ok: true });
   }
   /* ---------- monitoring center ---------- */
+  if (route === "GET edge") return json(adminPing(req)); /* the Cloudflare handshake, with "ready" (admin only, L4) */
   if (route === "GET ops") {
     const ops = opsStore(), all = (await ops.list()).blobs.map(x => x.key);
     const get = k => ops.get(k, { type: "json" }).catch(() => null), many = async ks => { const out = []; for (let i = 0; i < ks.length; i += 25) out.push(...await Promise.all(ks.slice(i, i + 25).map(get))); return out.filter(Boolean); };

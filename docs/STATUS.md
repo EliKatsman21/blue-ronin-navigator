@@ -115,8 +115,8 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - Netlify serves `/join` and `/go` from `join.html` / `go.html` (pretty URLs). Verify both on the live site after the release, and one real signup end to end.
 
 ## Cloudflare edge (set up 2026-11-12, waiting for the nameserver switch)
-- Zone `blueronin.app` on Cloudflare Free (account of eli211299@gmail.com), status pending until Netlify support moves the
-  nameservers (Netlify-registered domains have no self-service NS editor). Assigned NS: `damiete.ns.cloudflare.com`, `melany.ns.cloudflare.com`.
+- Zone `blueronin.app` on Cloudflare Free (account of eli211299@gmail.com), status pending until the nameservers move
+  (Netlify-registered domains have no NS editor; the domain is being moved to Eli's Name.com account, see Open items). Assigned NS: `damiete.ns.cloudflare.com`, `melany.ns.cloudflare.com`.
 - DNS: apex and www CNAME → `blueronin-north-map.netlify.app`, proxied. No mail on the domain: SPF `-all`, DMARC `p=reject`, null MX.
   CAA: `letsencrypt.org` only (Netlify certs; Cloudflare adds its own CAs), no wildcards.
 - SSL Full (strict), Always HTTPS, TLS 1.2+, TLS 1.3, 0-RTT off, HTTP/3. Rocket Loader, email obfuscation, Always Online off (do not touch the app HTML).
@@ -125,7 +125,7 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
   `/admin*` and `/api/admin*` from Israel only, scripted clients on `/api/`, injection/traversal patterns in the URL.
   Rate limit (1/1): `/api/*` except `/api/traffic-tile/*`, 100 requests / 10 s per IP → block 10 s. Bot Fight Mode on. Security level medium.
 - Under Attack mode: off. Emergency only (Overview → Under Attack Mode); it challenges every visitor and breaks `/api`, push, link previews.
-- DNSSEC signed in Cloudflare, DS **not** at the registrar yet. Ask Netlify to add the DS only after the zone is Active:
+- DNSSEC signed in Cloudflare, DS **not** at the registrar yet. Add the DS at Name.com only after the zone is Active:
   `blueronin.app. 3600 IN DS 2371 13 2 F0D80DA5601D8AE7F44073A3337D1CFD6289557F603BF60E61BCF4E0E4DF9DC9`.
 - Alerts by email: L7 DDoS, Universal SSL, security insights.
 - Edge handshake: a Cloudflare request-header rule (late transform) sets `x-br-edge` to a secret on every request. Netlify env
@@ -139,7 +139,7 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - If something breaks after the switch: first turn off Bot Fight Mode, then the custom rule that matches (Security → Events shows which).
 
 ## Open items
-- Cloudflare: NS request sent and confirmed 2026-11-12 (Netlify ticket #1191302, thread in Eli's Gmail). When the zone is Active: release the `GET /api/ping` handshake check (on `dev`), confirm `{"edge":true,"ready":true}` through blueronin.app → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
+- Cloudflare: Netlify can't change nameservers (it resells Name.com). Ticket #1191302: Netlify moves the domain into Eli's own Name.com account (free internal transfer); Eli created the account, verified ICANN contacts and sent the account code on 2026-11-13. Waiting for Netlify to confirm the transfer. Then at Name.com: set NS to `damiete`/`melany.ns.cloudflare.com`, turn on auto-renew there (renewal moves from Netlify to Name.com, due Oct 2027), and later add the DS record there ourselves. When the zone is Active: release the `GET /api/ping` handshake check (on `dev`), confirm `{"edge":true,"ready":true}` through blueronin.app → verify app, waitlist, push, live share, link previews, a deploy → then add the DS record. After verification: `EDGE_ENFORCE=1` + rebuild.
 - If the MapLibre CDN (unpkg) is unreachable the app does not boot and the guard shows recovery (seen in the offline test harness). Consider self-hosting MapLibre and SunCalc in `site/vendor/` so the shell is fully offline-capable and one CDN outage can't take the app down.
 - Rebuild the lost scenario test suites in `tests/e2e` as each area is touched (ride mode, transfer, group, replay, weather outage first).
 - `README.md` still describes the early north-only app and TomTom; refresh it.

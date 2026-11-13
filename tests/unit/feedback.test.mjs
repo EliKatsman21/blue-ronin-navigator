@@ -69,7 +69,7 @@ test("M1: parallel reports from different riders all reach the inbox, and media 
   assert.equal([...fb.m.keys()].filter(k => k.startsWith("q:")).length, 0, "the queue is folded in and cleared");
   assert.equal((await inboxNow(fb, media)).length, 8, "reading again changes nothing");
   const ids = new Set(inbox.map(x => x.id));
-  assert.ok([...media.m.keys()].every(k => ids.has(k.split("-")[0])), "no media without an inbox entry");
+  assert.ok([...media.m.keys()].filter(k => !k.startsWith("mb:")).every(k => ids.has(k.split("-")[0])), "no media without an inbox entry");
 });
 
 test("M1: the monitor's sweep deletes orphan media older than an hour and old rate markers", async () => {
@@ -97,4 +97,27 @@ test("M1: the inbox keeps the last 500, and media of reports that fall off is de
   const inbox = await inboxNow(fb, media);
   assert.equal(inbox.length, INBOX_MAX); assert.equal(inbox[inbox.length - 1].text, "החדש"); assert.ok(!inbox.some(x => x.id === old[0].id));
   assert.equal(media.m.has(old[0].id + "-p"), false);
+});
+
+test("M2: a global daily media budget; above it reports are kept as text and the rider is told", async () => {
+  const { fb, media } = setup(); const t = Date.UTC(2026, 10, 13, 9, 0, 0);
+  const { budgetBytes, usedBytes, sweepFeedback, dayOf } = await import("../../netlify/functions/lib/feedback-core.mjs");
+  assert.equal(budgetBytes(undefined), 50 * 1048576); assert.equal(budgetBytes("2"), 2 * 1048576); assert.equal(budgetBytes("x"), 50 * 1048576); assert.equal(budgetBytes("-1"), 50 * 1048576);
+  // a 1 MB budget: two reports of ~500 KB fit, the third is accepted without its photos
+  const h = makeFeedback({ fb, media, ipHash: async r => r.headers.get("x-ip"), now: () => t, budgetMb: "1" });
+  const send = i => h(req({ kind: "bug", text: "עם תמונות " + i, photos: [jpeg(250e3), jpeg(250e3)] }, "ip" + i));
+  for (const i of [1, 2]) { const r = await send(i); assert.equal(r.status, 200); assert.equal((await r.json()).note, undefined); }
+  const r3 = await send(3); assert.equal(r3.status, 200); const j3 = await r3.json(); assert.match(j3.note, /בלי התמונות/);
+  const inbox = await inboxNow(fb, media);
+  const third = inbox.find(x => x.text === "עם תמונות 3"); assert.ok(third && third.mediaDropped && !third.media);
+  assert.ok(![...media.m.keys()].some(k => k.startsWith(third.id)), "no media stored for it");
+  assert.equal(usedBytes([...media.m.keys()].filter(k => k.startsWith(`mb:${dayOf(t)}:`))), 1000e3);
+  // the monitor sees today's use (alert at 80%) and prunes markers from before yesterday
+  await media.setJSON("mb:2026-11-01:999:aaaaaaaaaaaa", {});
+  const sw = await sweepFeedback({ fb, media, now: t, budgetMb: "1" });
+  assert.ok(sw.pct > 0.9 && sw.pct < 1, String(sw.pct)); assert.equal(media.m.has("mb:2026-11-01:999:aaaaaaaaaaaa"), false);
+  // the alert is wired into the monitor
+  const { readFileSync } = await import("node:fs");
+  const health = readFileSync(new URL("../../netlify/functions/lib/health.mjs", import.meta.url), "utf8");
+  assert.match(health, /add\("fbmedia", sw\.pct < 0\.8/);
 });

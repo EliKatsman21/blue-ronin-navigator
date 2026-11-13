@@ -7,7 +7,10 @@
       inbox blob and parallel requests cannot all read "0 so far": whoever lists after the others wrote sees
       them (M1). Under a burst it fails closed.
    2. The body must be a JSON object (L2), then the media is checked (lib/fbmedia.mjs).
-   3. No read-modify-write of the inbox on the rider's path (M1). @netlify/blobs 8.x has no conditional
+   3. A global daily media budget (M2): each report with media leaves a marker mb:<day>:<bytes>:<id> in the
+      media store; their sum is today's use. Above FB_MEDIA_DAILY_MB (default 50) a report is still accepted, as
+      text, without its photos and voice note, and the rider is told why. The monitor alerts at 80%.
+   4. No read-modify-write of the inbox on the rider's path (M1). @netlify/blobs 8.x has no conditional
       (etag) writes (checked in the 8.2.0 package), so instead every report is its own blob q:<t>-<id>
       (a new key, nothing to race with). The admin console folds the queue into the one inbox blob
       (inboxNow) when it reads it; only the admin writes the inbox. Media is written after its report blob,
@@ -16,12 +19,15 @@ import { randomBytes } from "node:crypto";
 import { collectMedia, BODY_MAX } from "./fbmedia.mjs";
 
 export const KINDS = ["bug", "idea", "data", "hazard", "pro", "a11y", "other"];
-export const RATE_MAX = 6, INBOX_MAX = 500;
+export const RATE_MAX = 6, INBOX_MAX = 500, MEDIA_DAILY_MB = 50;
 const HOUR = 36e5;
 const clean = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/g, "").trim().slice(0, n);
 const json = (o, status = 200) => Response.json(o, { status });
 export const hourOf = t => Math.floor(t / HOUR);
 export const dayOf = t => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date(t));
+export const budgetBytes = env => { const mb = +(env || ""); return (Number.isFinite(mb) && mb > 0 ? mb : MEDIA_DAILY_MB) * 1024 * 1024; };
+/* bytes used today, from the keys mb:<day>:<bytes>:<id> */
+export const usedBytes = keys => keys.reduce((a, k) => a + (+k.split(":")[2] || 0), 0);
 /* L2: only a JSON object is a report (null, a number, a string or an array is a 400, not a crash) */
 export const validBody = b => !!b && typeof b === "object" && !Array.isArray(b);
 /* media keys <id>-<k> whose report is in neither the inbox nor the queue (the sweep then checks their age) */
@@ -49,7 +55,7 @@ export async function inboxNow(fb, media) {
   return keep;
 }
 
-/* deps: { fb, media, ipHash(req) -> string, now() -> ms } */
+/* deps: { fb, media, ipHash(req) -> string, now() -> ms, budgetMb: FB_MEDIA_DAILY_MB or undefined } */
 export function makeFeedback(deps) {
   return async req => {
     if (req.method !== "POST") return new Response("method", { status: 405 });
@@ -66,17 +72,24 @@ export function makeFeedback(deps) {
     const m = collectMedia(b); if (m.error) return json({ error: m.error }, 400);
     const it = { id: randomBytes(6).toString("hex"), t: now, ip, kind, text, status: "new", chap: /^[a-z0-9_]{1,24}$/i.test(b.chap || "") ? b.chap : "", ver: clean(b.ver, 20), ua: clean(req.headers.get("user-agent"), 120) };
     if (Number.isFinite(+b.lat) && Number.isFinite(+b.lon) && +b.lat > 29 && +b.lat < 33.6 && +b.lon > 34 && +b.lon < 36.2) { it.lat = +(+b.lat).toFixed(5); it.lon = +(+b.lon).toFixed(5); }
-    if (m.items.length) it.media = m.items.map(x => x.k);
-    /* 3. the report first (its own blob), then its media */
+    /* 3. the daily media budget */
+    let note = "";
+    if (m.items.length) {
+      const bytes = m.items.reduce((a, x) => a + x.buf.length, 0), day = dayOf(now);
+      if (usedBytes(await listKeys(deps.media, `mb:${day}:`)) + bytes > budgetBytes(deps.budgetMb)) { m.items = []; it.mediaDropped = true; note = "הדיווח התקבל בלי התמונות וההקלטה, כי הגענו למכסה היומית שלנו. אפשר לשלוח אותן שוב מחר."; }
+      else { await deps.media.setJSON(`mb:${day}:${bytes}:${it.id}`, { t: now }); it.media = m.items.map(x => x.k); }
+    }
+    /* 4. the report first (its own blob), then its media */
     await queueReport(deps.fb, it);
     for (const x of m.items) await deps.media.set(it.id + "-" + x.k, x.buf, { metadata: { ct: x.ct, t: now } });
-    return json({ ok: true, ref: it.id.slice(0, 5).toUpperCase() });
+    return json(note ? { ok: true, ref: it.id.slice(0, 5).toUpperCase(), note } : { ok: true, ref: it.id.slice(0, 5).toUpperCase() });
   };
 }
 
 /* The monitor's sweep (lib/health.mjs): media whose report is in neither the inbox nor the queue and is older
-   than an hour (or has no time, from before this change) is deleted; rate markers older than an hour are pruned. */
-export async function sweepFeedback({ fb, media, now }) {
+   than an hour (or has no time, from before this change) is deleted; rate markers older than an hour and budget
+   markers older than yesterday are pruned. Returns today's media use for the 80% alert. */
+export async function sweepFeedback({ fb, media, now, budgetMb }) {
   const inbox = (await fb.get("inbox", { type: "json" })) || [];
   const ids = new Set([...inbox.map(x => x.id), ...(await listKeys(fb, "q:")).map(k => k.split("-").pop())]);
   let orphans = 0, markers = 0;
@@ -86,5 +99,8 @@ export async function sweepFeedback({ fb, media, now }) {
   }
   const hr = hourOf(now);
   for (const k of await listKeys(fb, "rl:")) if (+k.split(":")[1] < hr - 1) { await fb.delete(k).catch(() => { }); markers++; }
-  return { orphans, markers };
+  const day = dayOf(now), yday = dayOf(now - 24 * HOUR);
+  for (const k of await listKeys(media, "mb:")) { const d = k.split(":")[1]; if (d !== day && d !== yday) { await media.delete(k).catch(() => { }); markers++; } }
+  const used = usedBytes(await listKeys(media, `mb:${day}:`)), cap = budgetBytes(budgetMb);
+  return { orphans, markers, used, cap, pct: used / cap };
 }

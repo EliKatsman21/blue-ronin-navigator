@@ -10,6 +10,7 @@ const handle = makeFeedback({
   /* getters: the store is opened per request (the Blobs context is only there during an invocation) */
   get fb() { return getStore({ name: "brn-feedback", consistency: "strong" }); },
   get media() { return getStore({ name: "brn-fb-media", consistency: "strong" }); },
+  get budgetMb() { return Netlify.env.get("FB_MEDIA_DAILY_MB"); }, /* daily media budget in MB, default 50 */
   ipHash, now: () => Date.now()
 });
 export default async req => {

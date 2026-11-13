@@ -30,6 +30,7 @@ export const PLAYBOOK = {
   field: ["תקלות מהשטח", "high", "קפיצה בתקלות מהטלפונים. לפתוח את ״בעיות מובילות״ ולבדוק איזו גרסה ואיזה מכשיר."],
   boot: ["פתיחת האפליקציה", "critical", "טלפונים לא מצליחים לפתוח את האפליקציה. לבדוק את התקלות האחרונות ולשקול Rollback."],
   ops: ["יומן השרת", "high", "שגיאות בפונקציות השרת. הפירוט ביומן למטה."],
+  fbmedia: ["תמונות משוב", "normal", "תמונות והקלטות המשוב של היום הגיעו ל־80% מהמכסה היומית. מעבר למכסה דיווחים מתקבלים בלי תמונות. אם זה רוכבים אמיתיים, אפשר להעלות את FB_MEDIA_DAILY_MB; אם זו הצפה, לבדוק את התיבה ולשקול חסימה ב־Cloudflare."],
   push: ["התראות", "normal", "אין מפתחות VAPID או שאין אף מנוי. התראות לא יגיעו."]
 };
 
@@ -90,7 +91,8 @@ export async function runScan({ manual = false } = {}) {
   const bad = own.filter(l => l.level === "error" || l.level === "critical"), crit = own.filter(l => l.level === "critical");
   add("ops", !bad.length, bad.length ? `${bad.length} שגיאות: ${[...new Set(bad.map(l => l.service))].join(", ")} · ${bad[bad.length - 1].msg}` : "אין שגיאות", null, crit.length ? "critical" : null);
   /* feedback storage: orphan media (no inbox entry, older than an hour) and old rate markers are deleted */
-  try { const sw = await sweepFeedback({ ...fbStores(), now }); if (sw.orphans) await opsLog("monitor", "info", `נמחקו ${sw.orphans} קובצי מדיה של משוב בלי דיווח`, sw); } catch (e) { }
+  try { const sw = await sweepFeedback({ ...fbStores(), now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB") }); if (sw.orphans) await opsLog("monitor", "info", `נמחקו ${sw.orphans} קובצי מדיה של משוב בלי דיווח`, sw);
+    const mb = n => (n / 1048576).toFixed(1); add("fbmedia", sw.pct < 0.8, `${mb(sw.used)} מתוך ${mb(sw.cap)} MB היום (${Math.round(sw.pct * 100)}%)`, null, sw.pct >= 1 ? "high" : "normal"); } catch (e) { }
   let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
   add("push", true, `${subs} מנויים להתראות`);
 

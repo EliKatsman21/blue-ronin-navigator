@@ -416,9 +416,11 @@
     let chip = $("rideChip"); if (!on) { if (chip) chip.remove(); return; }
     if (!chip) { chip = document.createElement("div"); chip.id = "rideChip"; chip.className = "ridechip"; document.body.appendChild(chip); }
     chip.innerHTML = `<span>${esc(ride.title)} · ${ride.km} ק״מ</span><button type="button" aria-label="חזרה למפה הרגילה">✕</button>`;
-    chip.querySelector("button").onclick = () => { st.rideShown = null; pushSources(); rideFocus(false); fitChapter(); };
+    chip.querySelector("button").onclick = () => { if (st.fly && st.fly.replay) stopFly(); st.rideShown = null; pushSources(); rideFocus(false); fitChapter(); };
   }
   function showRide(ride) {
+    if (!ride || !ride.trk || !ride.trk.length) return;
+    stopFly(); /* a replay still flying would keep the camera on the previous ride */
     st.rideShown = ride; pushSources(); rideFocus(true, ride);
     const b = new maplibregl.LngLatBounds(); ride.trk.forEach(p => b.extend([p[0], p[1]])); map.fitBounds(b, { padding: 60, duration: 900, maxZoom: 13 }); if (innerWidth < 900) setSheet("peek");
     toast(`${ride.title} · ${ride.km} ק״מ`);
@@ -602,7 +604,11 @@
     if (st.layers.radar) addRadarLayer();
     if (st.terrain) map.setTerrain({ source: "dem", exaggeration: 1.5 });
     pushSources(); applyLayerVis();
+    /* a style reload (theme change) re-adds every layer visible: keep the clean ride view and the replay's sky */
+    if (rideSaved) RIDE_CLUTTER.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none"); });
+    if (st.fly && st.fly.replay && map.setSky) try { map.setSky(skyFor(st.fly.replay.ride.start)); } catch (e) { }
   }
+  map.on("styleimagemissing", e => { try { if (e && e.id && !map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) }); } catch (x) { } });
   let styleReady = false;
   map.on("style.load", () => { styleReady = true; setupStyle(); });
   window.BR_MAP = map;
@@ -2024,8 +2030,9 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   function startFly(opts) {
-    if (st.fly) return stopFly();
     const o = opts && opts.coords ? opts : null;
+    /* the fly-through button toggles; a replay always replaces whatever is flying (another ride, the demo) */
+    if (st.fly) { stopFly(); if (!o) return; }
     const c = o ? { id: "replay", title: "שחזור · " + o.title } : chap(), r = o ? null : st.routes[st.chap]; if (!o && !r) return;
     const coords = o ? o.coords : r.coords, km0 = o ? o.replay.cum[o.replay.cum.length - 1] : r.km;
     const P = L.flyPath(coords, km0 > 250 ? 0.025 : 0.015);
@@ -2133,9 +2140,11 @@
   $("flSeek").addEventListener("change", () => { flySeeking = false; });
   function stopFly(done) {
     const F = st.fly; if (!F) return;
-    cancelAnimationFrame(F.raf); F.marker.remove(); st.fly = null; setSrc("br-fly", FC()); dropTileQueue(); renderMarkers();
-    if (F.replay) { try { map.setSky && map.setSky(F.prevSky || {}); } catch (e) { } clearTimeout(F.replay.resume); $("rpPop").hidden = true; }
-    map.setTerrain({ source: "dem", exaggeration: 1.5 });
+    st.fly = null; F.stopped = true; cancelAnimationFrame(F.raf);
+    const safe = f => { try { f(); } catch (e) { } };
+    safe(() => F.marker.remove()); safe(() => setSrc("br-fly", FC())); safe(dropTileQueue); safe(renderMarkers);
+    if (F.replay) { safe(() => map.setSky && map.setSky(F.prevSky || {})); clearTimeout(F.replay.resume); clearTimeout(F.replay.hide); const pop = $("rpPop"); pop.hidden = true; pop.classList.remove("in"); pop.onclick = null; }
+    safe(() => map.setTerrain({ source: "dem", exaggeration: 1.5 }));
     map.getCanvas().removeEventListener("pointerdown", flyTouch); document.body.classList.remove("flying");
     $("fFly").setAttribute("aria-pressed", "false"); flyUI(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     if (done) { if (F.replay) showRide(F.replay.ride); else fitChapter(1400); }
@@ -2158,6 +2167,7 @@
     if (st.ride) return stopRide();
     if (!navigator.geolocation) return toast("מצב רכיבה צריך גישה למיקום");
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
+    if (st.rideShown) { st.rideShown = null; pushSources(); rideFocus(false); }
     say(c.nav ? "יוצאים לדרך. ניווט אל " + c.title : "מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
     unlockAudio(); if (st.sos.crash) askMotion().then(ok => { if (ok && st.ride) fallArm(); }); geoPause(); walkStop();
     st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, offS: {}, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
@@ -2828,10 +2838,17 @@
     const ride = { id: "demo", demo: true, chap: cid, title: "הדגמה · " + (c ? c.title : "רכיבה"), start: trk[0][2], end: trk[trk.length - 1][2], km: +km.toFixed(1), moving: Math.round(moving), vmax: Math.round(vmax), fuel: +(km * bikeEff().cons / 100).toFixed(1), bike: bikeEff().name, trk };
     return ride;
   }
+  /* One lifecycle for every replay: stop whatever flies (another ride, the demo, the chapter fly-through),
+     show this ride alone on the map (its line in orange, the bike on it), then fly. A newer tap wins over an
+     older one still loading its photos, so any ride opens after any other, from any state. */
+  let replaySeq = 0;
   async function replayRide(ride) {
     if (!ride || !ride.trk) return; const rc = rideCoords(ride); if (!rc) return toast("הרכיבה קצרה מדי לשחזור");
     closeModal(); if (st.ride) return toast("אפשר לצפות בשחזור בסוף הרכיבה");
-    const cum = L.cumulative(rc.coords), mems = (await memAll()).filter(m => m.lat != null && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4);
+    const seq = ++replaySeq; stopFly();
+    const cum = L.cumulative(rc.coords), mems = (await memAll().catch(() => [])).filter(m => m.lat != null && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4);
+    if (seq !== replaySeq || st.ride) return;
+    st.rideShown = ride; pushSources(); rideFocus(true, ride);
     const pops = mems.map(m => { let bi = 0, bd = 1e9; for (let i = 0; i < rc.coords.length; i += 1) { const d = L.hav(rc.coords[i], [m.lon, m.lat]); if (d < bd) { bd = d; bi = i; } } return bd < 0.4 ? { km: cum[bi], m } : null; }).filter(Boolean).sort((a, b) => a.km - b.km);
     startFly({ coords: rc.coords, title: ride.title, replay: { ride, cum, times: rc.times, pops, next: 0 } });
   }

@@ -154,3 +154,22 @@ test("N1: the sweep deletes in batches within its time budget, and the next run 
   assert.ok(health.indexOf("await sweepFeedback(") > health.indexOf('await ops.setJSON("state", state)'), "sweep after the record");
   assert.match(health, /budgetMs: manual \? 3000 : 8000/);
 });
+
+test("L4: the inbox folds only the newest 500 queued reports and deletes older ones unread, with their media", async () => {
+  const { fb, media } = setup();
+  const N = 1300, id = i => (i + 1).toString(16).padStart(12, "0");
+  for (let i = 0; i < N; i++) { const it = { id: id(i), t: 1000 + i, text: "r" + i, status: "new" }; if (i % 100 === 0) it.media = ["p"]; await fb.setJSON(`q:${String(it.t).padStart(14, "0")}-${it.id}`, it); if (it.media) await media.set(it.id + "-p", Buffer.from("x"), { metadata: { t: 1 } }); }
+  let reads = 0; const get = fb.get.bind(fb); fb.get = async (k, o) => { if (k.startsWith("q:")) reads++; return get(k, o); };
+  const inbox = await inboxNow(fb, media);
+  assert.equal(reads, INBOX_MAX, "only the newest 500 queued blobs are read");
+  assert.equal(inbox.length, INBOX_MAX); assert.equal(inbox[0].text, "r" + (N - INBOX_MAX)); assert.equal(inbox.at(-1).text, "r" + (N - 1));
+  assert.equal([...fb.m.keys()].filter(k => k.startsWith("q:")).length, 0, "older queued reports are deleted");
+  assert.deepEqual([...media.m.keys()].sort(), [id(800) + "-p", id(900) + "-p", id(1000) + "-p", id(1100) + "-p", id(1200) + "-p"], "media of the dropped ones is deleted");
+  // a cleanup time budget: what is left is deleted on the next read
+  const s2 = setup(); for (let i = 0; i < 700; i++) await s2.fb.setJSON(`q:${String(1000 + i).padStart(14, "0")}-${id(i)}`, { id: id(i), t: 1000 + i, text: "x" });
+  let clock = 0; const del = s2.fb.delete.bind(s2.fb); s2.fb.delete = async k => { clock += 10; return del(k); };
+  await inboxNow(s2.fb, s2.media, { cleanMs: 200, clock: () => clock });
+  const left = [...s2.fb.m.keys()].filter(k => k.startsWith("q:")).length; assert.ok(left > 0 && left < 200, `${left} left`);
+  assert.equal((await inboxNow(s2.fb, s2.media)).length, INBOX_MAX);
+  assert.equal([...s2.fb.m.keys()].filter(k => k.startsWith("q:")).length, 0);
+});

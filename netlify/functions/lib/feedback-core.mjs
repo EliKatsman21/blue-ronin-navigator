@@ -39,18 +39,27 @@ export const queueReport = (fb, it) => fb.setJSON(`q:${String(it.t).padStart(14,
 
 /* The admin's view of the inbox: the inbox blob plus the queued reports, oldest first, the last INBOX_MAX kept.
    When there was a queue it is folded in: the inbox is written, read back, and only the queued blobs that made
-   it into the inbox are deleted, with the media of reports that fell off the end. */
-export async function inboxNow(fb, media) {
+   it into the inbox are deleted, with the media of reports that fell off the end.
+   L4: only the newest INBOX_MAX queued reports are read (parallel batches of 25); older ones could never make the
+   last INBOX_MAX, so their blobs are deleted unread, with their media (one list of the media store), within
+   cleanMs. What is left is deleted on the next read (or its media by the monitor's orphan sweep). */
+export async function inboxNow(fb, media, { cleanMs = 4000, clock = Date.now } = {}) {
   const inbox = (await fb.get("inbox", { type: "json" })) || [];
-  const qk = (await listKeys(fb, "q:")).sort(); if (!qk.length) return inbox;
+  const all = (await listKeys(fb, "q:")).sort(); if (!all.length) return inbox;
+  const qk = all.slice(-INBOX_MAX), old = all.slice(0, all.length - qk.length), idOf = k => k.split("-").pop();
   const have = new Set(inbox.map(x => x.id));
-  for (const k of qk) { const it = await fb.get(k, { type: "json" }).catch(() => null); if (it && it.id && !have.has(it.id)) { inbox.push(it); have.add(it.id); } }
+  await inBatches(qk, async k => { const it = await fb.get(k, { type: "json" }).catch(() => null); if (it && it.id && !have.has(it.id)) { inbox.push(it); have.add(it.id); } });
   inbox.sort((a, b) => a.t - b.t);
   const keep = inbox.slice(-INBOX_MAX), dropped = inbox.slice(0, inbox.length - keep.length);
   await fb.setJSON("inbox", keep);
   const back = new Set(((await fb.get("inbox", { type: "json" })) || []).map(x => x.id)), gone = new Set(dropped.map(x => x.id));
-  for (const k of qk) { const id = k.split("-").pop(); if (back.has(id) || gone.has(id)) await fb.delete(k).catch(() => { }); }
-  for (const x of dropped) for (const k of x.media || []) await media.delete(x.id + "-" + k).catch(() => { });
+  await inBatches(qk.filter(k => back.has(idOf(k)) || gone.has(idOf(k))), k => fb.delete(k));
+  await inBatches(dropped.flatMap(x => (x.media || []).map(k => x.id + "-" + k)), k => media.delete(k));
+  if (old.length) {
+    const opt = { end: clock() + cleanMs, clock }, oldIds = new Set(old.map(idOf));
+    const r = await inBatches(old, k => fb.delete(k), opt);
+    if (r.done) await inBatches((await listKeys(media, "")).filter(k => oldIds.has(k.split("-")[0])), k => media.delete(k), opt);
+  }
   return keep;
 }
 

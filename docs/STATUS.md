@@ -4,7 +4,7 @@ Source of truth for the project's state. Rules for working on the code are in `/
 `docs/WORKFLOW.md`. A copy of this file lives in the claude.ai Project as `claude/blue-ronin-navigator.md` and is
 refreshed at the end of every round.
 
-Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.7.1 (deployed 2026-11-12), SW shell v18.
+Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" since 2.5.0): everyday navigation anywhere, plus curated weekend chapters in the north, the Jerusalem hills and the Jordan Valley. Live at https://blueronin.app. The old address https://blueronin-north-map.netlify.app 301-redirects there (since v2.4.0). App version 2.8.0 (deployed 2026-11-13), SW shell v20.
 
 ## How it ships
 - Code: GitHub `EliKatsman21/blue-ronin-navigator` (public). Netlify site `blueronin-north-map` (id 4bff772c-…) builds production from `main` only; `netlify.toml` `ignore` skips every non-production build (since 2026-11-10).
@@ -20,6 +20,18 @@ Two-wheeler navigator PWA for all of Israel (brand "BLUE RONIN · ישראל" si
 - `netlify/functions/`: `osm*`, `fuel`, `brief*`, `vapid`, `subscribe`, `test-push`, `config`, `traffic` (HERE), `traffic-tile` (retired, 410), `wx` (weather proxy), `health-scan` (every 30 min), `photos`, `admin`, `content`, `feedback`, `ping`, `pro`, `live`, `sos`, `group`, `xfer`, `errlog`, `geo`. Shared: `lib/admin.mjs`, `lib/push.mjs`, `lib/pro.mjs`, `lib/safety.mjs`, `lib/ops.mjs` (ops log + usage counters, store `brn-ops`), `lib/health.mjs` (scanner + playbook + admin alerts), `lib/osm.mjs`, `lib/brief.mjs`.
 - `tests/`, `scripts/`, `docs/`, `media/`, `.github/`: see `CLAUDE.md`.
 - Tabs: ניווט · סופ״ש (the former תדריך שבת) · מסלול · עצירות ודלק · שלי · כלים. Opening tab: a #hash wins; else סופ״ש on Fri/Sat and ניווט Sun–Thu.
+
+## Release 2.8.0 (2026-11-13, issue #13)
+- Screen fit on iPhone (iOS 26 home-screen viewport bug): `guard.js` sets `--app-h` / `--sab`; every tab scrolls to its last button. Proven only in the field.
+- Replay lifecycle fixed (one bike, coloured route, ride after ride). One route everywhere: `setCurrentRoute()` + `br:route` event syncs navigate, weekend brief, journal and share.
+- Feedback with up to 4 photos (`lib/fbmedia.mjs`, EXIF stripped on the phone); feedback queue blobs `q:`, rate markers `rl:`, budget `mb:`.
+- Pro: all-time top speed + total riding time tile in the journal (`vmaxRec`). Open question m4: the record outlives a deleted journal.
+- Accessibility legal baseline (IS 5568 / WCAG AA P0 items, axe spec) + honest statement `accessibility.html` ("partial, in progress"). Contact = in-app feedback form only until hello@blueronin.app receives mail (then restore the mailto line and its unit test). Phase 2 in 2.8.1.
+- Push brief per chapter (`lib/brief-chapter.mjs`); send moved to `brief-send-background` + `lib/brief-job.mjs` (job id, 8 s check, inline takeover, monitor check "brief"). Push hardening `lib/push-core.mjs` (host allow-list, 5 s timeout, keep on transient failure, remove only on 410/404, subscribe throttle, 20,000 cap). SOS `lib/sos-core.mjs`: guardians kept on transient failure, rider told clearly when an alert reached nobody.
+- MapLibre 4.7.1 + SunCalc 1.9.0 self-hosted in `site/vendor/` (SHA-256 pinned, cache-first, immutable header). Server errors shown in Hebrew only (`BRL.heText`).
+- Privacy text: push row (chapter id) and media row (up to 4 photos, EXIF removed) approved by Eli 2026-11-13.
+- Gates: QA final GO with conditions, security final GO, performance OK (reports in the company folder `work/`). Deferred to 2.8.1: m10 SOS join race, m11 possible double brief at the 8 s check, m12 renderPush page error, m8 residue, D1-D3 brief atomicity, CSP vendoring, MapLibre upgrade.
+- Released on a Friday at Eli's explicit decision; watch the Saturday-morning brief in the ops log.
 
 ## Release 2.7.1 (2026-11-12)
 - Security only: `lib/edge.mjs` (Cloudflare edge handshake, Cloudflare-aware client IP, optional origin lock), every `/api` function gated. Env `EDGE_SECRET` set (Production). See "Cloudflare edge".

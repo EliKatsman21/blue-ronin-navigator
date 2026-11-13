@@ -16,7 +16,7 @@
       if (navigator.sendBeacon) navigator.sendBeacon("/api/errlog", new Blob([body], { type: "application/json" })); else fetch("/api/errlog", { method: "POST", body, keepalive: true }).catch(() => { });
     } catch (e) { }
   }
-  addEventListener("error", e => { if (!e.message && e.target && e.target !== window) { const s = e.target.src || e.target.href || ""; if (/unpkg|cdnjs|app\.js|logic\.js|data\.js/.test(s)) { report("load", "failed to load " + s.replace(/^https?:\/\/[^/]+/, ""), s, 0, ""); fatal("load"); } return; }
+  addEventListener("error", e => { if (!e.message && e.target && e.target !== window) { const s = e.target.src || e.target.href || ""; if (/unpkg|cdnjs|vendor\/|app\.js|logic\.js|data\.js/.test(s)) { report("load", "failed to load " + s.replace(/^https?:\/\/[^/]+/, ""), s, 0, ""); fatal("load"); } return; }
     report("error", e.message, e.filename, e.lineno, e.error && e.error.stack); if (!G.booted) fatal("error"); }, true);
   addEventListener("unhandledrejection", e => { const r = e.reason || {}; report("promise", r.message || String(r), "", 0, r.stack); });
   function endIntro() { const i = document.getElementById("intro"); if (i && !i.classList.contains("out")) i.classList.add("out"); }

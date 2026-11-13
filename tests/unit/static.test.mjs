@@ -30,6 +30,21 @@ test("service worker shell version looks right and every shell file exists", () 
   for (const f of files) if (f !== "./") assert.ok(existsSync(join(SITE, f)), `sw.js precaches missing file: ${f}`);
 });
 
+test("MapLibre and SunCalc are self-hosted, precached, licensed and match the pinned packages", () => {
+  const sw = read(join(SITE, "sw.js")), toml = read(join(SITE, "..", "netlify.toml"));
+  const libs = [["vendor/maplibre-gl/4.7.1/maplibre-gl.js", "maplibre-gl/dist/maplibre-gl.js"], ["vendor/maplibre-gl/4.7.1/maplibre-gl.css", "maplibre-gl/dist/maplibre-gl.css"], ["vendor/suncalc/1.9.0/suncalc.js", "suncalc/suncalc.js"]];
+  const pkg = JSON.parse(read(join(SITE, "..", "tests", "package.json"))).devDependencies;
+  assert.equal(pkg["maplibre-gl"], "4.7.1"); assert.equal(pkg.suncalc, "1.9.0");
+  for (const [v, nm] of libs) {
+    assert.ok(sw.includes(`"${v}"`), `sw.js shell is missing ${v}`);
+    const nmPath = join(SITE, "..", "tests", "node_modules", nm);
+    if (existsSync(nmPath)) assert.equal(read(join(SITE, v)).replace(/\r/g, ""), read(nmPath).replace(/\r/g, ""), `${v} differs from the npm package`);
+  }
+  assert.ok(existsSync(join(SITE, "vendor/maplibre-gl/4.7.1/LICENSE.txt")) && existsSync(join(SITE, "vendor/suncalc/1.9.0/LICENSE")), "vendor LICENSE files");
+  for (const page of ["index.html", "live.html", "admin.html"]) assert.ok(!/unpkg\.com\/maplibre-gl|suncalc\/1\.9\.0\/suncalc\.min/.test(read(join(SITE, page))), `${page} still loads a map library from a CDN`);
+  assert.ok(!/style-src[^;"]*unpkg/.test(toml), "no stylesheet comes from unpkg any more");
+});
+
 test("every browser script parses", () => {
   for (const f of readdirSync(SITE).filter(f => f.endsWith(".js")))
     execFileSync(process.execPath, ["--check", join(SITE, f)]);

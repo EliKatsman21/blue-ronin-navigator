@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Blue Ronin">
 <link rel="preconnect" href="https://tiles.openfreemap.org">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="vendor/maplibre-gl/4.7.1/maplibre-gl.css">
 <style>
 /* Concept: a dawn-ride instrument. Full-bleed 3D map, a ride sheet that docks right on desktop and slides up on phones.
    Night-asphalt blue ground, Yamaha-blue route, sunrise amber for anything time/sun related. */
@@ -822,8 +822,8 @@ body.riding .me{display:none}
 <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="חלון" hidden><div class="msheet"><button type="button" class="mx" id="mx" aria-label="סגירה">×</button><div id="mbody"></div></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+<script src="vendor/maplibre-gl/4.7.1/maplibre-gl.js"></script>
+<script src="vendor/suncalc/1.9.0/suncalc.js"></script>
 <script src="geo.js"></script>
 <script src="data.js"></script>
 <script src="bikes.js"></script>

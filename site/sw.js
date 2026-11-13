@@ -1,6 +1,6 @@
 /* Blue Ronin Navigator — service worker: offline shell, cached map tiles, network-first live data. */
-const SHELL = "brn-shell-v18", TILES = "brn-tiles-v1", DATA = "brn-data-v1";
-const SHELL_FILES = ["./", "index.html", "guard.js", "intro.js", "app.js", "bikes.js", "logic.js", "geo.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/badge-96.png", "sounds/ignition.mp3"];
+const SHELL = "brn-shell-v19", TILES = "brn-tiles-v1", DATA = "brn-data-v1";
+const SHELL_FILES = ["./", "index.html", "guard.js", "intro.js", "app.js", "bikes.js", "logic.js", "geo.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/badge-96.png", "sounds/ignition.mp3", "accessibility.html", "vendor/maplibre-gl/4.7.1/maplibre-gl.js", "vendor/maplibre-gl/4.7.1/maplibre-gl.css", "vendor/suncalc/1.9.0/suncalc.js"];
 const TILE_HOSTS = ["tiles.openfreemap.org", "s3.amazonaws.com"];
 const LIB_HOSTS = ["unpkg.com", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];
 const DATA_HOSTS = ["api.open-meteo.com", "overpass-api.de", "overpass.kumi.systems", "router.project-osrm.org", "api.rainviewer.com"];

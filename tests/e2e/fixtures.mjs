@@ -1,24 +1,13 @@
-// Shared setup: CDN libraries come from node_modules, every other outside request is blocked,
-// so the tests are deterministic and need no network. Page errors are collected per test.
+// Shared setup: MapLibre and SunCalc are self-hosted in site/vendor/ and served by serve.mjs like the rest of
+// the app; every outside request is blocked (as if the CDNs were down), so the tests are deterministic, need
+// no network, and prove the app boots without any CDN. Page errors are collected per test.
 import { test as base, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-const nm = p => readFileSync(fileURLToPath(new URL(`../node_modules/${p}`, import.meta.url)));
-const LIBS = [
-  [/unpkg\.com\/maplibre-gl@[^/]+\/dist\/maplibre-gl\.js/, "maplibre-gl/dist/maplibre-gl.js", "text/javascript"],
-  [/unpkg\.com\/maplibre-gl@[^/]+\/dist\/maplibre-gl\.css/, "maplibre-gl/dist/maplibre-gl.css", "text/css"],
-  [/cdnjs\.cloudflare\.com\/ajax\/libs\/suncalc\/.*suncalc(\.min)?\.js/, "suncalc/suncalc.js", "text/javascript"],
-];
 export const test = base.extend({
   // auto: every test gets the offline routing, even if it never reads pageErrors.
   pageErrors: [async ({ page }, use) => {
     const errors = [];
     page.on("pageerror", e => errors.push(String(e && e.stack || e)));
-    await page.route(url => !/^http:\/\/localhost/.test(url.href), route => {
-      const u = route.request().url();
-      const lib = LIBS.find(([re]) => re.test(u));
-      return lib ? route.fulfill({ status: 200, contentType: lib[2], body: nm(lib[1]) }) : route.abort("internetdisconnected");
-    });
+    await page.route(url => !/^http:\/\/localhost/.test(url.href), route => route.abort("internetdisconnected"));
     await use(errors);
   }, { auto: true }],
 });

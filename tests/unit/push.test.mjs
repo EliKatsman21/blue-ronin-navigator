@@ -129,9 +129,19 @@ test("perf: the brief is handed to a background function as a one-time job, sent
   const p = briefPayload(job);
   assert.deepEqual(p({ chap: "c2" }), { title: "c2", body: "C", tag: "brief-2026-11-14", url: "./#brief" });
   assert.equal(p({ chap: "nope" }).title, "best");
-  // the hand-off failed: the scheduled function sends inline, and the job is gone
-  r = await dispatchBrief({ store, b, mode: "saturday", now, trigger: async () => { throw new Error("down"); }, send: async j => { inline++; assert.equal(j.mode, "saturday"); return { sent: 7, total: 7 }; } });
+  // the hand-off was refused (a definite non-202): the scheduled function sends inline, and the job is gone
+  r = await dispatchBrief({ store, b, mode: "saturday", now, trigger: async () => ({ status: 500 }), send: async j => { inline++; assert.equal(j.mode, "saturday"); return { sent: 7, total: 7 }; } });
   assert.equal(r.queued, false); assert.equal(r.sent, 7); assert.equal(inline, 1); assert.equal(store.m.size, 0);
+  // L1: the trigger fetch THREW after the background function already got the request: it sends, the scheduled
+  // function does not, so the brief goes out exactly once
+  let bgSends = 0; inline = 0;
+  r = await dispatchBrief({ store, b, mode: "friday", now,
+    trigger: async id => { const j = await takeJob(store, id, now); if (j) bgSends++; throw new Error("socket hang up"); },
+    send: async () => { inline++; return { sent: 1 }; } });
+  assert.deepEqual(r, { queued: true, unsure: true }); assert.equal(bgSends, 1); assert.equal(inline, 0, "never sent twice");
+  // a thrown fetch that never reached it: nothing inline, the job is left (not lost) for the background function
+  r = await dispatchBrief({ store, b, mode: "friday", now, trigger: async () => { throw new Error("down"); }, send: async () => { inline++; return {}; } });
+  assert.equal(r.unsure, true); assert.equal(inline, 0); assert.equal(store.m.size, 1); store.m.clear();
   // nobody outside can start a send: bad ids, unknown ids, expired jobs
   for (const id of [undefined, "", "x", "../job", "a".repeat(31), "A".repeat(32)]) assert.equal(await takeJob(store, id, now), null, String(id));
   assert.equal(await takeJob(store, "f".repeat(32), now), null);

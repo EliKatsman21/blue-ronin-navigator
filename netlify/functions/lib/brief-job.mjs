@@ -6,8 +6,11 @@
    The scheduled function computes the brief once, stores it as a one-time job job:<32 hex> in the "brn" store and
    POSTs only that id to the background function. The background function takes the job (read, then delete) and
    sends. Nobody outside can start a broadcast: an id is 128 random bits, known only to the server, used once,
-   and older than JOB_TTL it is ignored. If the hand-off fails, the scheduled function takes the job itself and
-   sends inline (what it did before), so a job is sent at most once. Pure: store, trigger and sender are passed in. */
+   and older than JOB_TTL it is ignored. If the background function answers with a definite status other than 202,
+   the scheduled function takes the job itself and sends inline (what it did before). If the trigger fetch THROWS,
+   the background function may already have the request (a reset on the response), so nothing is sent inline: the
+   job is left for it, and the result says so (unsure), to be logged (L1, security review 2026-11-13 final: a brief
+   is never sent twice). Pure: store, trigger and sender are passed in. */
 import { randomBytes } from "node:crypto";
 import { pickMessage, cleanChap } from "./brief-chapter.mjs";
 
@@ -33,7 +36,7 @@ export async function takeJob(store, id, now) {
 /* trigger(id) -> Response (202 = the background function took it); send(job) -> the sendAll result */
 export async function dispatchBrief({ store, b, mode, now, trigger, send }) {
   const id = await queueJob(store, b, mode, now);
-  let status = 0; try { status = (await trigger(id)).status; } catch (e) { }
+  let status = 0; try { status = (await trigger(id)).status; } catch (e) { return { queued: true, unsure: true }; }
   if (status === 202) return { queued: true };
   const job = await takeJob(store, id, now);
   return job ? { queued: false, ...(await send(job)) } : { queued: true }; /* gone = the background function has it */

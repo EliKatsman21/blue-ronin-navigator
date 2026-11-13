@@ -15,6 +15,7 @@ export default async () => {
       send: job => sendAll(briefPayload(job), "saturday") });
     console.log("saturday brief", b.title, JSON.stringify(r));
     if (!r.queued) await opsLog("push", "info", `עדכון שבת בבוקר נשלח ל־${r.sent} מתוך ${r.total}`, r);
+    if (r.unsure) await opsLog("push", "warn", "עדכון שבת בבוקר: ההעברה לפונקציית הרקע לא אושרה. לא נשלח שוב מכאן כדי לא לשלוח פעמיים");
   } catch (e) { await opsLog("push", "error", "עדכון שבת בבוקר נכשל: " + e.message); }
 };
 export const config = { schedule: "15 3 * * 6" };

@@ -38,7 +38,7 @@ test("the scheduled briefs send per chapter, and the subscription stores the cha
   for (const f of ["brief-friday.mjs", "brief-saturday.mjs"]) {
     const src = read(`../../netlify/functions/${f}`);
     /* the sending moved to brief-send-background through a one-time job (perf round 2.8); the payload per chapter is briefPayload */
-    assert.match(src, /dispatchBrief\(\{/, f); assert.match(src, /sendAll\(briefPayload\(job\), "(friday|saturday)"\)/, f);
+    assert.match(src, /dispatchBrief\(\{/, f); assert.match(src, /sendAll\(briefPayload\(job\), "(friday|saturday)", \{ deadline \}\)/, f);
     assert.equal((src.match(/computeBrief\(/g) || []).length, 1, `${f} computes the brief once`);
   }
   assert.match(read("../../netlify/functions/lib/brief-job.mjs"), /const m = pickMessage\(job\.messages, cleanChap\(rec\.chap\)\)/);

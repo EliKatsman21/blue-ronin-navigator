@@ -82,16 +82,18 @@ export async function trySend(send, sub, payload) {
   try { await send(sub, payload); return SEND_OK; } catch (e) { return isGone(e) ? SEND_GONE : SEND_FAIL; }
 }
 
-export async function sendAllWith({ store, send, payload, pref, concurrency = SEND_CONCURRENCY }) {
-  const keys = await listKeys(store, ""); let sent = 0, gone = 0, skipped = 0, failed = 0;
+/* deadline (ms, optional): no new send starts after it; those are counted as cut (the inline brief fallback, R1) */
+export async function sendAllWith({ store, send, payload, pref, concurrency = SEND_CONCURRENCY, deadline = Infinity, clock = Date.now }) {
+  const keys = await listKeys(store, ""); let sent = 0, gone = 0, skipped = 0, failed = 0, cut = 0;
   await mapLimit(keys, concurrency, async k => {
+    if (clock() >= deadline) { cut++; return; }
     const rec = await store.get(k, { type: "json" }).catch(() => null);
     if (!rec || !rec.sub || (pref && rec.prefs && rec.prefs[pref] === false)) { skipped++; return; }
     const p = typeof payload === "function" ? payload(rec) : payload;
     const r = await trySend(send, rec.sub, p);
     if (r === SEND_OK) sent++; else if (r === SEND_GONE) { await store.delete(k).catch(() => { }); gone++; } else failed++;
   });
-  return { sent, gone, skipped, failed, total: keys.length };
+  return { sent, gone, skipped, failed, cut, total: keys.length };
 }
 
 const json = (o, status = 200) => Response.json(o, { status });

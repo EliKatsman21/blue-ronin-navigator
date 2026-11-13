@@ -36,7 +36,7 @@ export async function sendOne(rec, payload, opts = {}) {
 }
 /* payload: one payload for all, or a function rec => payload (the weekend brief: the rider's chapter).
    Sent with bounded concurrency (push-core SEND_CONCURRENCY). */
-export async function sendAll(payload, pref) {
+export async function sendAll(payload, pref, { deadline } = {}) {
   await configure();
-  return sendAllWith({ store: subs(), send: (sub, p) => push(sub, p), payload, pref });
+  return sendAllWith({ store: subs(), send: (sub, p) => push(sub, p), payload, pref, deadline });
 }

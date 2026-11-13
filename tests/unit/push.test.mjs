@@ -120,28 +120,23 @@ test("perf: the brief is handed to a background function as a one-time job, sent
   const { queueJob, takeJob, dispatchBrief, briefPayload, JOB_TTL } = await import("../../netlify/functions/lib/brief-job.mjs");
   const b = { title: "T", sat: "2026-11-14", messages: { best: { title: "best", body: "B" }, byChap: { c2: { title: "c2", body: "C" } } } };
   const store = fakeStore(), now = Date.UTC(2026, 10, 13, 14, 30);
-  // the background function took it (202): nothing sent inline, the job waits for it, once
-  let inline = 0, ids = [];
-  let r = await dispatchBrief({ store, b, mode: "friday", now, trigger: async id => { ids.push(id); return { status: 202 }; }, send: async () => { inline++; return { sent: 1 }; } });
-  assert.deepEqual(r, { queued: true }); assert.equal(inline, 0);
-  const job = await takeJob(store, ids[0], now + 1000); assert.equal(job.mode, "friday");
-  assert.equal(await takeJob(store, ids[0], now + 1000), null, "a job runs once");
+  // the background function took it (202): nothing sent inline; the job runs once (R1 confirm/fallback: brief-watch.test.mjs)
+  let inline = 0, job = null; const wait = async () => { };
+  let r = await dispatchBrief({ store, b, mode: "friday", now, wait, trigger: async id => { job = await takeJob(store, id, now + 1000); return { status: 202 }; }, send: async () => { inline++; return { sent: 1 }; } });
+  assert.equal(r.queued, true); assert.equal(r.how, "background"); assert.equal(inline, 0); assert.equal(job.mode, "friday"); assert.equal(store.m.size, 0, "a job runs once");
   const p = briefPayload(job);
   assert.deepEqual(p({ chap: "c2" }), { title: "c2", body: "C", tag: "brief-2026-11-14", url: "./#brief" });
   assert.equal(p({ chap: "nope" }).title, "best");
   // the hand-off was refused (a definite non-202): the scheduled function sends inline, and the job is gone
-  r = await dispatchBrief({ store, b, mode: "saturday", now, trigger: async () => ({ status: 500 }), send: async j => { inline++; assert.equal(j.mode, "saturday"); return { sent: 7, total: 7 }; } });
+  r = await dispatchBrief({ store, b, mode: "saturday", now, wait, trigger: async () => ({ status: 500 }), send: async j => { inline++; assert.equal(j.mode, "saturday"); return { sent: 7, total: 7 }; } });
   assert.equal(r.queued, false); assert.equal(r.sent, 7); assert.equal(inline, 1); assert.equal(store.m.size, 0);
   // L1: the trigger fetch THREW after the background function already got the request: it sends, the scheduled
-  // function does not, so the brief goes out exactly once
+  // function finds the job gone and does not, so the brief goes out exactly once
   let bgSends = 0; inline = 0;
-  r = await dispatchBrief({ store, b, mode: "friday", now,
+  r = await dispatchBrief({ store, b, mode: "friday", now, wait,
     trigger: async id => { const j = await takeJob(store, id, now); if (j) bgSends++; throw new Error("socket hang up"); },
     send: async () => { inline++; return { sent: 1 }; } });
-  assert.deepEqual(r, { queued: true, unsure: true }); assert.equal(bgSends, 1); assert.equal(inline, 0, "never sent twice");
-  // a thrown fetch that never reached it: nothing inline, the job is left (not lost) for the background function
-  r = await dispatchBrief({ store, b, mode: "friday", now, trigger: async () => { throw new Error("down"); }, send: async () => { inline++; return {}; } });
-  assert.equal(r.unsure, true); assert.equal(inline, 0); assert.equal(store.m.size, 1); store.m.clear();
+  assert.equal(r.queued, true); assert.equal(r.unsure, true); assert.equal(bgSends, 1); assert.equal(inline, 0, "never sent twice");
   // nobody outside can start a send: bad ids, unknown ids, expired jobs
   for (const id of [undefined, "", "x", "../job", "a".repeat(31), "A".repeat(32)]) assert.equal(await takeJob(store, id, now), null, String(id));
   assert.equal(await takeJob(store, "f".repeat(32), now), null);

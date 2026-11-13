@@ -7,6 +7,7 @@ import { getStore } from "@netlify/blobs";
 import { opsStore, opsLog, usage } from "./ops.mjs";
 import { sendOne } from "./push.mjs";
 import { subsCap } from "./push-core.mjs";
+import { briefWatch } from "./brief-job.mjs";
 import { sweepFeedback, mediaUse } from "./feedback-core.mjs";
 
 const errStore = () => getStore({ name: "brn-err", consistency: "strong" });
@@ -32,6 +33,7 @@ export const PLAYBOOK = {
   boot: ["פתיחת האפליקציה", "critical", "טלפונים לא מצליחים לפתוח את האפליקציה. לבדוק את התקלות האחרונות ולשקול Rollback."],
   ops: ["יומן השרת", "high", "שגיאות בפונקציות השרת. הפירוט ביומן למטה."],
   fbmedia: ["תמונות משוב", "normal", "תמונות והקלטות המשוב של היום הגיעו ל־80% מהמכסה היומית. מעבר למכסה דיווחים מתקבלים בלי תמונות. אם זה רוכבים אמיתיים, אפשר להעלות את FB_MEDIA_DAILY_MB; אם זו הצפה, לבדוק את התיבה ולשקול חסימה ב־Cloudflare."],
+  brief: ["תדריך סופ״ש", "high", "התדריך הועבר לשליחה אבל לא נרשמה שליחה תוך 20 דקות: פונקציית הרקע (brief-send-background) כנראה לא רצה. לבדוק את הלוגים שלה ב־Netlify. רוכבים לא קיבלו את התדריך השבוע."],
   push: ["התראות", "normal", "מספר המנויים להתראות הגיע ל־90% מהתקרה (PUSH_SUBS_CAP, ברירת מחדל 20000). מעבר לתקרה הרשמות חדשות נדחות. אם אלה רוכבים אמיתיים, אפשר להעלות את PUSH_SUBS_CAP; אם זו הצפה, לבדוק ולשקול חסימה ב־Cloudflare."]
 };
 
@@ -98,11 +100,14 @@ export async function runScan({ manual = false } = {}) {
   { const cap = subsCap(Netlify.env.get("PUSH_SUBS_CAP")), pct = subs / cap; /* N2: alert at 90% of the cap on subscriptions */
     add("push", pct < 0.9, `${subs} מנויים להתראות מתוך תקרה של ${cap} (${Math.round(pct * 100)}%)`, null, pct >= 1 ? "high" : "normal"); }
 
-  /* incidents: open after two failing scans in a row (one, for critical), close on recovery */
+  /* R1: a weekend brief that was queued but never recorded as sent within 20 minutes */
+  try { const bw = briefWatch(await ops.get("brief", { type: "json" }), now); add("brief", bw.ok, bw.detail); } catch (e) { }
+
+  /* incidents: open after two failing scans in a row (one, for critical or a missed brief: it will not fix itself), close on recovery */
   const alerts = [];
   for (const c of checks) {
     const f = c.ok ? 0 : (state.fails[c.id] || 0) + 1; state.fails[c.id] = f; const open = state.open[c.id];
-    if (!c.ok && !open && (f >= 2 || c.level === "critical")) { state.open[c.id] = { id: c.id, title: c.name, level: c.level, since: now, last: now, detail: c.detail, hint: PLAYBOOK[c.id][2], n: 1 }; alerts.push({ kind: "open", c }); }
+    if (!c.ok && !open && (f >= 2 || c.level === "critical" || c.id === "brief")) { state.open[c.id] = { id: c.id, title: c.name, level: c.level, since: now, last: now, detail: c.detail, hint: PLAYBOOK[c.id][2], n: 1 }; alerts.push({ kind: "open", c }); }
     else if (!c.ok && open) { open.last = now; open.n++; open.detail = c.detail; if (c.level === "critical" && open.level !== "critical") { open.level = "critical"; alerts.push({ kind: "open", c }); } }
     else if (c.ok && open) { const dur = Math.round((now - open.since) / MIN); delete state.open[c.id]; alerts.push({ kind: "close", c, dur }); const hist = (await ops.get("incidents", { type: "json" }).catch(() => null)) || []; hist.unshift(Object.assign({}, open, { closed: now })); await ops.setJSON("incidents", hist.slice(0, 60)); }
   }

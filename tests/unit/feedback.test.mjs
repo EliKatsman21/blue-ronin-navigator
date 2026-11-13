@@ -1,7 +1,7 @@
 // /api/feedback hardening (security review 2026-11-13): the handler runs against an in-memory Blobs store.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeFeedback, RATE_MAX, validBody, inboxNow, INBOX_MAX } from "../../netlify/functions/lib/feedback-core.mjs";
+import { makeFeedback, RATE_MAX, validBody, inboxNow, inboxState, updateInbox, INBOX_MAX, FOLD_MAX, FOLD_BATCH } from "../../netlify/functions/lib/feedback-core.mjs";
 
 /* the parts of a Netlify Blobs store the feedback code uses; reads and writes yield to the event loop like I/O */
 export function fakeStore() {
@@ -155,21 +155,63 @@ test("N1: the sweep deletes in batches within its time budget, and the next run 
   assert.match(health, /budgetMs: manual \? 3000 : 8000/);
 });
 
-test("L4: the inbox folds only the newest 500 queued reports and deletes older ones unread, with their media", async () => {
+const qput = (fb, it) => fb.setJSON(`q:${String(it.t).padStart(14, "0")}-${it.id}`, it);
+const hexId = i => (i + 1).toString(16).padStart(12, "0");
+const qcount = fb => [...fb.m.keys()].filter(k => k.startsWith("q:")).length;
+
+test("L4: only the newest 500 queued reports can reach the inbox; older ones are deleted unread, with their media", async () => {
   const { fb, media } = setup();
-  const N = 1300, id = i => (i + 1).toString(16).padStart(12, "0");
-  for (let i = 0; i < N; i++) { const it = { id: id(i), t: 1000 + i, text: "r" + i, status: "new" }; if (i % 100 === 0) it.media = ["p"]; await fb.setJSON(`q:${String(it.t).padStart(14, "0")}-${it.id}`, it); if (it.media) await media.set(it.id + "-p", Buffer.from("x"), { metadata: { t: 1 } }); }
+  const N = 1300;
+  for (let i = 0; i < N; i++) { const it = { id: hexId(i), t: 1000 + i, text: "r" + i, status: "new" }; if (i % 100 === 0) it.media = ["p"]; await qput(fb, it); if (it.media) await media.set(it.id + "-p", Buffer.from("x"), { metadata: { t: 1 } }); }
   let reads = 0; const get = fb.get.bind(fb); fb.get = async (k, o) => { if (k.startsWith("q:")) reads++; return get(k, o); };
-  const inbox = await inboxNow(fb, media);
-  assert.equal(reads, INBOX_MAX, "only the newest 500 queued blobs are read");
+  await inboxNow(fb, media);
+  assert.equal(qcount(fb), INBOX_MAX - FOLD_MAX, "the 800 older ones are gone after one call, unread; 100 of the newest 500 folded");
+  assert.equal(reads, FOLD_MAX);
+  assert.deepEqual([...media.m.keys()].sort(), [hexId(800) + "-p", hexId(900) + "-p", hexId(1000) + "-p", hexId(1100) + "-p", hexId(1200) + "-p"], "media of the never-read ones is deleted");
+  let inbox; for (let i = 0; i < 4; i++) inbox = await inboxNow(fb, media);
+  assert.equal(reads, INBOX_MAX, "every one of the newest 500 read exactly once");
   assert.equal(inbox.length, INBOX_MAX); assert.equal(inbox[0].text, "r" + (N - INBOX_MAX)); assert.equal(inbox.at(-1).text, "r" + (N - 1));
-  assert.equal([...fb.m.keys()].filter(k => k.startsWith("q:")).length, 0, "older queued reports are deleted");
-  assert.deepEqual([...media.m.keys()].sort(), [id(800) + "-p", id(900) + "-p", id(1000) + "-p", id(1100) + "-p", id(1200) + "-p"], "media of the dropped ones is deleted");
-  // a cleanup time budget: what is left is deleted on the next read
-  const s2 = setup(); for (let i = 0; i < 700; i++) await s2.fb.setJSON(`q:${String(1000 + i).padStart(14, "0")}-${id(i)}`, { id: id(i), t: 1000 + i, text: "x" });
+  assert.equal(qcount(fb), 0);
+  // the cleanup of old queued reports has a time budget; what is left goes on the next call
+  const s2 = setup(); for (let i = 0; i < 700; i++) await qput(s2.fb, { id: hexId(i), t: 1000 + i, text: "x" });
   let clock = 0; const del = s2.fb.delete.bind(s2.fb); s2.fb.delete = async k => { clock += 10; return del(k); };
   await inboxNow(s2.fb, s2.media, { cleanMs: 200, clock: () => clock });
-  const left = [...s2.fb.m.keys()].filter(k => k.startsWith("q:")).length; assert.ok(left > 0 && left < 200, `${left} left`);
-  assert.equal((await inboxNow(s2.fb, s2.media)).length, INBOX_MAX);
-  assert.equal([...s2.fb.m.keys()].filter(k => k.startsWith("q:")).length, 0);
+  assert.ok(qcount(s2.fb) > INBOX_MAX - FOLD_MAX, "not all old ones deleted in one call");
+  for (let i = 0; i < 12 && qcount(s2.fb); i++) await inboxNow(s2.fb, s2.media);
+  assert.equal(qcount(s2.fb), 0); assert.equal((await inboxNow(s2.fb, s2.media)).length, INBOX_MAX);
+});
+
+test("perf: 500 queued reports fold in bounded steps, each saved, no call does the whole queue", async () => {
+  const { fb, media } = setup();
+  for (let i = 0; i < 500; i++) await qput(fb, { id: hexId(i), t: 1000 + i, text: "r" + i, status: "new" });
+  let ops = 0, writes = 0, live = 0, peak = 0; const get = fb.get.bind(fb), set = fb.setJSON.bind(fb);
+  fb.get = async (k, o) => { ops++; live++; peak = Math.max(peak, live); try { return await get(k, o); } finally { live--; } };
+  fb.setJSON = async (k, v, o) => { ops++; if (k === "inbox") writes++; return set(k, v, o); };
+  const calls = [];
+  for (let c = 0; c < 10; c++) {
+    ops = 0; writes = 0; const st = await inboxState(fb, media);
+    calls.push({ ops, writes, pending: st.pending, n: st.items.length });
+    assert.ok(ops <= FOLD_MAX + 3 * (FOLD_MAX / FOLD_BATCH) + 2, `call ${c}: ${ops} reads/writes`);
+    assert.equal(writes, FOLD_MAX / FOLD_BATCH, `call ${c}: the inbox is saved after each batch`);
+    if (!st.pending) break;
+  }
+  assert.ok(peak <= FOLD_BATCH + 1, `at most ${FOLD_BATCH} parallel reads (${peak})`);
+  assert.deepEqual(calls.map(c => c.n), [100, 200, 300, 400, 500]); assert.deepEqual(calls.map(c => c.pending), [400, 300, 200, 100, 0]);
+  assert.equal(qcount(fb), 0);
+});
+
+test("perf: a status change is never lost to a fold that runs at the same time", async () => {
+  const { fb, media } = setup();
+  await fb.setJSON("inbox", [{ id: "aaaaaaaaaaaa", t: 1, text: "old", status: "new" }]);
+  for (let i = 0; i < 60; i++) await qput(fb, { id: hexId(i), t: 1000 + i, text: "r" + i, status: "new" });
+  // a fold (GET stats) and a status change (POST feedback/status) at once
+  await Promise.all([inboxNow(fb, media), updateInbox(fb, media, cur => cur.map(x => x.id === "aaaaaaaaaaaa" ? Object.assign(x, { status: "done" }) : x))]);
+  const inbox = await inboxNow(fb, media);
+  assert.equal(inbox.find(x => x.id === "aaaaaaaaaaaa").status, "done");
+  assert.equal(inbox.length, 61);
+  // the admin routes go through updateInbox, not a stale copy
+  const { readFileSync } = await import("node:fs");
+  const admin = readFileSync(new URL("../../netlify/functions/admin.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(admin, /setJSON\("inbox"/);
+  assert.equal((admin.match(/updateInbox\(fbStore\(\), fbMedia\(\)/g) || []).length, 2);
 });

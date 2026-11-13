@@ -37,31 +37,51 @@ export const orphanKeys = (keys, liveIds) => keys.filter(k => { const id = k.spl
 /* a report waiting for the admin: its own blob, never a read-modify-write (also used by /api/pro "interest") */
 export const queueReport = (fb, it) => fb.setJSON(`q:${String(it.t).padStart(14, "0")}-${it.id}`, it);
 
-/* The admin's view of the inbox: the inbox blob plus the queued reports, oldest first, the last INBOX_MAX kept.
-   When there was a queue it is folded in: the inbox is written, read back, and only the queued blobs that made
-   it into the inbox are deleted, with the media of reports that fell off the end.
-   L4: only the newest INBOX_MAX queued reports are read (parallel batches of 25); older ones could never make the
-   last INBOX_MAX, so their blobs are deleted unread, with their media (one list of the media store), within
-   cleanMs. What is left is deleted on the next read (or its media by the monitor's orphan sweep). */
-export async function inboxNow(fb, media, { cleanMs = 4000, clock = Date.now } = {}) {
-  const inbox = (await fb.get("inbox", { type: "json" })) || [];
-  const all = (await listKeys(fb, "q:")).sort(); if (!all.length) return inbox;
-  const qk = all.slice(-INBOX_MAX), old = all.slice(0, all.length - qk.length), idOf = k => k.split("-").pop();
-  const have = new Set(inbox.map(x => x.id));
-  await inBatches(qk, async k => { const it = await fb.get(k, { type: "json" }).catch(() => null); if (it && it.id && !have.has(it.id)) { inbox.push(it); have.add(it.id); } });
-  inbox.sort((a, b) => a.t - b.t);
-  const keep = inbox.slice(-INBOX_MAX), dropped = inbox.slice(0, inbox.length - keep.length);
-  await fb.setJSON("inbox", keep);
-  const back = new Set(((await fb.get("inbox", { type: "json" })) || []).map(x => x.id)), gone = new Set(dropped.map(x => x.id));
-  await inBatches(qk.filter(k => back.has(idOf(k)) || gone.has(idOf(k))), k => fb.delete(k));
+/* The one read-modify-write of the inbox blob, kept as short as the store allows (@netlify/blobs 8.x has no etag
+   writes): read the inbox fresh, apply fn (returns the new list), keep the last INBOX_MAX by time, write, and
+   delete the media of reports that fell off the end. Every writer (the fold, a status change, a purge) goes
+   through it, so none of them writes a copy it read before another writer's change (perf round 2.8: a status
+   change was overwritten by a concurrent fold). Returns { inbox, dropped, removed }. */
+export async function updateInbox(fb, media, fn) {
+  const cur = (await fb.get("inbox", { type: "json" })) || [];
+  const next = (await fn(cur.slice())) || cur;
+  const ids = new Set(next.map(x => x.id)), removed = cur.filter(x => !ids.has(x.id));
+  next.sort((a, b) => a.t - b.t);
+  const inbox = next.slice(-INBOX_MAX), dropped = next.slice(0, next.length - inbox.length);
+  await fb.setJSON("inbox", inbox);
   await inBatches(dropped.flatMap(x => (x.media || []).map(k => x.id + "-" + k)), k => media.delete(k));
+  return { inbox, dropped, removed };
+}
+
+export const FOLD_MAX = 100, FOLD_BATCH = 20;
+/* The admin's view of the inbox: the inbox blob plus the queued reports. Each call folds at most FOLD_MAX queued
+   reports, oldest first, FOLD_BATCH read in parallel and saved per batch through updateInbox, so one admin
+   request never does the whole queue and every batch it finishes is kept (perf round 2.8). A queued blob is
+   deleted only once the inbox read back holds it (or it fell off the end). L4: only the newest INBOX_MAX queued
+   reports can make the inbox; older ones are deleted unread, with their media (one list of the media store),
+   within cleanMs; what is left goes on the next call (or its media by the monitor's orphan sweep).
+   Returns { items, pending } (pending = queued reports still to fold). */
+export async function inboxState(fb, media, { cleanMs = 4000, clock = Date.now, foldMax = FOLD_MAX } = {}) {
+  const all = (await listKeys(fb, "q:")).sort(), idOf = k => k.split("-").pop();
+  if (!all.length) return { items: (await fb.get("inbox", { type: "json" })) || [], pending: 0 };
+  const qk = all.slice(-INBOX_MAX), old = all.slice(0, all.length - qk.length), todo = qk.slice(0, foldMax);
   if (old.length) {
     const opt = { end: clock() + cleanMs, clock }, oldIds = new Set(old.map(idOf));
     const r = await inBatches(old, k => fb.delete(k), opt);
     if (r.done) await inBatches((await listKeys(media, "")).filter(k => oldIds.has(k.split("-")[0])), k => media.delete(k), opt);
   }
-  return keep;
+  let items = null;
+  for (let i = 0; i < todo.length; i += FOLD_BATCH) {
+    const part = todo.slice(i, i + FOLD_BATCH);
+    const got = (await Promise.all(part.map(k => fb.get(k, { type: "json" }).catch(() => null)))).filter(it => it && it.id);
+    const r = await updateInbox(fb, media, cur => { const have = new Set(cur.map(x => x.id)); for (const it of got) if (!have.has(it.id)) { cur.push(it); have.add(it.id); } return cur; });
+    const back = new Set(((await fb.get("inbox", { type: "json" })) || []).map(x => x.id)), gone = new Set(r.dropped.map(x => x.id));
+    await inBatches(part.filter(k => back.has(idOf(k)) || gone.has(idOf(k))), k => fb.delete(k), { size: FOLD_BATCH });
+    items = r.inbox;
+  }
+  return { items: items || (await fb.get("inbox", { type: "json" })) || [], pending: qk.length - todo.length };
 }
+export const inboxNow = async (fb, media, opts) => (await inboxState(fb, media, opts)).items;
 
 /* deps: { fb, media, ipHash(req) -> string, now() -> ms, budgetMb: FB_MEDIA_DAILY_MB or undefined } */
 export function makeFeedback(deps) {

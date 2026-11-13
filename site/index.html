@@ -268,6 +268,9 @@ body.riding .annc,body.flying .annc{display:none}
 .mk{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);font-size:12.5px;border:2.5px solid var(--bg);box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer}
 .mk.view{background:var(--view)}.mk.cafe{background:var(--sun)}.mk.start{outline:2px solid var(--accent);outline-offset:3px}
 .mk.dim{opacity:.45;transform:scale(.8)}
+/* keyboard focus on a map marker: the app's focus ring, also on the start marker (its own outline would hide it),
+   in ink on a sun-coloured cafe marker, and a dimmed marker comes back to full strength */
+.mk:focus-visible,.mk.start:focus-visible{outline:2px solid var(--sun);outline-offset:3px}.mk.cafe:focus-visible{outline-color:var(--ink)}.mk.dim:focus-visible{opacity:1}
 .mkc{width:22px;height:22px;border-radius:50%;background:var(--sun);border:2px solid var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 .mkc svg{width:12px;height:12px;color:var(--accent-ink)}
 .mkw{display:flex;align-items:center;gap:3px;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:999px;padding:1px 7px 1px 3px;font-family:var(--mono);font-size:12px;transform:translateY(-26px);pointer-events:none}

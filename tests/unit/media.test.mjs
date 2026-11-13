@@ -42,3 +42,17 @@ test("phone budget: one photo keeps 560KB, four share the request and fit the se
   // 4 photos at budget + the longest voice note, base64 in JSON, fit under the body limit
   assert.ok(Math.ceil((four * 4 + M.AUD_MAX) * 4 / 3) + 4000 < M.BODY_MAX);
 });
+test("L3: stored media is served with fixed, safe headers", () => {
+  const h = M.mediaHeaders("image/jpeg");
+  assert.equal(h["content-type"], "image/jpeg");
+  assert.equal(h["content-disposition"], 'inline; filename="report.jpg"');
+  assert.equal(h["cross-origin-resource-policy"], "same-origin");
+  assert.equal(h["x-content-type-options"], "nosniff");
+  assert.equal(h["content-security-policy"], "default-src 'none'; sandbox");
+  assert.equal(h["cache-control"], "private, no-store");
+  assert.equal(M.mediaHeaders("audio/webm")["content-disposition"], 'inline; filename="report.webm"');
+  // an unknown or missing type is never echoed back
+  for (const ct of [undefined, "text/html", "image/svg+xml"]) { const x = M.mediaHeaders(ct); assert.equal(x["content-type"], "application/octet-stream"); assert.equal(x["content-disposition"], 'inline; filename="report.bin"'); }
+  const { readFileSync } = require("node:fs");
+  assert.match(readFileSync(join(ROOT, "netlify", "functions", "admin.mjs"), "utf8"), /new Response\(r\.data, \{ headers: mediaHeaders\(r\.metadata && r\.metadata\.ct\) \}\)/);
+});

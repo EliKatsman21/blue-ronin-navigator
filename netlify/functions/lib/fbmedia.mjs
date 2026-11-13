@@ -14,6 +14,14 @@ export const sniff = buf => {
   if (buf.slice(0, 4).toString() === "OggS") return "audio/ogg";
   return null;
 };
+/* Headers for serving a stored file to the admin (security review L3): our own content type, never sniffed,
+   no script can run, shown inline under a fixed file name, and only to our own origin. */
+const EXT = { "image/jpeg": "jpg", "image/webp": "webp", "audio/webm": "webm", "audio/mp4": "m4a", "audio/ogg": "ogg" };
+export const mediaHeaders = ct => {
+  const type = EXT[ct] ? ct : "application/octet-stream";
+  return { "content-type": type, "content-disposition": `inline; filename="report.${EXT[ct] || "bin"}"`, "cross-origin-resource-policy": "same-origin",
+    "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" };
+};
 const decode = (s, max) => { if (typeof s !== "string" || !s) return null; const b = Buffer.from(s.replace(/^data:[^,]*,/, ""), "base64"); return b.length && b.length <= max ? b : null; };
 /* body.photos (array) or the older body.photo (one). Returns { items: [{ k, buf, ct }] } or { error }. */
 export function collectMedia(body) {

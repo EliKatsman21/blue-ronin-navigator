@@ -15,7 +15,7 @@ import { joinStore, SRCS, NEED, refsOf } from "./lib/join.mjs";
 
 const fuelStore = () => getStore({ name: "brn-fuel", consistency: "strong" });
 const fbStore = () => getStore({ name: "brn-feedback", consistency: "strong" });
-import { MEDIA_KEY } from "./lib/fbmedia.mjs";
+import { MEDIA_KEY, mediaHeaders } from "./lib/fbmedia.mjs";
 import { inboxNow } from "./lib/feedback-core.mjs";
 const fbMedia = () => getStore({ name: "brn-fb-media", consistency: "strong" });
 const dropMedia = async items => { for (const x of items) for (const k of x.media || []) await fbMedia().delete(x.id + "-" + k).catch(() => { }); };
@@ -123,7 +123,7 @@ export default async req => {
   if (route === "GET feedback/media") {
     const q = new URL(req.url).searchParams, id = q.get("id") || "", k = q.get("k"); if (!/^[a-f0-9]{12}$/.test(id) || !MEDIA_KEY.test(k || "")) return json({ error: "bad" }, 400);
     const r = await fbMedia().getWithMetadata(id + "-" + k, { type: "arrayBuffer" }); if (!r) return json({ error: "not found" }, 404);
-    return new Response(r.data, { headers: { "content-type": r.metadata && r.metadata.ct || "application/octet-stream", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
+    return new Response(r.data, { headers: mediaHeaders(r.metadata && r.metadata.ct) });
   }
   if (route === "GET feedback") return json({ items: (await inboxNow(fbStore(), fbMedia())).slice().reverse() });
   if (route === "POST feedback/status") {

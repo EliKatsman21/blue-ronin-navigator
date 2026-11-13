@@ -13,14 +13,14 @@ const mkRide = (id, title, lon0, lat0, n, startIso, vmax) => {
 const A = mkRide("r-a", "רכיבה א׳ · כרמל", 35.02, 32.70, 40, "2026-11-07T06:30:00Z", 96);
 const B = mkRide("r-b", "רכיבה ב׳ · גליל", 35.40, 32.95, 50, "2026-11-08T07:00:00Z", 112);
 
-async function setup(page) {
+async function setup(page, { pro = true } = {}) {
   await page.route(/tiles\.openfreemap\.org\/styles\//, r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(STYLE) }));
-  await page.addInitScript(([rides]) => {
+  await page.addInitScript(([rides, pro]) => {
     try {
       localStorage.setItem("brn:rides", JSON.stringify(rides));
-      localStorage.setItem("brn:pro", JSON.stringify({ token: "test", exp: Date.now() + 864e5, src: "code", checked: Date.now() }));
+      if (pro) localStorage.setItem("brn:pro", JSON.stringify({ token: "test", exp: Date.now() + 864e5, src: "code", checked: Date.now() }));
     } catch (e) { }
-  }, [[B, A]]); // newest first, like the app stores them
+  }, [[B, A], pro]); // newest first, like the app stores them
   await boot(page, "#me");
   await expect.poll(() => page.evaluate(() => !!(window.BR_MAP && BR_MAP.getLayer("br-ride"))), { timeout: 20_000 }).toBe(true);
 }
@@ -109,5 +109,19 @@ test("journal stats: the top speed tile holds the fastest ride and opens it", as
   expect(Math.max(...heights) - Math.min(...heights), "tiles in a row line up").toBeLessThanOrEqual(2);
   await top.click();
   await expect.poll(async () => (await state(page)).chip).toContain(B.title);
+  expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
+});
+
+test("journal stats, free rider: top speed is a locked Pro tile, the value never shows, a tap opens Pro", async ({ page, pageErrors }) => {
+  await setup(page, { pro: false }); await openMe(page);
+  const top = page.locator("#jTop");
+  await expect(top).toHaveClass(/locked/);
+  await expect(top).toContainText("Pro");
+  expect(await top.innerText()).not.toMatch(/\d/);
+  expect(await top.getAttribute("aria-label")).not.toMatch(/\d/);
+  expect(await page.locator(".fsum.jstats").innerText()).not.toContain("112");
+  await top.click();
+  await expect(page.locator("#modal")).toBeVisible();
+  await expect(page.locator("#mbody .pw")).toBeVisible();
   expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
 });

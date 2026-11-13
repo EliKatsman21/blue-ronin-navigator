@@ -482,18 +482,18 @@
       <button type="button" class="linkbtn small muted" id="jDemo" style="justify-self:start">הדגמת שחזור 3D על הפרק הנוכחי</button>
       ${hiddenN ? `<button type="button" class="lockrow" id="jMore">${PWI.lock}<span>עוד ${hiddenN} רכיבות שמורות במכשיר שלך. היומן המלא פתוח ב־Pro</span></button>` : ""}</div>`;
   }
-  /* the stats block: every tile is label / number / unit, one grid of three. The top speed tile opens its ride. */
+  /* the stats block: every tile is label / number / unit, one grid of three. The top speed tile opens its ride.
+     Top speed is a Pro total (Eli, 2026-11-13): free riders see the tile locked, never the value; a tap opens the paywall. */
   function jStats(rides, mrides, tot, top, pro) {
     const tile = (k, v, u) => `<div><span class="k">${k}</span><b class="mono">${v}</b><span class="k">${u}</span></div>`;
-    const topT = top ? `<button type="button" class="jtop" id="jTop" aria-label="מהירות שיא ${top.v} קמ״ש, ${esc(top.title)}, ${esc(shortD(top.start))}"><span class="k">מהירות שיא</span><b class="mono">${top.v}</b><span class="k">קמ״ש · ${esc(shortD(top.start))}</span></button>` : tile("מהירות שיא", "—", "קמ״ש");
+    const topT = !pro ? `<button type="button" class="jtop locked" id="jTop" aria-label="מהירות שיא: פתוח ב־Pro"><span class="k">מהירות שיא</span><b aria-hidden="true">${PWI.lock}</b><span class="k">Pro</span></button>` : top ? `<button type="button" class="jtop" id="jTop" aria-label="מהירות שיא ${top.v} קמ״ש, ${esc(top.title)}, ${esc(shortD(top.start))}"><span class="k">מהירות שיא</span><b class="mono">${top.v}</b><span class="k">קמ״ש · ${esc(shortD(top.start))}</span></button>` : tile("מהירות שיא", "—", "קמ״ש");
     if (!pro) return `<div class="fsum jstats solo">${topT}</div>`;
     return `<div class="fsum jstats">${tile("החודש", Math.round(tot(mrides, "km")), "ק״מ")}${tile("רכיבות", mrides.length, "החודש")}${tile("זמן רכיבה", dur(tot(rides, "moving")), "שעות")}${tile("סה״כ", Math.round(tot(rides, "km")), "ק״מ")}${tile("דלק", Math.round(tot(rides, "fuel")), "ל׳")}${topT}</div>`;
   }
   function bindJournal() {
     const rides = LS.get("rides", []);
-    if ($("jTop")) $("jTop").onclick = () => { const top = LS.get("vmaxRec", null); if (!top) return; const i = rides.findIndex(r => r.id === top.id);
+    if ($("jTop")) $("jTop").onclick = () => { if (!isPro()) return openPaywall("journal"); const top = LS.get("vmaxRec", null); if (!top) return; const i = rides.findIndex(r => r.id === top.id);
       if (i < 0) return toast(`השיא ${top.v} קמ״ש מ־${shortD(top.start)}. הרכיבה כבר לא ביומן`, 4000);
-      if (!isPro() && i > 0) return openPaywall("journal");
       showRide(rides[i]); toast(`מהירות שיא ${top.v} קמ״ש · ${rides[i].title}`, 3500); };
     document.querySelectorAll("[data-rshow]").forEach(b => b.onclick = () => showRide(rides[+b.dataset.rshow]));
     document.querySelectorAll("[data-rgpx]").forEach(b => b.onclick = () => rideGpx(rides[+b.dataset.rgpx]));

@@ -22,7 +22,16 @@
       catch (e) { if (!CACHE_KEY.test(k) && !LS.warned) { LS.warned = true; setTimeout(() => { try { toast("אין מספיק מקום בטלפון לשמירה. כדאי לשמור גיבוי בלשונית שלי", 6000); } catch (x) { } }, 50); window.BRG && BRG.report("storage", "quota " + k, "", 0, ""); } return false; }
     }
   };
-  const toast = (m, ms = 2600) => { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, ms); };
+  /* #toast is a permanent polite live region (role=status): screen readers read every message; empty = not shown */
+  const toast = (m, ms = 2600) => { const t = $("toast"); t.hidden = false; t.textContent = ""; clearTimeout(toast.t); requestAnimationFrame(() => { t.textContent = m; }); toast.t = setTimeout(() => { t.textContent = ""; }, ms); };
+  /* A form error in text next to its field (WCAG 3.3.1): aria-invalid + aria-describedby, focus moves to the field.
+     Cleared as soon as the rider edits the field. */
+  const fieldErr = (id, msg) => {
+    const f = $(id); if (!f) { toast(msg); return; }
+    let e = $(id + "Err"); if (!e) { e = document.createElement("p"); e.className = "ferr"; e.id = id + "Err"; e.setAttribute("role", "alert"); (f.closest("label") || f).after(e); }
+    e.textContent = msg; f.setAttribute("aria-invalid", "true"); f.setAttribute("aria-describedby", e.id); try { f.focus(); } catch (x) { }
+    f.addEventListener("input", () => { e.textContent = ""; f.removeAttribute("aria-invalid"); }, { once: true });
+  };
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const TZ = "Asia/Jerusalem";
   const fmtT = d => new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ }).format(d);
@@ -160,15 +169,34 @@
     cup: ["M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z", "M16 10.5h1.4a2 2 0 0 1 0 4H16", "M8.5 4.5c0 1 1 1.2 1 2.2M12 4.5c0 1 1 1.2 1 2.2", "M4 20.5h13"]
   };
   /* ================= modal sheet (one at a time) ================= */
+  /* Accessibility: the dialog is named by its first heading, focus moves into it, Tab stays inside,
+     Escape closes, and focus returns to the control that opened it. */
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   function openModal(html, cls = "") {
     clearTimeout(closeModal.t); /* a sheet opened right after another closed must not be wiped by the old close */
-    const m = $("modal"); $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
-    requestAnimationFrame(() => m.classList.add("in")); const f = m.querySelector("[autofocus], .btn.primary"); if (f) setTimeout(() => f.focus(), 250);
+    const m = $("modal"), wasOpen = !m.hidden; $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
+    if (!wasOpen) { const a = document.activeElement; openModal.from = a && a !== document.body && !m.contains(a) ? a : null; }
+    const h = $("mbody").querySelector("h1,h2,h3");
+    if (h) { h.id = h.id || "mTitle"; m.setAttribute("aria-labelledby", h.id); m.removeAttribute("aria-label"); } else { m.removeAttribute("aria-labelledby"); m.setAttribute("aria-label", "חלון"); }
+    requestAnimationFrame(() => m.classList.add("in"));
+    const f = m.querySelector("[autofocus], .btn.primary") || h; if (h && f === h) h.setAttribute("tabindex", "-1");
+    setTimeout(() => { if (m.hidden) return; const t = f && f.isConnected ? f : $("mx"); try { t.focus(); } catch (e) { } }, 250);
     return $("mbody");
   }
-  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); clearTimeout(closeModal.t); closeModal.t = setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; }, 220); }
+  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); clearTimeout(closeModal.t);
+    const back = openModal.from; openModal.from = null;
+    closeModal.t = setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; if (back && back.isConnected && back.offsetParent !== null) try { back.focus(); } catch (e) { } }, 220); }
   $("mx").onclick = closeModal; $("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
   addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  $("modal").addEventListener("keydown", e => {
+    if (e.key !== "Tab") return; const els = [...$("modal").querySelectorAll(FOCUSABLE)].filter(x => x.offsetParent !== null || x === document.activeElement); if (!els.length) return;
+    const first = els[0], last = els[els.length - 1];
+    const a = document.activeElement, i = els.indexOf(a);
+    /* from the dialog heading (or anything not in the list) Tab goes to the first control, Shift+Tab to the last */
+    if (i < 0) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+  });
 
   /* ================= Blue Ronin Pro =================
      Free forever: the Saturday brief, all chapters, ride mode with voice, cameras, hazards, territory alerts,
@@ -224,7 +252,7 @@
       <ul class="pwf">${f.map(([i, t, d]) => `<li><span class="pwi">${PWI[i]}</span><div><b>${t}</b><span>${d}</span></div></li>`).join("")}</ul>
       <div class="pwplans" role="group" aria-label="בחירת מסלול"><button type="button" class="plan best" data-plan="yearly" aria-pressed="false"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly" aria-pressed="false"><b>₪14.90</b><span>לחודש</span></button></div>
       <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום. לחיצה נוספת מבטלת.</p>
-      <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
+      <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" aria-label="קוד הטבה" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
       <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, איש קשר לחירום, זיהוי נפילה ושיתוף מיקום חי, מצב רכיבה עם הנחיות קוליות, התראות עיקולים חדים, מצלמות ומפגעים, התראות שטחים, התשובה אם הדלק מספיק, איתור התחנה הקרובה לפי הדלק שנשאר ונורית דלק במצב רכיבה, מפות אופליין. בטיחות לא נמכרת.</div>
       <div class="err small" id="pwErr"></div></div>`, "pwmodal");
     const err = m => { $("pwErr").textContent = m; };
@@ -1128,7 +1156,7 @@
     const all = sets.cafe.concat(sets.fuel, sets.view).sort((a, b) => a.km - b.km);
     let shown = cat === "all" ? all : sets[cat];
     if (st.stopsNear && st.me) { const me = [st.me.lon, st.me.lat]; shown = shown.map(x => Object.assign({}, x, { dme: L.hav(me, [x.lon, x.lat]) })).sort((a, b) => a.dme - b.dme); }
-    h += `<div class="seg pcat" role="tablist" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" role="tab" data-pc="${k}" aria-selected="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
+    h += `<div class="seg pcat" role="group" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" data-pc="${k}" aria-pressed="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
     h += `<div class="row" style="justify-content:space-between;margin:0">${placeStrip(all, r.km)}</div><div class="row small" style="margin:0;justify-content:space-between"><span class="muted">${st.stopsNear && st.me ? "ממוין לפי המרחק ממך" : "ממוין לפי הקילומטר בפרק"}</span><button type="button" class="btn sm" id="pNear" aria-pressed="${!!st.stopsNear}">${IC.nav}${st.stopsNear ? "לפי הפרק" : "קרוב אליי"}</button></div>`;
     if (cat === "fuel") h += `<div class="row small" style="margin:0"><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק תחנות עם 98</label><span class="muted">אימות רוכבים: לוחצים ״פרטים״</span></div>`;
     if (st.shabbat) h += `<p class="small muted" style="margin:0">מצב שבת מסתיר מקומות שמסומנים סגורים בשבת. ״לבדוק״ = אין מידע, כדאי להתקשר.</p>`;
@@ -1890,11 +1918,11 @@
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
     <div class="card"><h3>שיתוף ודיווח לחבר׳ה</h3><div class="row"><button type="button" class="btn" id="shareGo">שיתוף האפליקציה</button><a class="btn" target="_blank" rel="noopener" href="${LIVE_BOARD}">לוח הדיווחים החי</a></div>
       <label for="repType" class="small muted">דיווח מהיר מהמיקום שלך לוואטסאפ</label><div class="row"><select id="repType" class="btn"><option>ניידת / ממל״ז</option><option>מצלמה ניידת / לייזר</option><option>חצץ או שמן על הכביש</option><option>עבודות / חסימה</option><option>כביש סגור</option><option>נקודת עצירה מומלצת</option></select><button type="button" class="btn primary" id="repGo">שליחה</button><button type="button" class="btn" id="repPhoto">${PWI.cam}עם תמונה</button></div></div>
-    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונות</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
+    ${st.flags.feedback ? `<div class="card" id="fbCard"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי, מפגע בדרך או בעיית נגישות. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><label class="fbf" for="fbKind">סוג הפנייה<select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option><option value="a11y">נגישות</option></select></label><label class="fbf" for="fbText">מה רציתם לספר<textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea></label><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונות</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
     <div class="card"><h3>נשארים בקשר</h3><p class="small muted" style="margin:0">תדריך סופ״ש כל חמישי בוואטסאפ, סרטוני מסלולים, ורשימת ההמתנה להשקה בחנויות.</p><div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m">ערוץ התדריך בוואטסאפ</a><a class="btn" href="join?src=app">רשימת ההמתנה</a><a class="btn" target="_blank" rel="noopener" href="https://www.instagram.com/blueroninapp/">אינסטגרם</a><a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@blueroninapp">יוטיוב</a><a class="btn" target="_blank" rel="noopener" href="https://www.tiktok.com/@blueroninapp">טיקטוק</a><a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/blueroninapp/">פייסבוק</a></div></div>
-    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
+    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <a href="accessibility.html">הצהרת נגישות</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
     $("p-tools").innerHTML = h;
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
@@ -1931,7 +1959,7 @@
     box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   async function sendFeedback() {
-    const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return toast("כתבו כמה מילים");
+    const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return fieldErr("fbText", "כתבו כמה מילים, לפחות 3 תווים");
     const a = st.fbAtt || {}, ph = fbPhotos(), cap = L.photoBudget(ph.length);
     /* photos added in two goes were sized for a smaller set: shrink any that are over their share now */
     for (let i = 0; i < ph.length; i++) if (ph[i].size > cap) try { ph[i] = await fitJpeg(ph[i], cap); } catch (e) { }
@@ -2596,12 +2624,12 @@
     h += `<div class="card"><h3>גיבוי והעברה</h3><p class="small muted" style="margin:0">טלפון חדש, או מעבר מהכתובת הקודמת: הכול עובר בקוד מוצפן. גיבוי לקובץ כולל גם את הזיכרונות.</p>
       <div class="row"><button type="button" class="btn primary" id="xSend">שליחה למכשיר אחר</button><button type="button" class="btn" id="xRecv">קבלת נתונים בקוד</button></div>
       <div class="row"><button type="button" class="btn sm" id="xBackup">שמירת גיבוי לקובץ</button><button type="button" class="btn sm" id="xRestore">שחזור מקובץ</button></div></div>`;
-    h += `<div class="card"><h3>אני איש קשר של רוכב</h3><p class="small muted" style="margin:0">קיבלתם קוד הזמנה? הזינו אותו כאן כדי לקבל התראות חירום בטלפון הזה.</p><div class="row"><input id="gCode" class="btn mono" dir="ltr" maxlength="9" placeholder="XXXX-XXXX" style="flex:1;min-width:0"><button type="button" class="btn" id="gGo">הצטרפות</button></div></div>`;
+    h += `<div class="card"><h3>אני איש קשר של רוכב</h3><p class="small muted" style="margin:0">קיבלתם קוד הזמנה? הזינו אותו כאן כדי לקבל התראות חירום בטלפון הזה.</p><div class="row"><input id="gCode" class="btn mono" dir="ltr" maxlength="9" placeholder="XXXX-XXXX" aria-label="קוד הזמנה של איש קשר" style="flex:1;min-width:0"><button type="button" class="btn" id="gGo">הצטרפות</button></div></div>`;
     p.innerHTML = h; bindMe();
   }
   function bindMe() {
     const c = st.sos, val = id => $(id).value.trim();
-    $("sSave").onclick = () => { const ph = val("sCPhone"); if (ph && !IL(ph)) return toast("מספר הטלפון של איש הקשר לא תקין"); if (val("sPhone") && !IL(val("sPhone"))) return toast("מספר הטלפון שלך לא תקין"); Object.assign(c, { name: val("sName"), phone: val("sPhone"), cName: val("sCName"), cPhone: ph }); saveSos(); toast("נשמר"); renderMe(); };
+    $("sSave").onclick = () => { const ph = val("sCPhone"); if (ph && !IL(ph)) return fieldErr("sCPhone", "מספר הטלפון של איש הקשר לא תקין. לדוגמה: 050-1234567"); if (val("sPhone") && !IL(val("sPhone"))) return fieldErr("sPhone", "מספר הטלפון שלך לא תקין. לדוגמה: 050-1234567"); Object.assign(c, { name: val("sName"), phone: val("sPhone"), cName: val("sCName"), cPhone: ph }); saveSos(); toast("נשמר"); renderMe(); };
     $("sInvite").onclick = async () => { if (!val("sName")) return toast("קודם כתבו את השם שלכם"); c.name = val("sName"); saveSos(); const inv = await sosInvite(); if (!inv) return; const code = inv.slice(0, 4) + "-" + inv.slice(4), link = `${location.origin}/#guard=${inv}`;
       const text = `${c.name} רוכב אופנוע ומבקש שתהיו איש הקשר שלו לחירום ב־Blue Ronin. אם יקרה משהו בדרך, תקבלו התראה עם המיקום שלו.\nלאישור: ${link}\n(או קוד: ${code})`;
       try { if (navigator.share) { await navigator.share({ text }); toast("כשהוא יאשר, השם שלו יופיע כאן"); return; } } catch (e) { if (e.name === "AbortError") return; }
@@ -2700,10 +2728,22 @@
   $("hudPark").onclick = () => { if (!st.me) return toast("אין מיקום עדיין"); setPark({ lat: st.me.lat, lon: st.me.lon, acc: st.meAcc }); };
   $("hudLive").onclick = () => st.live ? liveShare() : liveShare();
   $("walkX").onclick = walkStop;
-  (() => { const b = $("hudSos"); let t = null; const go = () => { b.classList.remove("hold"); t = null; try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
-    b.addEventListener("pointerdown", e => { e.preventDefault(); b.classList.add("hold"); t = setTimeout(go, 1200); });
-    const cancel = () => { if (t) { clearTimeout(t); t = null; b.classList.remove("hold"); toast("החזיקו לחוץ שנייה כדי לשלוח"); } };
+  /* SOS: a long press (1.2 s) sends at once, as before. The accessible alternative (WCAG 2.5.1 / 2.1.1): a short tap,
+     Enter or Space opens a confirm sheet; only its own "send" button alerts the contacts. Focus starts on "cancel",
+     so a second accidental Enter does not send. */
+  function sosConfirm() {
+    if (st.sosOn) return sosAlert("sos");
+    openModal(`<div class="sos-sheet"><h2>לשלוח קריאת חירום?</h2><p style="margin:0">אנשי הקשר שלך יקבלו התראה עם המיקום, ושיתוף המיקום החי יופעל. במקרה חירום מתקשרים ל־101.</p>
+      <button type="button" class="btn sosbig" id="sosSend">${PWI.phone}שליחת קריאת חירום</button><button type="button" class="btn" id="sosNo" autofocus>ביטול</button></div>`, "sosm");
+    $("sosSend").onclick = () => { closeModal(); try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
+    $("sosNo").onclick = closeModal;
+  }
+  (() => { const b = $("hudSos"); let t = null, fired = false; const go = () => { b.classList.remove("hold"); t = null; fired = true; try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
+    b.addEventListener("pointerdown", e => { e.preventDefault(); fired = false; b.classList.add("hold"); t = setTimeout(go, 1200); });
+    const cancel = () => { if (t) { clearTimeout(t); t = null; b.classList.remove("hold"); } };
     b.addEventListener("pointerup", cancel); b.addEventListener("pointerleave", cancel); b.addEventListener("pointercancel", cancel);
+    /* click comes after pointerup (tap) or from the keyboard; after a completed long press it is swallowed */
+    b.addEventListener("click", e => { e.preventDefault(); if (fired) { fired = false; return; } sosConfirm(); });
     b.addEventListener("contextmenu", e => e.preventDefault()); })();
   setInterval(() => { const on = !!st.live; $("hudLive").classList.toggle("on", on); }, 2000);
 
@@ -2880,7 +2920,7 @@
   function replayClock(F) { const R = F.replay, km = F.km * R.scale; let lo = 0, hi = R.cum.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (R.cum[mid] < km) lo = mid; else hi = mid; } const f = R.cum[hi] > R.cum[lo] ? (km - R.cum[lo]) / (R.cum[hi] - R.cum[lo]) : 0; return R.times[lo] + (R.times[hi] - R.times[lo]) * Math.max(0, Math.min(1, f)); }
   function replayPop(F) {
     const R = F.replay; if (!R || R.next >= R.pops.length) return; const p = R.pops[R.next]; if (F.km * R.scale < p.km) return; R.next++;
-    const el = $("rpPop"); el.innerHTML = `<img src="${blobUrl(p.m.id + "t", p.m.thumb)}" alt=""><span>${esc(p.m.note || fmtT(new Date(p.m.t)))}</span>`; el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+    const el = $("rpPop"); el.innerHTML = `<img src="${blobUrl(p.m.id + "t", p.m.thumb)}" alt=""><span>${esc(p.m.note || fmtT(new Date(p.m.t)))}</span>`; el.setAttribute("aria-label", "זיכרון מהרכיבה: " + (p.m.note || fmtT(new Date(p.m.t)))); el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
     el.onclick = () => memViewer(p.m.id);
     if (F.playing) { F.playing = false; flyUI(); clearTimeout(R.resume); R.resume = setTimeout(() => { if (st.fly === F && !F.hold) { F.playing = true; flyUI(); } }, 2600); }
     clearTimeout(R.hide); R.hide = setTimeout(() => { el.classList.remove("in"); setTimeout(() => el.hidden = true, 300); }, 3200);
@@ -3009,13 +3049,21 @@
   if (st.group) setTimeout(gStart, 2000);
 
   function setTab(t) {
-    st.tab = t; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.t === t)));
+    st.tab = t; document.querySelectorAll(".tab").forEach(b => { const on = b.dataset.t === t; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
     ["go", "brief", "route", "stops", "me", "tools"].forEach(k => $("p-" + k).hidden = k !== t); $("panes").scrollTop = 0;
     if (innerWidth < 900 && st.sheet === "peek") setSheet("half");
     renderTab();
   }
   const renderTab = () => ({ go: renderGo, brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
+  /* keyboard: the tab pattern. In RTL the next tab is to the left. Moving selects (automatic activation). */
+  document.querySelector(".tabs").addEventListener("keydown", e => {
+    const tabs = [...document.querySelectorAll(".tab")], i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const next = { ArrowLeft: rtl ? 1 : -1, ArrowRight: rtl ? -1 : 1 }[e.key];
+    const j = next ? (i + next + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+    if (j < 0) return; e.preventDefault(); setTab(tabs[j].dataset.t); tabs[j].focus();
+  });
   function setChap(id) { stopFly(); st.rideShown = null; rideFocus(false); setCurrentRoute(id); pushSources(); renderMarkers(); renderTab(); fitChapter(); }
   /* every consumer of the current route that is not redrawn with the tab follows it here */
   addEventListener("br:route", () => {

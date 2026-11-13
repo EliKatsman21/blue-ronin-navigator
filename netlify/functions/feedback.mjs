@@ -9,7 +9,7 @@ import { collectMedia, BODY_MAX } from "./lib/fbmedia.mjs";
 const fb = () => getStore({ name: "brn-feedback", consistency: "strong" });
 const media = () => getStore({ name: "brn-fb-media", consistency: "strong" });
 /* Photos (up to 4) and a voice note can ride along: see lib/fbmedia.mjs for the limits and the checks. */
-const KINDS = ["bug", "idea", "data", "hazard", "pro", "other"];
+const KINDS = ["bug", "idea", "data", "hazard", "pro", "a11y", "other"];
 const clean = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/g, "").trim().slice(0, n);
 export default async req => {
   const gate = edgeGate(req); if (gate) return gate;

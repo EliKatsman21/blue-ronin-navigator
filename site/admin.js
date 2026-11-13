@@ -236,7 +236,7 @@
   }
 
   /* ---------- inbox ---------- */
-  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר", pro: "Pro" };
+  const KIND = { bug: "תקלה", idea: "רעיון", data: "מידע שגוי", hazard: "דיווח דרך", other: "אחר", pro: "Pro", a11y: "נגישות" };
   const STAT = { new: "חדש", open: "בטיפול", done: "טופל" };
   async function inbox(filter = S.inboxFilter || "active") {
     S.inboxFilter = filter;

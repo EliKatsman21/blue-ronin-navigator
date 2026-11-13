@@ -116,3 +116,12 @@ test("accessibility statement: no personal name and no draft note in the publish
   assert.match(html, /mailto:hello@blueronin\.app/);
   assert.match(html, /מפעיל השירות: Blue Ronin\./);
 });
+
+test("vendored libraries: cache-first in the service worker and immutable at the edge (round 2.8 perf)", () => {
+  const sw = read(join(SITE, "sw.js")), toml = read(join(SITE, "..", "netlify.toml"));
+  assert.match(sw, /u\.origin === self\.location\.origin && u\.pathname\.startsWith\("\/vendor\/"\)\) return e\.respondWith\(cacheFirst\(req, SHELL\)\)/);
+  assert.ok(sw.indexOf('startsWith("/vendor/")') < sw.indexOf("shellFirst(req)"), "the vendor rule comes before the shell-first rule");
+  assert.match(toml, /for = "\/vendor\/\*"\s+\[headers\.values\]\s+Cache-Control = "public, max-age=31536000, immutable"/);
+  // every vendored path is versioned, which is what makes immutable safe
+  for (const f of JSON.parse(sw.match(/const SHELL_FILES = (\[[^\]]+\])/)[1]).filter(f => f.startsWith("vendor/"))) assert.match(f, /^vendor\/[a-z-]+\/\d+\.\d+\.\d+\//, f);
+});

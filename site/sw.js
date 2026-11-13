@@ -38,6 +38,8 @@ self.addEventListener("fetch", e => {
   if (TILE_HOSTS.includes(u.hostname)) { if (u.hostname === "s3.amazonaws.com" && !u.pathname.startsWith("/elevation-tiles-prod/")) return; return e.respondWith(cacheFirst(req, TILES)); }
   if (LIB_HOSTS.includes(u.hostname)) return e.respondWith(cacheFirst(req, SHELL));
   if (DATA_HOSTS.includes(u.hostname)) return e.respondWith(networkFirst(req, DATA));
+  /* vendored libraries: the path carries the version, so the cached copy is always right (no revalidation per boot) */
+  if (u.origin === self.location.origin && u.pathname.startsWith("/vendor/")) return e.respondWith(cacheFirst(req, SHELL));
   if (u.origin === self.location.origin) { if (u.pathname.startsWith("/api/") || u.pathname.startsWith("/admin")) return; return e.respondWith(shellFirst(req)); }
 });
 

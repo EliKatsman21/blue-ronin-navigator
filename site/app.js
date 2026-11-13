@@ -1958,13 +1958,16 @@
     box.querySelectorAll("[data-fp]").forEach(b => b.onclick = () => { ph.splice(+b.dataset.fp, 1); paintFbAtt(); });
     box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  /* the rider is told why the server said no: too large (413) and too many this hour (429) get their own words */
+  const fbErrText = (status, err) => status === 413 ? "התמונות או ההקלטה גדולות מדי. נסו לשלוח פחות תמונות"
+    : status === 429 ? "שלחתם הרבה דיווחים בשעה האחרונה. אפשר לנסות שוב בעוד שעה" : (typeof err === "string" && err) || "השליחה נכשלה";
   async function sendFeedback() {
     const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return fieldErr("fbText", "כתבו כמה מילים, לפחות 3 תווים");
     const a = st.fbAtt || {}, ph = fbPhotos(), cap = L.photoBudget(ph.length);
     /* photos added in two goes were sized for a smaller set: shrink any that are over their share now */
     for (let i = 0; i < ph.length; i++) if (ph[i].size > cap) try { ph[i] = await fitJpeg(ph[i], cap); } catch (e) { }
     const photos = ph.length ? await Promise.all(ph.map(b64of)) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
-    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photos || voice ? (photos && photos.length > 1 ? `שולח ${photos.length} תמונות…` : "שולח…") : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photos, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
+    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photos || voice ? (photos && photos.length > 1 ? `שולח ${photos.length} תמונות…` : "שולח…") : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photos, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(fbErrText(r.status, j.error)); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
         $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span>${j.note ? `<span class="small" style="display:block;margin-top:4px">${esc(j.note)}</span>` : ""}</div></div>`;
         try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } $("fbRes").scrollIntoView({ block: "nearest", behavior: "smooth" }); toast("הדיווח נשלח ✓");
       } catch (e) { $("fbRes").innerHTML = `<div class="fberr" role="alert">${esc(e.message || "אין חיבור")}. הטקסט נשמר, אפשר לנסות שוב.</div>`; } $("fbGo").disabled = false; };

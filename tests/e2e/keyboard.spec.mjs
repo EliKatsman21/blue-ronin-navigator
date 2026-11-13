@@ -36,3 +36,42 @@ test("map markers: keyboard focus shows the app's focus ring, the start marker t
   expect(n.mk && !n.start).toBe(true); expect(n.style).toBe("solid"); expect(n.w).toBeGreaterThanOrEqual(2);
   expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
 });
+
+test("keyboard-only walk through all six tabs: every stop has a name, none inside hidden content", async ({ page, pageErrors }) => {
+  test.setTimeout(90_000);
+  await boot(page);
+  const hard = [];
+  for (const t of TABS) {
+    // reach the tab with the keyboard only: focus the selected tab, arrow to the wanted one, Enter
+    await page.locator('.tab[aria-selected="true"]').focus();
+    const order = await page.locator(".tab").evaluateAll(ts => ts.map(x => x.dataset.t));
+    const cur = await page.locator('.tab[aria-selected="true"]').getAttribute("data-t");
+    let steps = order.indexOf(t) - order.indexOf(cur);
+    while (steps > 0) { await page.keyboard.press("ArrowLeft"); steps--; }
+    while (steps < 0) { await page.keyboard.press("ArrowRight"); steps++; }
+    await page.keyboard.press("Enter");
+    await expect(page.locator(`.tab[data-t="${t}"]`)).toHaveAttribute("aria-selected", "true");
+    const seen = [];
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press("Tab");
+      const f = await page.evaluate(() => {
+        const e = document.activeElement; if (!e || e === document.body) return null;
+        const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+        const name = e.getAttribute("aria-label") || (e.getAttribute("aria-labelledby") || "").split(" ").map(id => (document.getElementById(id) || {}).textContent || "").join(" ")
+          || (e.labels && e.labels[0] && e.labels[0].textContent) || e.textContent || e.getAttribute("title") || e.getAttribute("placeholder") || (e.querySelector("img[alt]") || {}).alt || "";
+        const vis = r.width > 0 && r.height > 0 && cs.visibility !== "hidden";
+        return { key: e.id || e.tagName + "." + String(e.className).slice(0, 40) + ":" + name.trim().slice(0, 30), name: name.trim(), hidden: !!e.closest('[aria-hidden="true"],[hidden],[inert]'),
+          vis, ring: cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0 || cs.boxShadow !== "none", mk: e.classList.contains("mk") };
+      });
+      if (!f) continue;
+      if (seen.includes(f.key) && seen.length > 3) break; // wrapped around
+      seen.push(f.key);
+      if (!f.name) hard.push(`${t}: no name ${f.key}`);
+      if (f.hidden) hard.push(`${t}: focus inside hidden content ${f.key}`);
+      if (f.mk && f.vis && !f.ring) hard.push(`${t}: marker without a focus ring ${f.key}`);
+    }
+    expect(seen.length, `${t}: the keyboard reaches controls`).toBeGreaterThan(3);
+  }
+  expect(hard, hard.join("\n")).toEqual([]);
+  expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
+});

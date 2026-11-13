@@ -391,7 +391,7 @@
     const trk = R.trk.length > 600 ? R.trk.filter((_, i) => i % Math.ceil(R.trk.length / 600) === 0 || i === R.trk.length - 1) : R.trk;
     const cidR = R.c ? R.c.id : R.cid, sim = cidR && st.routes[cidR] ? fuelSimFor(cidR) : null, rate = sim ? sim.burn / sim.total : (bikeEff().cons * bikeEff().style / 100);
     const ride = { id: "r" + Date.now().toString(36), chap: cidR, title: R.c ? R.c.title : R.title, start: R.trk[0][2], end: R.trk[R.trk.length - 1][2], km: +R.odo.toFixed(1), moving: Math.round(R.moving > 60 ? R.moving : (R.trk[R.trk.length - 1][2] - R.trk[0][2]) / 1000), vmax: Math.round(R.vmax || 0), fuel: +(R.odo * rate).toFixed(1), bike: bikeEff().name, trk };
-    const rides = LS.get("rides", []); rides.unshift(ride); LS.set("rides", rides.slice(0, 60));
+    const rides = LS.get("rides", []); rides.unshift(ride); LS.set("rides", rides.slice(0, 60)); topSpeedRec(rides);
     return ride;
   }
   const dur = s => `${Math.floor(s / 3600)}:${String(Math.round(s % 3600 / 60)).padStart(2, "0")}`;
@@ -430,21 +430,35 @@
     const g = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Blue Ronin Navigator" xmlns="http://www.topografix.com/GPX/1/1">\n<trk><name>${esc(ride.title)}</name><trkseg>\n${ride.trk.map(p => `<trkpt lat="${p[1]}" lon="${p[0]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join("\n")}\n</trkseg></trk>\n</gpx>\n`;
     saveFile(`blue-ronin-ride-${new Date(ride.start).toISOString().slice(0, 10)}.gpx`, g, "application/gpx+xml");
   }
+  /* all-time top speed: computed from the saved rides, the record kept in LS so it outlives the 60-ride cap */
+  function topSpeedRec(rides) { const t = L.topSpeed(rides, LS.get("vmaxRec", null)); const was = LS.get("vmaxRec", null); if (JSON.stringify(t) !== JSON.stringify(was)) LS.set("vmaxRec", t); return t; }
+  const shortD = t => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "2-digit", timeZone: TZ }).format(new Date(t));
   function journalCard() {
-    const rides = LS.get("rides", []); const pro = isPro();
+    const rides = LS.get("rides", []); const pro = isPro(), top = topSpeedRec(rides);
     if (!rides.length) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3><span class="probadge soft">יומן</span></div><p class="small muted" style="margin:0">כל רכיבה במצב רכיבה נרשמת כאן אוטומטית: מרחק, זמן תנועה, ממוצע ודלק משוער. הכול נשמר רק במכשיר שלך.</p><div class="row"><button type="button" class="btn sm primary" id="jDemo">${PWI.play}הדגמה: שחזור 3D</button></div><p class="small muted" style="margin:0">רכיבה לדוגמה על הפרק שבחרתם, כדי לראות איך נראה השחזור. היא לא נשמרת ביומן.</p></div>`;
     const month = new Date().toISOString().slice(0, 7), mrides = rides.filter(r => new Date(r.start).toISOString().slice(0, 7) === month);
     const tot = (list, f) => list.reduce((a, r) => a + (r[f] || 0), 0);
     const row = (r, i) => `<div class="item"><div style="min-width:0"><b>${esc(r.title)}</b><span class="small muted mono">${esc(fmtD(new Date(r.start)))} · ${r.km} ק״מ · ${dur(r.moving)} · ${r.fuel} ל׳</span></div><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm primary" data-rplay="${i}" aria-label="שחזור תלת־ממד">${PWI.play}3D</button><button type="button" class="btn sm" data-rshow="${i}">במפה</button><button type="button" class="btn sm" data-rgpx="${i}">GPX</button></div></div>`;
     const visible = pro ? rides : rides.slice(0, 1), hiddenN = rides.length - visible.length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3>${pro ? '<span class="probadge">PRO</span>' : ""}</div>
-      ${pro ? `<div class="fsum"><div><span class="k">החודש</span><b class="mono">${Math.round(tot(mrides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">רכיבות</span><b class="mono">${mrides.length}</b></div><div><span class="k">סה״כ</span><b class="mono">${Math.round(tot(rides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">דלק</span><b class="mono">${Math.round(tot(rides, "fuel"))}</b><span class="k">ל׳</span></div></div>` : ""}
+      ${jStats(rides, mrides, tot, top, pro)}
       ${visible.map(row).join("")}
       <button type="button" class="linkbtn small muted" id="jDemo" style="justify-self:start">הדגמת שחזור 3D על הפרק הנוכחי</button>
       ${hiddenN ? `<button type="button" class="lockrow" id="jMore">${PWI.lock}<span>עוד ${hiddenN} רכיבות שמורות במכשיר שלך. היומן המלא פתוח ב־Pro</span></button>` : ""}</div>`;
   }
+  /* the stats block: every tile is label / number / unit, one grid of three. The top speed tile opens its ride. */
+  function jStats(rides, mrides, tot, top, pro) {
+    const tile = (k, v, u) => `<div><span class="k">${k}</span><b class="mono">${v}</b><span class="k">${u}</span></div>`;
+    const topT = top ? `<button type="button" class="jtop" id="jTop" aria-label="מהירות שיא ${top.v} קמ״ש, ${esc(top.title)}, ${esc(shortD(top.start))}"><span class="k">מהירות שיא</span><b class="mono">${top.v}</b><span class="k">קמ״ש · ${esc(shortD(top.start))}</span></button>` : tile("מהירות שיא", "—", "קמ״ש");
+    if (!pro) return `<div class="fsum jstats solo">${topT}</div>`;
+    return `<div class="fsum jstats">${tile("החודש", Math.round(tot(mrides, "km")), "ק״מ")}${tile("רכיבות", mrides.length, "החודש")}${tile("זמן רכיבה", dur(tot(rides, "moving")), "שעות")}${tile("סה״כ", Math.round(tot(rides, "km")), "ק״מ")}${tile("דלק", Math.round(tot(rides, "fuel")), "ל׳")}${topT}</div>`;
+  }
   function bindJournal() {
     const rides = LS.get("rides", []);
+    if ($("jTop")) $("jTop").onclick = () => { const top = LS.get("vmaxRec", null); if (!top) return; const i = rides.findIndex(r => r.id === top.id);
+      if (i < 0) return toast(`השיא ${top.v} קמ״ש מ־${shortD(top.start)}. הרכיבה כבר לא ביומן`, 4000);
+      if (!isPro() && i > 0) return openPaywall("journal");
+      showRide(rides[i]); toast(`מהירות שיא ${top.v} קמ״ש · ${rides[i].title}`, 3500); };
     document.querySelectorAll("[data-rshow]").forEach(b => b.onclick = () => showRide(rides[+b.dataset.rshow]));
     document.querySelectorAll("[data-rgpx]").forEach(b => b.onclick = () => rideGpx(rides[+b.dataset.rgpx]));
     document.querySelectorAll("[data-rplay]").forEach(b => b.onclick = () => { if (innerWidth < 900) setSheet("peek"); replayRide(rides[+b.dataset.rplay]); });

@@ -99,3 +99,15 @@ test("a style reload during a replay keeps the ride view clean and the bike on",
   await expectRide(page, A);
   expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
 });
+
+test("journal stats: the top speed tile holds the fastest ride and opens it", async ({ page, pageErrors }) => {
+  await setup(page); await openMe(page);
+  const top = page.locator("#jTop");
+  await expect(top).toContainText("112");
+  await expect(page.locator(".fsum.jstats > *")).toHaveCount(6);
+  const heights = await page.locator(".fsum.jstats > *").evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+  expect(Math.max(...heights) - Math.min(...heights), "tiles in a row line up").toBeLessThanOrEqual(2);
+  await top.click();
+  await expect.poll(async () => (await state(page)).chip).toContain(B.title);
+  expect(pageErrors, pageErrors.join("\n\n")).toEqual([]);
+});

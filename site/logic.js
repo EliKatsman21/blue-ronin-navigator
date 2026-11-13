@@ -396,5 +396,18 @@
   const FB_PHOTOS_MAX = 4;
   function photoBudget(n, total = 1200 * 1024, each = 560 * 1024) { return n > 0 ? Math.min(each, Math.floor(total / n)) : each; }
 
-  g.BRL = { FB_PHOTOS_MAX, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* All-time top speed over the saved rides (ride.vmax already needs two sustained readings, see rideTrack).
+     Demo rides never count. The kept record survives a ride falling off the 60-ride journal, but only while
+     no saved ride beats it; a tie goes to the earlier ride. */
+  function topSpeed(rides, rec) {
+    const ok = v => v > 0 && v < 230; let best = null;
+    for (const r of rides || []) {
+      if (!r || r.demo || r.id === "demo") continue; const v = Math.round(+r.vmax || 0); if (!ok(v)) continue;
+      if (!best || v > best.v || (v === best.v && r.start < best.start)) best = { v, id: r.id, start: r.start, title: r.title || "" };
+    }
+    if (rec && ok(rec.v) && rec.id !== "demo" && (!best || rec.v > best.v) && !(rides || []).some(r => r && r.id === rec.id)) return { v: rec.v, id: rec.id, start: rec.start, title: rec.title || "", gone: true };
+    return best;
+  }
+
+  g.BRL = { FB_PHOTOS_MAX, topSpeed, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

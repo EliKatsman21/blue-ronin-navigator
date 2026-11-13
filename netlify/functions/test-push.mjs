@@ -9,7 +9,7 @@ export default async req => {
   if (!rec) return new Response("not subscribed", { status: 404 });
   let p; try { const b = await computeBrief("friday"); p = { title: "בדיקה · " + b.title, body: b.body, tag: "test" }; }
   catch (e) { p = { title: "Blue Ronin מחובר", body: "ההתראות עובדות. התדריך הבא יגיע בשישי אחר הצהריים.", tag: "test" }; }
-  const ok = await sendOne(rec, p);
-  return Response.json({ ok });
+  const r = await sendOne(rec, p); /* "ok" | "gone" | "fail" (H1) */
+  return Response.json({ ok: r === "ok" });
 };
 export const config = { path: "/api/test-push" };

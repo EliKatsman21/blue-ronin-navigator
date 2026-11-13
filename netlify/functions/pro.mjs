@@ -5,6 +5,7 @@ import { getStore } from "@netlify/blobs";
 import { randomBytes } from "node:crypto";
 import { proStore, sign, verify, cidOk, TRIAL_DAYS } from "./lib/pro.mjs";
 import { ipHash } from "./lib/admin.mjs";
+import { queueReport } from "./lib/feedback-core.mjs";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 const day = 864e5;
@@ -50,10 +51,10 @@ export default async req => {
     const prev = ["monthly", "yearly"].includes(b.prev) ? b.prev : null;
     if (b.plan === "none") { if (prev) { const c0 = (await s.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 }; c0[prev] = Math.max(0, (c0[prev] || 0) - 1); await s.setJSON("interest", c0); } return json({ ok: true }); }
     const plan = ["monthly", "yearly"].includes(b.plan) ? b.plan : "yearly";
-    const fb = getStore({ name: "brn-feedback", consistency: "strong" }); const inbox = (await fb.get("inbox", { type: "json" })) || [];
+    const fb = getStore({ name: "brn-feedback", consistency: "strong" });
     const contact = String(b.contact || "").replace(/[\u0000-\u001F‪-‮]/g, "").trim().slice(0, 120);
-    inbox.push({ id: randomBytes(6).toString("hex"), t: Date.now(), ip: await ipHash(req), kind: "pro", text: `שריון מחיר מייסד: ${plan === "yearly" ? "שנתי" : "חודשי"}${contact ? " · " + contact : ""}`, status: "new", ver: String(b.ver || "").slice(0, 20) });
-    await fb.setJSON("inbox", inbox.slice(-500));
+    /* into the admin inbox queue (its own blob, no read-modify-write of the inbox; lib/feedback-core.mjs) */
+    await queueReport(fb, { id: randomBytes(6).toString("hex"), t: Date.now(), ip: await ipHash(req), kind: "pro", text: `שריון מחיר מייסד: ${plan === "yearly" ? "שנתי" : "חודשי"}${contact ? " · " + contact : ""}`, status: "new", ver: String(b.ver || "").slice(0, 20) });
     const cnt = (await s.get("interest", { type: "json" })) || { monthly: 0, yearly: 0 }; cnt[plan]++; if (prev && prev !== plan) cnt[prev] = Math.max(0, (cnt[prev] || 0) - 1); await s.setJSON("interest", cnt);
     return json({ ok: true });
   }

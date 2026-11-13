@@ -1,11 +1,12 @@
-/* Web Push plumbing: VAPID keys and subscriptions live in Netlify Blobs (created on first use, no setup). */
+/* Web Push plumbing: VAPID keys and subscriptions live in Netlify Blobs (created on first use, no setup).
+   The logic (endpoint allow-list, throttle, cap, bounded sending) is in lib/push-core.mjs, unit-tested. */
 import { getStore } from "@netlify/blobs";
 import webpush from "web-push";
-import { createHash } from "node:crypto";
+import { validSub, keyOf, sendAllWith, trySend, SEND_GONE, SEND_FAIL, PUSH_TIMEOUT_MS } from "./push-core.mjs";
 
 const meta = () => getStore({ name: "brn", consistency: "strong" });
 const subs = () => getStore({ name: "brn-subs", consistency: "strong" });
-export const keyOf = endpoint => createHash("sha256").update(endpoint).digest("hex").slice(0, 40);
+export { validSub, keyOf };
 
 export { configure };
 export async function vapid() {
@@ -17,30 +18,25 @@ async function configure() {
   const v = await vapid();
   webpush.setVapidDetails(process.env.URL || "https://blue-ronin.netlify.app", v.publicKey, v.privateKey);
 }
-export const validSub = s => s && typeof s.endpoint === "string" && /^https:\/\//.test(s.endpoint) && s.keys && typeof s.keys.p256dh === "string" && typeof s.keys.auth === "string";
-export async function saveSub(sub, prefs) {
-  const clean = { friday: prefs?.friday !== false, saturday: prefs?.saturday !== false };
-  await subs().setJSON(keyOf(sub.endpoint), { sub: { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }, prefs: clean, ts: Date.now() });
-  return clean;
-}
+/* saving, the chapter and the throttle of /api/subscribe: push-core.mjs makeSubscribe */
 export const removeSub = endpoint => subs().delete(keyOf(endpoint));
 export const getSub = endpoint => subs().get(keyOf(endpoint), { type: "json" });
 
 const payloadOf = p => JSON.stringify({ title: p.title, body: p.body, tag: p.tag || "brief", url: p.url || "./", sos: !!p.sos });
+/* N2: every send has a timeout, so a slow push endpoint cannot hold a function until it times out */
+const push = (sub, p, opts = {}) => webpush.sendNotification(sub, payloadOf(p), { TTL: opts.ttl || 12 * 3600, urgency: opts.urgency || "normal", timeout: PUSH_TIMEOUT_MS });
 
+/* -> "ok" | "gone" | "fail" (push-core trySend), never throws. Only "gone" (404/410) removes a rider subscription;
+   callers that keep their own copy (SOS guardians, admin devices) must also drop it only on "gone" (H1). */
 export async function sendOne(rec, payload, opts = {}) {
-  await configure();
-  try { await webpush.sendNotification(rec.sub, payloadOf(payload), { TTL: opts.ttl || 12 * 3600, urgency: opts.urgency || "normal" }); return true; }
-  catch (e) { if (e.statusCode === 404 || e.statusCode === 410) await removeSub(rec.sub.endpoint); return false; }
+  try { await configure(); } catch (e) { return SEND_FAIL; }
+  const r = await trySend((sub, p) => push(sub, p, opts), rec.sub, payload);
+  if (r === SEND_GONE) await removeSub(rec.sub.endpoint).catch(() => { });
+  return r;
 }
-export async function sendAll(payload, pref) {
+/* payload: one payload for all, or a function rec => payload (the weekend brief: the rider's chapter).
+   Sent with bounded concurrency (push-core SEND_CONCURRENCY). */
+export async function sendAll(payload, pref, { deadline } = {}) {
   await configure();
-  const s = subs(); const { blobs } = await s.list(); let sent = 0, gone = 0, skipped = 0;
-  for (const b of blobs) {
-    const rec = await s.get(b.key, { type: "json" });
-    if (!rec || (pref && rec.prefs && rec.prefs[pref] === false)) { skipped++; continue; }
-    try { await webpush.sendNotification(rec.sub, payloadOf(payload), { TTL: 12 * 3600, urgency: "normal" }); sent++; }
-    catch (e) { if (e.statusCode === 404 || e.statusCode === 410) { await s.delete(b.key); gone++; } }
-  }
-  return { sent, gone, skipped, total: blobs.length };
+  return sendAllWith({ store: subs(), send: (sub, p) => push(sub, p), payload, pref, deadline });
 }

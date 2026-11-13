@@ -7,6 +7,8 @@
   const APP_VER = "2.7.1";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
+  /* the real window height: the body is sized to it in guard.js ("Viewport fit"); innerHeight can be short on iOS */
+  const vpH = () => (document.body && document.body.clientHeight) || innerHeight;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   /* Device storage. When the phone's quota is full, cached map data (routes, elevation, weather, places)
      is dropped first so the rider's own data (routes, rides, bike, safety, Pro) is never the thing lost. */
@@ -20,7 +22,16 @@
       catch (e) { if (!CACHE_KEY.test(k) && !LS.warned) { LS.warned = true; setTimeout(() => { try { toast("אין מספיק מקום בטלפון לשמירה. כדאי לשמור גיבוי בלשונית שלי", 6000); } catch (x) { } }, 50); window.BRG && BRG.report("storage", "quota " + k, "", 0, ""); } return false; }
     }
   };
-  const toast = (m, ms = 2600) => { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, ms); };
+  /* #toast is a permanent polite live region (role=status): screen readers read every message; empty = not shown */
+  const toast = (m, ms = 2600) => { const t = $("toast"); t.hidden = false; t.textContent = ""; clearTimeout(toast.t); requestAnimationFrame(() => { t.textContent = m; }); toast.t = setTimeout(() => { t.textContent = ""; }, ms); };
+  /* A form error in text next to its field (WCAG 3.3.1): aria-invalid + aria-describedby, focus moves to the field.
+     Cleared as soon as the rider edits the field. */
+  const fieldErr = (id, msg) => {
+    const f = $(id); if (!f) { toast(msg); return; }
+    let e = $(id + "Err"); if (!e) { e = document.createElement("p"); e.className = "ferr"; e.id = id + "Err"; e.setAttribute("role", "alert"); (f.closest("label") || f).after(e); }
+    e.textContent = msg; f.setAttribute("aria-invalid", "true"); f.setAttribute("aria-describedby", e.id); try { f.focus(); } catch (x) { }
+    f.addEventListener("input", () => { e.textContent = ""; f.removeAttribute("aria-invalid"); }, { once: true });
+  };
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const TZ = "Asia/Jerusalem";
   const fmtT = d => new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ }).format(d);
@@ -91,11 +102,19 @@
     Object.assign(st.flags, ct.flags || {});
     CHAPTERS.slice(0, BUILT_IN).forEach(c => { const x = (ct.chapters || {})[c.id] || {}; c.hidden = !!x.hidden; c.alertMsg = x.alert || ""; c.featured = ct.featured === c.id; c.stops.forEach(s => { const n = (ct.notes || {})[c.id + ":" + s.id]; s.note = n || s._note0; }); });
     st.hazards = Array.isArray(ct.hazards) ? ct.hazards : [];
-    if (CHAPTERS.find(c => c.id === st.chap)?.hidden) st.chap = (CHAPTERS.find(c => !c.hidden) || CHAPTERS[0]).id;
+    if (CHAPTERS.find(c => c.id === st.chap)?.hidden) setCurrentRoute((CHAPTERS.find(c => !c.hidden) || CHAPTERS[0]).id, { persist: false });
   }
   applyContent(LS.get("content", null));
   if (!CHAPTERS.some(c => c.id === st.chap)) st.chap = "c1";
   const chap = () => CHAPTERS.find(c => c.id === st.chap);
+  /* The current route has one writer. A real choice is remembered (never the route being built or a navigation
+     trip); every change is announced as "br:route" {id, prev} so the weekend brief, the weather points and the
+     other consumers follow the route tab instead of each catching up on its own. */
+  function setCurrentRoute(id, { persist = true } = {}) {
+    const prev = st.chap; st.chap = id;
+    if (persist && id !== "draft" && id !== "nav") LS.set("chap", id);
+    if (prev !== id) try { dispatchEvent(new CustomEvent("br:route", { detail: { id, prev } })); } catch (e) { }
+  }
   const isDark = () => st.theme === "dark" || (st.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   function applyTheme() { if (st.theme === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", st.theme); document.querySelector('meta[name="theme-color"]').content = css("--bg") || "#0A111E"; }
   applyTheme();
@@ -107,7 +126,7 @@
   const sheetPad = () => {
     if (innerWidth >= 900) return { top: 80, bottom: 40, left: 80, right: 460 };
     const sh = $("sheet").getBoundingClientRect().height || 300;
-    return { top: 90, bottom: Math.min(sh + 20, innerHeight * 0.6), left: 70, right: 30 };
+    return { top: 90, bottom: Math.min(sh + 20, vpH() * 0.6), left: 70, right: 30 };
   };
   /* One info window at a time: opening a popup for another place closes the previous one (like every maps app).
      Popups keep all their content and buttons; only the stacking is gone. */
@@ -150,15 +169,34 @@
     cup: ["M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z", "M16 10.5h1.4a2 2 0 0 1 0 4H16", "M8.5 4.5c0 1 1 1.2 1 2.2M12 4.5c0 1 1 1.2 1 2.2", "M4 20.5h13"]
   };
   /* ================= modal sheet (one at a time) ================= */
+  /* Accessibility: the dialog is named by its first heading, focus moves into it, Tab stays inside,
+     Escape closes, and focus returns to the control that opened it. */
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   function openModal(html, cls = "") {
     clearTimeout(closeModal.t); /* a sheet opened right after another closed must not be wiped by the old close */
-    const m = $("modal"); $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
-    requestAnimationFrame(() => m.classList.add("in")); const f = m.querySelector("[autofocus], .btn.primary"); if (f) setTimeout(() => f.focus(), 250);
+    const m = $("modal"), wasOpen = !m.hidden; $("mbody").innerHTML = html; m.className = "modal " + cls; m.hidden = false;
+    if (!wasOpen) { const a = document.activeElement; openModal.from = a && a !== document.body && !m.contains(a) ? a : null; }
+    const h = $("mbody").querySelector("h1,h2,h3");
+    if (h) { h.id = h.id || "mTitle"; m.setAttribute("aria-labelledby", h.id); m.removeAttribute("aria-label"); } else { m.removeAttribute("aria-labelledby"); m.setAttribute("aria-label", "חלון"); }
+    requestAnimationFrame(() => m.classList.add("in"));
+    const f = m.querySelector("[autofocus], .btn.primary") || h; if (h && f === h) h.setAttribute("tabindex", "-1");
+    setTimeout(() => { if (m.hidden) return; const t = f && f.isConnected ? f : $("mx"); try { t.focus(); } catch (e) { } }, 250);
     return $("mbody");
   }
-  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); clearTimeout(closeModal.t); closeModal.t = setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; }, 220); }
+  function closeModal() { const m = $("modal"); if (m.hidden) return; m.classList.remove("in"); clearTimeout(closeModal.t);
+    const back = openModal.from; openModal.from = null;
+    closeModal.t = setTimeout(() => { m.hidden = true; $("mbody").innerHTML = ""; if (back && back.isConnected && back.offsetParent !== null) try { back.focus(); } catch (e) { } }, 220); }
   $("mx").onclick = closeModal; $("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
   addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  $("modal").addEventListener("keydown", e => {
+    if (e.key !== "Tab") return; const els = [...$("modal").querySelectorAll(FOCUSABLE)].filter(x => x.offsetParent !== null || x === document.activeElement); if (!els.length) return;
+    const first = els[0], last = els[els.length - 1];
+    const a = document.activeElement, i = els.indexOf(a);
+    /* from the dialog heading (or anything not in the list) Tab goes to the first control, Shift+Tab to the last */
+    if (i < 0) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+  });
 
   /* ================= Blue Ronin Pro =================
      Free forever: the Saturday brief, all chapters, ride mode with voice, cameras, hazards, territory alerts,
@@ -214,7 +252,7 @@
       <ul class="pwf">${f.map(([i, t, d]) => `<li><span class="pwi">${PWI[i]}</span><div><b>${t}</b><span>${d}</span></div></li>`).join("")}</ul>
       <div class="pwplans" role="group" aria-label="בחירת מסלול"><button type="button" class="plan best" data-plan="yearly" aria-pressed="false"><span class="tag">מחיר מייסדים</span><b>₪99</b><span>לשנה · ₪8.25 לחודש</span></button><button type="button" class="plan" data-plan="monthly" aria-pressed="false"><b>₪14.90</b><span>לחודש</span></button></div>
       <p class="small muted" style="margin:0">התשלום ייפתח עם ההשקה בגוגל פליי. לחיצה על מסלול משריינת את מחיר המייסדים, בלי התחייבות ובלי פרטי תשלום. לחיצה נוספת מבטלת.</p>
-      <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
+      <details class="pwcode"><summary>יש לי קוד</summary><div class="row"><input id="pwCode" class="btn mono" dir="ltr" placeholder="BR-XXXX-XXXX" aria-label="קוד הטבה" autocomplete="off" maxlength="14" style="flex:1"><button type="button" class="btn" id="pwRedeem">הפעלה</button></div></details>
       <div class="pwfree"><b>תמיד בחינם, לכולם:</b> תדריך שבת, כל הפרקים, איש קשר לחירום, זיהוי נפילה ושיתוף מיקום חי, מצב רכיבה עם הנחיות קוליות, התראות עיקולים חדים, מצלמות ומפגעים, התראות שטחים, התשובה אם הדלק מספיק, איתור התחנה הקרובה לפי הדלק שנשאר ונורית דלק במצב רכיבה, מפות אופליין. בטיחות לא נמכרת.</div>
       <div class="err small" id="pwErr"></div></div>`, "pwmodal");
     const err = m => { $("pwErr").textContent = m; };
@@ -296,7 +334,7 @@
     const techBefore = km => ins.tech.reduce((a, t) => a + Math.max(0, Math.min(km, t.from + t.km) - t.from), 0);
     const moveH = km => km / v + techBefore(km) * (1 / (v * 0.68) - 1 / v);
     const DWELL = { view: 8, cafe: 30 }; let dwell = 0;
-    const wpts = wxPoints().map((p, i) => ({ p, i })).filter(x => x.p.chap === cid || (c.combo && c.combo.includes(x.p.chap)));
+    const wpts = wxPts().map((p, i) => ({ p, i })).filter(x => x.p.chap === cid || (c.combo && c.combo.includes(x.p.chap)));
     const wxNear = s => { if (!st.wx || !wpts.length) return -1; let bi = -1, bd = 1e9; wpts.forEach(x => { const d = L.hav([x.p.lon, x.p.lat], [s.lon, s.lat]); if (d < bd) { bd = d; bi = x.i; } }); return bi; };
     const stops = c.stops.map((s, i) => {
       const km = r.stopKm[i] || 0, eta = new Date(dep.getTime() + (moveH(km) * 60 + dwell) * 6e4); const leave = new Date(eta.getTime() + (DWELL[s.kind] || 0) * 6e4); dwell += DWELL[s.kind] || 0;
@@ -389,7 +427,7 @@
     const trk = R.trk.length > 600 ? R.trk.filter((_, i) => i % Math.ceil(R.trk.length / 600) === 0 || i === R.trk.length - 1) : R.trk;
     const cidR = R.c ? R.c.id : R.cid, sim = cidR && st.routes[cidR] ? fuelSimFor(cidR) : null, rate = sim ? sim.burn / sim.total : (bikeEff().cons * bikeEff().style / 100);
     const ride = { id: "r" + Date.now().toString(36), chap: cidR, title: R.c ? R.c.title : R.title, start: R.trk[0][2], end: R.trk[R.trk.length - 1][2], km: +R.odo.toFixed(1), moving: Math.round(R.moving > 60 ? R.moving : (R.trk[R.trk.length - 1][2] - R.trk[0][2]) / 1000), vmax: Math.round(R.vmax || 0), fuel: +(R.odo * rate).toFixed(1), bike: bikeEff().name, trk };
-    const rides = LS.get("rides", []); rides.unshift(ride); LS.set("rides", rides.slice(0, 60));
+    const rides = LS.get("rides", []); rides.unshift(ride); LS.set("rides", rides.slice(0, 60)); topSpeedRec(rides);
     return ride;
   }
   const dur = s => `${Math.floor(s / 3600)}:${String(Math.round(s % 3600 / 60)).padStart(2, "0")}`;
@@ -414,9 +452,11 @@
     let chip = $("rideChip"); if (!on) { if (chip) chip.remove(); return; }
     if (!chip) { chip = document.createElement("div"); chip.id = "rideChip"; chip.className = "ridechip"; document.body.appendChild(chip); }
     chip.innerHTML = `<span>${esc(ride.title)} · ${ride.km} ק״מ</span><button type="button" aria-label="חזרה למפה הרגילה">✕</button>`;
-    chip.querySelector("button").onclick = () => { st.rideShown = null; pushSources(); rideFocus(false); fitChapter(); };
+    chip.querySelector("button").onclick = () => { if (st.fly && st.fly.replay) stopFly(); st.rideShown = null; pushSources(); rideFocus(false); fitChapter(); };
   }
   function showRide(ride) {
+    if (!ride || !ride.trk || !ride.trk.length) return;
+    stopFly(); /* a replay still flying would keep the camera on the previous ride */
     st.rideShown = ride; pushSources(); rideFocus(true, ride);
     const b = new maplibregl.LngLatBounds(); ride.trk.forEach(p => b.extend([p[0], p[1]])); map.fitBounds(b, { padding: 60, duration: 900, maxZoom: 13 }); if (innerWidth < 900) setSheet("peek");
     toast(`${ride.title} · ${ride.km} ק״מ`);
@@ -426,21 +466,35 @@
     const g = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Blue Ronin Navigator" xmlns="http://www.topografix.com/GPX/1/1">\n<trk><name>${esc(ride.title)}</name><trkseg>\n${ride.trk.map(p => `<trkpt lat="${p[1]}" lon="${p[0]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join("\n")}\n</trkseg></trk>\n</gpx>\n`;
     saveFile(`blue-ronin-ride-${new Date(ride.start).toISOString().slice(0, 10)}.gpx`, g, "application/gpx+xml");
   }
+  /* all-time top speed: computed from the saved rides, the record kept in LS so it outlives the 60-ride cap */
+  function topSpeedRec(rides) { const t = L.topSpeed(rides, LS.get("vmaxRec", null)); const was = LS.get("vmaxRec", null); if (JSON.stringify(t) !== JSON.stringify(was)) LS.set("vmaxRec", t); return t; }
+  const shortD = t => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "2-digit", timeZone: TZ }).format(new Date(t));
   function journalCard() {
-    const rides = LS.get("rides", []); const pro = isPro();
+    const rides = LS.get("rides", []); const pro = isPro(), top = topSpeedRec(rides);
     if (!rides.length) return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3><span class="probadge soft">יומן</span></div><p class="small muted" style="margin:0">כל רכיבה במצב רכיבה נרשמת כאן אוטומטית: מרחק, זמן תנועה, ממוצע ודלק משוער. הכול נשמר רק במכשיר שלך.</p><div class="row"><button type="button" class="btn sm primary" id="jDemo">${PWI.play}הדגמה: שחזור 3D</button></div><p class="small muted" style="margin:0">רכיבה לדוגמה על הפרק שבחרתם, כדי לראות איך נראה השחזור. היא לא נשמרת ביומן.</p></div>`;
     const month = new Date().toISOString().slice(0, 7), mrides = rides.filter(r => new Date(r.start).toISOString().slice(0, 7) === month);
     const tot = (list, f) => list.reduce((a, r) => a + (r[f] || 0), 0);
     const row = (r, i) => `<div class="item"><div style="min-width:0"><b>${esc(r.title)}</b><span class="small muted mono">${esc(fmtD(new Date(r.start)))} · ${r.km} ק״מ · ${dur(r.moving)} · ${r.fuel} ל׳</span></div><div class="row" style="flex-wrap:nowrap"><button type="button" class="btn sm primary" data-rplay="${i}" aria-label="שחזור תלת־ממד">${PWI.play}3D</button><button type="button" class="btn sm" data-rshow="${i}">במפה</button><button type="button" class="btn sm" data-rgpx="${i}">GPX</button></div></div>`;
     const visible = pro ? rides : rides.slice(0, 1), hiddenN = rides.length - visible.length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>הרכיבות שלי</h3>${pro ? '<span class="probadge">PRO</span>' : ""}</div>
-      ${pro ? `<div class="fsum"><div><span class="k">החודש</span><b class="mono">${Math.round(tot(mrides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">רכיבות</span><b class="mono">${mrides.length}</b></div><div><span class="k">סה״כ</span><b class="mono">${Math.round(tot(rides, "km"))}</b><span class="k">ק״מ</span></div><div><span class="k">דלק</span><b class="mono">${Math.round(tot(rides, "fuel"))}</b><span class="k">ל׳</span></div></div>` : ""}
+      ${jStats(rides, mrides, tot, top, pro)}
       ${visible.map(row).join("")}
       <button type="button" class="linkbtn small muted" id="jDemo" style="justify-self:start">הדגמת שחזור 3D על הפרק הנוכחי</button>
       ${hiddenN ? `<button type="button" class="lockrow" id="jMore">${PWI.lock}<span>עוד ${hiddenN} רכיבות שמורות במכשיר שלך. היומן המלא פתוח ב־Pro</span></button>` : ""}</div>`;
   }
+  /* the stats block: every tile is label / number / unit, one grid of three. The top speed tile opens its ride.
+     Top speed is a Pro total (Eli, 2026-11-13): free riders see the tile locked, never the value; a tap opens the paywall. */
+  function jStats(rides, mrides, tot, top, pro) {
+    const tile = (k, v, u) => `<div><span class="k">${k}</span><b class="mono">${v}</b><span class="k">${u}</span></div>`;
+    const topT = !pro ? `<button type="button" class="jtop locked" id="jTop" aria-label="מהירות שיא: פתוח ב־Pro"><span class="k">מהירות שיא</span><b aria-hidden="true">${PWI.lock}</b><span class="k">Pro</span></button>` : top ? `<button type="button" class="jtop" id="jTop" aria-label="מהירות שיא ${top.v} קמ״ש, ${esc(top.title)}, ${esc(shortD(top.start))}"><span class="k">מהירות שיא</span><b class="mono">${top.v}</b><span class="k">קמ״ש · ${esc(shortD(top.start))}</span></button>` : tile("מהירות שיא", "—", "קמ״ש");
+    if (!pro) return `<div class="fsum jstats solo">${topT}</div>`;
+    return `<div class="fsum jstats">${tile("החודש", Math.round(tot(mrides, "km")), "ק״מ")}${tile("רכיבות", mrides.length, "החודש")}${tile("זמן רכיבה", dur(tot(rides, "moving")), "שעות")}${tile("סה״כ", Math.round(tot(rides, "km")), "ק״מ")}${tile("דלק", Math.round(tot(rides, "fuel")), "ל׳")}${topT}</div>`;
+  }
   function bindJournal() {
     const rides = LS.get("rides", []);
+    if ($("jTop")) $("jTop").onclick = () => { if (!isPro()) return openPaywall("journal"); const top = LS.get("vmaxRec", null); if (!top) return; const i = rides.findIndex(r => r.id === top.id);
+      if (i < 0) return toast(`השיא ${top.v} קמ״ש מ־${shortD(top.start)}. הרכיבה כבר לא ביומן`, 4000);
+      showRide(rides[i]); toast(`מהירות שיא ${top.v} קמ״ש · ${rides[i].title}`, 3500); };
     document.querySelectorAll("[data-rshow]").forEach(b => b.onclick = () => showRide(rides[+b.dataset.rshow]));
     document.querySelectorAll("[data-rgpx]").forEach(b => b.onclick = () => rideGpx(rides[+b.dataset.rgpx]));
     document.querySelectorAll("[data-rplay]").forEach(b => b.onclick = () => { if (innerWidth < 900) setSheet("peek"); replayRide(rides[+b.dataset.rplay]); });
@@ -600,7 +654,11 @@
     if (st.layers.radar) addRadarLayer();
     if (st.terrain) map.setTerrain({ source: "dem", exaggeration: 1.5 });
     pushSources(); applyLayerVis();
+    /* a style reload (theme change) re-adds every layer visible: keep the clean ride view and the replay's sky */
+    if (rideSaved) RIDE_CLUTTER.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none"); });
+    if (st.fly && st.fly.replay && map.setSky) try { map.setSky(skyFor(st.fly.replay.ride.start)); } catch (e) { }
   }
+  map.on("styleimagemissing", e => { try { if (e && e.id && !map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) }); } catch (x) { } });
   let styleReady = false;
   map.on("style.load", () => { styleReady = true; setupStyle(); });
   window.BR_MAP = map;
@@ -692,7 +750,7 @@
       e.onclick = ev => { ev.stopPropagation(); stopPopup(s, n); };
       mk.push(new maplibregl.Marker({ element: e }).setLngLat(lonlat(s)).addTo(map));
     }));
-    if (st.layers.wx && st.wx && !st.fly) wxPoints().forEach((p, i) => {
+    if (st.layers.wx && st.wx && !st.fly) wxPts().forEach((p, i) => {
       const h = satHour(i, 8); if (!h) return;
       const e = document.createElement("div"); e.className = "mkw"; e.innerHTML = `${wxIcon(h.code)}${Math.round(h.t)}°`;
       mk.push(new maplibregl.Marker({ element: e, anchor: "bottom" }).setLngLat([p.lon, p.lat]).addTo(map));
@@ -725,7 +783,7 @@
      the zoom: the map is framed for the space above a half sheet at most) */
   const ISRAEL = [[34.27, 29.5], [35.9, 33.33]];
   function homeIsrael(dur = 1200) {
-    const ph = innerWidth < 900, H = innerHeight, pad = ph ? { top: 70, bottom: Math.min(H * 0.42, sheetPad().bottom || 0) + 10, left: 70, right: 16 } : { top: 70, bottom: 30, left: 90, right: Math.min(innerWidth * 0.42, 460) + 20 };
+    const ph = innerWidth < 900, H = vpH(), pad = ph ? { top: 70, bottom: Math.min(H * 0.42, sheetPad().bottom || 0) + 10, left: 70, right: 16 } : { top: 70, bottom: 30, left: 90, right: Math.min(innerWidth * 0.42, 460) + 20 };
     let cam = null; try { cam = map.cameraForBounds(ISRAEL, { padding: pad, bearing: 0 }); } catch (e) { }
     if (!cam) try { cam = map.cameraForBounds(ISRAEL, { padding: 10, bearing: 0 }); } catch (e) { }
     if (cam) map.easeTo(Object.assign({}, cam, { pitch: 0, bearing: 0, duration: dur })); else map.fitBounds(ISRAEL, { padding: 10, duration: dur });
@@ -818,6 +876,9 @@
     return pts;
   }
   const wxSig = () => wxPoints().map(p => p.lat.toFixed(2) + p.lon.toFixed(2)).join("");
+  /* the points the stored forecast belongs to: lookups go through these, never through today's list, so a route
+     change can't hand one route's weather to another (an old cache without them counts only while it matches) */
+  const wxPts = () => (st.wx && st.wx.meta) || (st.wx && st.wx.sig === wxSig() ? wxPoints() : []);
   const WX_Q = "&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,visibility,cloud_cover" +
     "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation&forecast_days=9&timezone=Asia%2FJerusalem&wind_speed_unit=kmh";
   async function wxFromServer(pts) {
@@ -840,20 +901,20 @@
       const pts = wxPoints(), sig = wxSig(); let arr = null;
       try { arr = await wxFromServer(pts); } catch (e) { try { arr = await wxDirect(pts); } catch (e2) { if (window.BRG) BRG.report("weather", String((e2 && e2.message) || e2) + " / " + String((e && e.message) || e)); } }
       st.wxFail = !arr; st.wxFailTs = arr ? 0 : Date.now();
-      if (arr) { st.wx = { ts: Date.now(), sat: st.sat.iso, sig, pts: arr.map(x => ({ h: x.hourly, cur: x.current })) }; LS.set("wx2", st.wx); }
+      if (arr) { st.wx = { ts: Date.now(), sat: st.sat.iso, sig, meta: pts.map(p => ({ lat: p.lat, lon: p.lon, name: p.name, chap: p.chap })), pts: arr.map(x => ({ h: x.hourly, cur: x.current })) }; LS.set("wx2", st.wx); }
       else if (st.wx && st.wx.sig !== sig) { /* the cached forecast is for other points: keep it only if it still lines up */ if (st.wx.pts.length !== pts.length) st.wx = null; }
       if (!st.wx && force) toast("התחזית לא זמינה כרגע. ננסה שוב בעוד כמה דקות.");
       const s = f => { try { f(); } catch (e) { if (window.BRG) BRG.report("weather-render", String(e && e.stack || e)); } };
       s(renderNow); s(renderMarkers); if (st.tab === "brief") s(renderBrief);
-    })().finally(() => { wxBusy = null; });
+    })().finally(() => { wxBusy = null; /* the route changed while this ran: fetch its points now */ if (st.wx && !st.wxFail && st.wx.sig !== wxSig()) loadWeather(); });
   }
   function satHour(i, hour) {
     const p = st.wx && st.wx.pts[i]; if (!p || !p.h || !Array.isArray(p.h.time)) return null; const iso = `${st.sat.iso}T${String(hour).padStart(2, "0")}:00`; const k = p.h.time.indexOf(iso); if (k < 0) return null;
     return { t: p.h.temperature_2m[k], code: p.h.weather_code[k], p: p.h.precipitation_probability[k], g: p.h.wind_gusts_10m[k], vis: p.h.visibility ? p.h.visibility[k] : null };
   }
-  function wxMid(cid) { const cc = CHAPTERS.find(c => c.id === cid); const id = cc && cc.combo ? cc.combo[Math.floor(cc.combo.length / 2)] : cid; return wxPoints().findIndex(x => x.chap === id) + 1; }
+  function wxMid(cid) { const cc = CHAPTERS.find(c => c.id === cid); const id = cc && cc.combo ? cc.combo[Math.floor(cc.combo.length / 2)] : cid; return wxPts().findIndex(x => x.chap === id) + 1; }
   function chapterWx(cid) {
-    if (!st.wx) return null; const pts = wxPoints(); const rows = []; const cc = CHAPTERS.find(c => c.id === cid); const ids = cc && cc.combo ? cc.combo : [cid];
+    if (!st.wx) return null; const pts = wxPts(); const rows = []; const cc = CHAPTERS.find(c => c.id === cid); const ids = cc && cc.combo ? cc.combo : [cid];
     pts.forEach((p, i) => { if (!ids.includes(p.chap) || !st.wx.pts[i] || !st.wx.pts[i].h || !Array.isArray(st.wx.pts[i].h.time)) return; const w = L.windowStats(st.wx.pts[i].h, `${st.sat.iso}T06:00`, `${st.sat.iso}T12:00`, `${st.sat.prevIso}T20:00`); if (w) rows.push({ p, w, i }); });
     if (!rows.length) return null;
     const agg = { tMin: Math.min(...rows.map(r => r.w.tMin)), tMax: Math.max(...rows.map(r => r.w.tMax)), maxP: Math.max(...rows.map(r => r.w.maxP)), sumMm: Math.max(...rows.map(r => r.w.sumMm)), maxGust: Math.max(...rows.map(r => r.w.maxGust)), minVis: Math.min(...rows.map(r => r.w.minVis)), wet: rows.some(r => r.w.wet), storm: rows.some(r => r.w.storm), fog: rows.some(r => r.w.fog) };
@@ -1095,7 +1156,7 @@
     const all = sets.cafe.concat(sets.fuel, sets.view).sort((a, b) => a.km - b.km);
     let shown = cat === "all" ? all : sets[cat];
     if (st.stopsNear && st.me) { const me = [st.me.lon, st.me.lat]; shown = shown.map(x => Object.assign({}, x, { dme: L.hav(me, [x.lon, x.lat]) })).sort((a, b) => a.dme - b.dme); }
-    h += `<div class="seg pcat" role="tablist" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" role="tab" data-pc="${k}" aria-selected="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
+    h += `<div class="seg pcat" role="group" aria-label="סוג מקום">${Object.entries(PCAT).map(([k, t]) => `<button type="button" data-pc="${k}" aria-pressed="${k === cat}">${t} <span class="mono">${k === "all" ? all.length : sets[k].length}</span></button>`).join("")}</div>`;
     h += `<div class="row" style="justify-content:space-between;margin:0">${placeStrip(all, r.km)}</div><div class="row small" style="margin:0;justify-content:space-between"><span class="muted">${st.stopsNear && st.me ? "ממוין לפי המרחק ממך" : "ממוין לפי הקילומטר בפרק"}</span><button type="button" class="btn sm" id="pNear" aria-pressed="${!!st.stopsNear}">${IC.nav}${st.stopsNear ? "לפי הפרק" : "קרוב אליי"}</button></div>`;
     if (cat === "fuel") h += `<div class="row small" style="margin:0"><label class="toggle"><input type="checkbox" id="ffOct" ${ff.oct ? "checked" : ""}> רק תחנות עם 98</label><span class="muted">אימות רוכבים: לוחצים ״פרטים״</span></div>`;
     if (st.shabbat) h += `<p class="small muted" style="margin:0">מצב שבת מסתיר מקומות שמסומנים סגורים בשבת. ״לבדוק״ = אין מידע, כדאי להתקשר.</p>`;
@@ -1375,9 +1436,10 @@
         try {
           const perm = await Notification.requestPermission(); if (perm !== "granted") { renderPush(); return; }
           const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(st.vapid) });
-          const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs }) });
-          if (!r.ok) throw 0; toast("ההתראות פעילות"); renderPush();
-        } catch (e) { toast("ההפעלה לא הצליחה. נסו שוב"); }
+          const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: s.toJSON(), prefs, chap: pushChap() }) });
+          if (!r.ok) { const j = await r.json().catch(() => ({})); try { await s.unsubscribe(); } catch (e) { } throw new Error(L.heText(j.error, "")); } /* M1, m8, m9: the server's Hebrew reason; not left "active" on the device */
+          LS.set("pushChap", pushChap()); toast("ההתראות פעילות"); renderPush();
+        } catch (e) { toast((e && e.message) || "ההפעלה לא הצליחה. נסו שוב", 5000); }
       };
       return;
     }
@@ -1385,7 +1447,7 @@
       <label class="toggle small"><input type="checkbox" id="ppF" ${prefs.friday ? "checked" : ""}> תדריך שבת · שישי אחר הצהריים</label>
       <label class="toggle small"><input type="checkbox" id="ppS" ${prefs.saturday ? "checked" : ""}> עדכון בוקר שבת · לפני הזריחה</label>
       <div class="row"><button type="button" class="btn" id="pushTest">שליחת התראת בדיקה</button><button type="button" class="btn" id="pushOff">כיבוי</button></div>`;
-    const savePrefs = async () => { const p = { friday: $("ppF").checked, saturday: $("ppS").checked }; LS.set("pushPrefs", p); try { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs: p }) }); toast("נשמר"); } catch (e) { toast("לא נשמר, אין חיבור"); } };
+    const savePrefs = async () => { const p = { friday: $("ppF").checked, saturday: $("ppS").checked }; LS.set("pushPrefs", p); try { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs: p, chap: pushChap() }) }); LS.set("pushChap", pushChap()); toast("נשמר"); } catch (e) { toast("לא נשמר, אין חיבור"); } };
     $("ppF").onchange = savePrefs; $("ppS").onchange = savePrefs;
     $("pushTest").onclick = async () => { try { const r = await fetch("/api/test-push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); if (r.status === 404) { await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: sub.toJSON(), prefs }) }); toast("נרשם מחדש. לחצו שוב"); return; } toast(r.ok ? "נשלחה. היא תקפוץ בעוד רגע" : "השליחה נכשלה"); } catch (e) { toast("אין חיבור לשרת"); } };
     $("pushOff").onclick = async () => { try { await fetch("/api/subscribe", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); } catch (e) { } await sub.unsubscribe(); toast("ההתראות כבויות"); renderPush(); };
@@ -1507,8 +1569,8 @@
   function syncDraft() {
     const i = CHAPTERS.findIndex(c => c.id === DRAFT); if (i >= 0) CHAPTERS.splice(i, 1);
     ["routes", "curves", "cstats", "glare", "elev", "terr", "traffic"].forEach(k => delete st[k][DRAFT]);
-    const b = st.build; if (!b || b.pts.length < 2) { if (st.chap === DRAFT || !CHAPTERS.some(c => c.id === st.chap)) st.chap = st.prevChap && st.prevChap !== DRAFT && CHAPTERS.some(c => c.id === st.prevChap) ? st.prevChap : "c1"; pushSources(); renderMarkers(); return; }
-    const c = customChapter({ id: DRAFT, title: b.title || "המסלול שלי", stops: b.pts, opts: b.opts }); CHAPTERS.push(c); st.chap = DRAFT;
+    const b = st.build; if (!b || b.pts.length < 2) { if (st.chap === DRAFT || !CHAPTERS.some(c => c.id === st.chap)) setCurrentRoute(st.prevChap && st.prevChap !== DRAFT && CHAPTERS.some(c => c.id === st.prevChap) ? st.prevChap : "c1", { persist: false }); pushSources(); renderMarkers(); return; }
+    const c = customChapter({ id: DRAFT, title: b.title || "המסלול שלי", stops: b.pts, opts: b.opts }); CHAPTERS.push(c); setCurrentRoute(DRAFT);
     clearTimeout(syncDraft.t); syncDraft.t = setTimeout(async () => { const r = await loadRoute(c); if (!CHAPTERS.includes(c)) return; processRoute(c, r); pushSources(); renderMarkers(); renderRoute(); fitChapter(); loadElev(DRAFT).then(() => st.tab === "route" && renderRoute()); }, 350);
   }
   function builderPanel() {
@@ -1692,7 +1754,7 @@
     c.nav = true; c.hidden = true; CHAPTERS.push(c);
     st.navPrev = st.chap !== NAV ? st.chap : st.navPrev; st.nav = { dest, busy: true };
     const rec = navRecent().filter(x => L.hav([x.lon, x.lat], [dest.lon, dest.lat]) > 0.1); rec.unshift({ name: dest.name, sub: dest.sub || "", lat: +dest.lat, lon: +dest.lon, t: Date.now() }); LS.set("navRecent", rec.slice(0, 8));
-    st.chap = NAV; renderGo();
+    setCurrentRoute(NAV); renderGo();
     const r = await loadRoute(c); if (navChapter() !== c) return;
     processRoute(c, r); st.nav.busy = false; st.nav.err = r.real ? null : "השרת של המסלולים לא ענה, זה קו משוער. נסו שוב בעוד רגע";
     pushSources(); renderMarkers(); fitChapter(900); if (innerWidth < 900) setSheet("half"); renderGo();
@@ -1710,7 +1772,7 @@
     const i = CHAPTERS.findIndex(c => c.id === NAV); if (i >= 0) CHAPTERS.splice(i, 1);
     ["routes", "curves", "cstats", "glare", "elev", "terr", "traffic"].forEach(k => delete st[k][NAV]);
     st.nav = null; if (quiet) return;
-    st.chap = st.navPrev && CHAPTERS.some(c => c.id === st.navPrev) ? st.navPrev : LS.get("chap", "c1"); if (!CHAPTERS.some(c => c.id === st.chap)) st.chap = "c1";
+    { const back = st.navPrev && CHAPTERS.some(c => c.id === st.navPrev) ? st.navPrev : LS.get("chap", "c1"); setCurrentRoute(CHAPTERS.some(c => c.id === back) ? back : "c1", { persist: false }); }
     pushSources(); renderMarkers(); renderGo();
   }
   function navSave() {
@@ -1857,11 +1919,11 @@
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
     <div class="card"><h3>שיתוף ודיווח לחבר׳ה</h3><div class="row"><button type="button" class="btn" id="shareGo">שיתוף האפליקציה</button><a class="btn" target="_blank" rel="noopener" href="${LIVE_BOARD}">לוח הדיווחים החי</a></div>
       <label for="repType" class="small muted">דיווח מהיר מהמיקום שלך לוואטסאפ</label><div class="row"><select id="repType" class="btn"><option>ניידת / ממל״ז</option><option>מצלמה ניידת / לייזר</option><option>חצץ או שמן על הכביש</option><option>עבודות / חסימה</option><option>כביש סגור</option><option>נקודת עצירה מומלצת</option></select><button type="button" class="btn primary" id="repGo">שליחה</button><button type="button" class="btn" id="repPhoto">${PWI.cam}עם תמונה</button></div></div>
-    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונה</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
+    ${st.flags.feedback ? `<div class="card" id="fbCard"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי, מפגע בדרך או בעיית נגישות. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><label class="fbf" for="fbKind">סוג הפנייה<select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option><option value="a11y">נגישות</option></select></label><label class="fbf" for="fbText">מה רציתם לספר<textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea></label><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונות</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
     <div class="card"><h3>נשארים בקשר</h3><p class="small muted" style="margin:0">תדריך סופ״ש כל חמישי בוואטסאפ, סרטוני מסלולים, ורשימת ההמתנה להשקה בחנויות.</p><div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m">ערוץ התדריך בוואטסאפ</a><a class="btn" href="join?src=app">רשימת ההמתנה</a><a class="btn" target="_blank" rel="noopener" href="https://www.instagram.com/blueroninapp/">אינסטגרם</a><a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@blueroninapp">יוטיוב</a><a class="btn" target="_blank" rel="noopener" href="https://www.tiktok.com/@blueroninapp">טיקטוק</a><a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/blueroninapp/">פייסבוק</a></div></div>
-    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
+    <div class="small muted legal"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a> · <a href="accessibility.html">הצהרת נגישות</a> · <button type="button" class="linkbtn" id="creditsGo">מקורות המידע</button> · גרסה ${APP_VER}</div>`;
     $("p-tools").innerHTML = h;
     $("offGo").onclick = downloadOffline;
     if ($("instGo")) $("instGo").onclick = async () => { installEvt.prompt(); await installEvt.userChoice; installEvt = null; renderTools(); };
@@ -1869,7 +1931,7 @@
       /* the draft survives leaving the tab (or the app): a rider often goes to check where the problem was */
       { const d = LS.get("fbDraft", null); if (d) { if (d.text) $("fbText").value = d.text; if (d.kind) $("fbKind").value = d.kind; }
         const save = () => LS.set("fbDraft", { text: $("fbText").value, kind: $("fbKind").value, t: Date.now() }); $("fbText").addEventListener("input", save); $("fbKind").addEventListener("change", save); }
-      $("fbPhoto").onclick = async () => { const [f] = await pickFile({}); if (!f) return; try { const im = await decodeImg(f); let q = 0.8, b = await toJpeg(im, 1400, q); while (b.size > 560 * 1024 && q > 0.4) { q -= 0.15; b = await toJpeg(im, 1100, q); } try { im.close && im.close(); } catch (e) { } st.fbAtt.photo = b; paintFbAtt(); } catch (e) { toast(e.message); } };
+      $("fbPhoto").onclick = fbAddPhotos;
       $("fbVoice").onclick = async () => { const b = await recordVoice(60); if (b) { if (b.size > 680 * 1024) return toast("ההקלטה ארוכה מדי"); st.fbAtt.voice = b; paintFbAtt(); } }; }
     $("repPhoto").onclick = reportPhoto;
     $("creditsGo").onclick = () => openModal(`<h2>מקורות המידע</h2><p class="small" style="margin:0">מפה: OpenFreeMap ו־© OpenStreetMap contributors (ODbL). מזג אוויר וגבהים: Open-Meteo (CC BY 4.0). מכ״ם: RainViewer. ניתוב: OSRM. תבליט: Mapzen/AWS Terrain Tiles. שקיעה וזריחה: SunCalc. תמונות: Mapillary ו־Wikimedia Commons, עם קרדיט לכל צילום. בתי קפה מומלצים: טיולי, mako, מעריב. אכיפה: וואלה (2012), ynetnews (2026).</p>`);
@@ -1878,13 +1940,36 @@
     $("introSnd").onchange = e => { LS.set("introSound", e.target.checked); toast(e.target.checked ? "הצליל יתנגן בפתיחה הבאה" : "הפתיחה תהיה שקטה"); };
     $("refAll").onclick = () => { loadWeather(true); loadOSM(true); loadCrowd(true); };
   }
-  function paintFbAtt() { const a = st.fbAtt || {}, box = $("fbAtt"); if (!box) return; box.innerHTML = (a.photo ? `<img src="${URL.createObjectURL(a.photo)}" alt="תמונה מצורפת"><button type="button" class="linkbtn small" data-fx="photo">הסרה</button>` : "") + (a.voice ? `<span class="chip">הקלטה ${Math.round(a.voice.size / 1024)}KB</span><button type="button" class="linkbtn small" data-fx="voice">הסרה</button>` : ""); box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
+  /* feedback photos: up to L.FB_PHOTOS_MAX, picked several at a time from the gallery, compressed on the phone */
+  const fbPhotos = () => { const a = st.fbAtt || (st.fbAtt = {}); if (a.photo) { a.photos = [a.photo]; delete a.photo; } return a.photos || (a.photos = []); };
+  async function fitJpeg(src, cap) { const im = await decodeImg(src); try { let max = 1400, q = 0.8, b = await toJpeg(im, max, q); while (b.size > cap && (q > 0.42 || max > 900)) { if (q > 0.42) q -= 0.12; else max -= 250; b = await toJpeg(im, max, q); } return b; } finally { try { im.close && im.close(); } catch (e) { } } }
+  async function fbAddPhotos() {
+    const have = fbPhotos(), room = L.FB_PHOTOS_MAX - have.length; if (room <= 0) return toast(`עד ${L.FB_PHOTOS_MAX} תמונות בדיווח`);
+    const files = await pickFile({ multiple: true }); if (!files.length) return;
+    const list = files.slice(0, room), cap = L.photoBudget(have.length + list.length), res = $("fbRes"); let bad = 0;
+    if (files.length > room) toast(`אפשר עד ${L.FB_PHOTOS_MAX} תמונות בדיווח. צורפו ${list.length}.`);
+    $("fbPhoto").disabled = true;
+    for (let i = 0; i < list.length; i++) { if (res && list.length > 1) res.textContent = `מכין תמונה ${i + 1} מתוך ${list.length}…`; try { have.push(await fitJpeg(list[i], cap)); } catch (e) { bad++; } paintFbAtt(); }
+    $("fbPhoto").disabled = false; if (res && list.length > 1) res.textContent = "";
+    if (bad) toast(bad === list.length ? "התמונה לא נתמכת" : `${bad} מהתמונות לא נתמכות ולא צורפו`);
+  }
+  function paintFbAtt() { const a = st.fbAtt || {}, box = $("fbAtt"); if (!box) return; const ph = fbPhotos();
+    box.innerHTML = ph.map((p, i) => `<span class="fbth"><img src="${URL.createObjectURL(p)}" alt="תמונה מצורפת ${i + 1}"><button type="button" class="fbx" data-fp="${i}" aria-label="הסרת תמונה ${i + 1}">✕</button></span>`).join("") + (ph.length ? `<span class="small muted">${ph.length}/${L.FB_PHOTOS_MAX}</span>` : "") + (a.voice ? `<span class="chip">הקלטה ${Math.round(a.voice.size / 1024)}KB</span><button type="button" class="linkbtn small" data-fx="voice">הסרה</button>` : "");
+    box.querySelectorAll("img").forEach(im => im.onload = () => URL.revokeObjectURL(im.src));
+    box.querySelectorAll("[data-fp]").forEach(b => b.onclick = () => { ph.splice(+b.dataset.fp, 1); paintFbAtt(); });
+    box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  /* the rider is told why the server said no: too large (413) and too many this hour (429) get their own words */
+  const fbErrText = (status, err) => status === 413 ? "התמונות או ההקלטה גדולות מדי. נסו לשלוח פחות תמונות"
+    : status === 429 ? "שלחתם הרבה דיווחים בשעה האחרונה. אפשר לנסות שוב בעוד שעה" : L.heText(err, "השליחה נכשלה"); /* m8: Hebrew only */
   async function sendFeedback() {
-    const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return toast("כתבו כמה מילים");
-    const a = st.fbAtt || {}, photo = a.photo ? await b64of(a.photo) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
-    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
-        $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span></div></div>`;
+    const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return fieldErr("fbText", "כתבו כמה מילים, לפחות 3 תווים");
+    const a = st.fbAtt || {}, ph = fbPhotos(), cap = L.photoBudget(ph.length);
+    /* photos added in two goes were sized for a smaller set: shrink any that are over their share now */
+    for (let i = 0; i < ph.length; i++) if (ph[i].size > cap) try { ph[i] = await fitJpeg(ph[i], cap); } catch (e) { }
+    const photos = ph.length ? await Promise.all(ph.map(b64of)) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
+    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photos || voice ? (photos && photos.length > 1 ? `שולח ${photos.length} תמונות…` : "שולח…") : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photos, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(fbErrText(r.status, j.error)); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
+        $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span>${j.note ? `<span class="small" style="display:block;margin-top:4px">${esc(j.note)}</span>` : ""}</div></div>`;
         try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } $("fbRes").scrollIntoView({ block: "nearest", behavior: "smooth" }); toast("הדיווח נשלח ✓");
       } catch (e) { $("fbRes").innerHTML = `<div class="fberr" role="alert">${esc(e.message || "אין חיבור")}. הטקסט נשמר, אפשר לנסות שוב.</div>`; } $("fbGo").disabled = false; };
     if (kind === "hazard" && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => post(p.coords.latitude, p.coords.longitude), () => { const c = map.getCenter(); post(c.lat, c.lng); }, { timeout: 6000, enableHighAccuracy: true });
@@ -2002,8 +2087,9 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   function startFly(opts) {
-    if (st.fly) return stopFly();
     const o = opts && opts.coords ? opts : null;
+    /* the fly-through button toggles; a replay always replaces whatever is flying (another ride, the demo) */
+    if (st.fly) { stopFly(); if (!o) return; }
     const c = o ? { id: "replay", title: "שחזור · " + o.title } : chap(), r = o ? null : st.routes[st.chap]; if (!o && !r) return;
     const coords = o ? o.coords : r.coords, km0 = o ? o.replay.cum[o.replay.cum.length - 1] : r.km;
     const P = L.flyPath(coords, km0 > 250 ? 0.025 : 0.015);
@@ -2111,9 +2197,11 @@
   $("flSeek").addEventListener("change", () => { flySeeking = false; });
   function stopFly(done) {
     const F = st.fly; if (!F) return;
-    cancelAnimationFrame(F.raf); F.marker.remove(); st.fly = null; setSrc("br-fly", FC()); dropTileQueue(); renderMarkers();
-    if (F.replay) { try { map.setSky && map.setSky(F.prevSky || {}); } catch (e) { } clearTimeout(F.replay.resume); $("rpPop").hidden = true; }
-    map.setTerrain({ source: "dem", exaggeration: 1.5 });
+    st.fly = null; F.stopped = true; cancelAnimationFrame(F.raf);
+    const safe = f => { try { f(); } catch (e) { } };
+    safe(() => F.marker.remove()); safe(() => setSrc("br-fly", FC())); safe(dropTileQueue); safe(renderMarkers);
+    if (F.replay) { safe(() => map.setSky && map.setSky(F.prevSky || {})); clearTimeout(F.replay.resume); clearTimeout(F.replay.hide); const pop = $("rpPop"); pop.hidden = true; pop.classList.remove("in"); pop.onclick = null; }
+    safe(() => map.setTerrain({ source: "dem", exaggeration: 1.5 }));
     map.getCanvas().removeEventListener("pointerdown", flyTouch); document.body.classList.remove("flying");
     $("fFly").setAttribute("aria-pressed", "false"); flyUI(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     if (done) { if (F.replay) showRide(F.replay.ride); else fitChapter(1400); }
@@ -2136,6 +2224,7 @@
     if (st.ride) return stopRide();
     if (!navigator.geolocation) return toast("מצב רכיבה צריך גישה למיקום");
     stopFly(); const c = chap(), r = st.routes[st.chap]; if (!r) return;
+    if (st.rideShown) { st.rideShown = null; pushSources(); rideFocus(false); }
     say(c.nav ? "יוצאים לדרך. ניווט אל " + c.title : "מצב רכיבה פעיל. " + c.title); /* inside the tap, so the phone unlocks speech for the whole ride */
     unlockAudio(); if (st.sos.crash) askMotion().then(ok => { if (ok && st.ride) fallArm(); }); geoPause(); walkStop();
     st.ride = { c, G: guideFrom(c.stops, r, null), last: null, alerted: new Set(), spoke: new Set(), lock: null, odo: 0, lowWarned: false, offS: {}, rerouting: false, inT: null, terrMsg: null, trk: [], vmax: 0, moving: 0, lastT: 0 };
@@ -2285,13 +2374,13 @@
   (() => {
     const head = $("sheetHead"), sheet = $("sheet"); if (!head) return; let drag = null;
     head.addEventListener("pointerdown", e => { if (e.target.closest("button") || innerWidth >= 900) return; drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, t: performance.now(), moved: false }; head.setPointerCapture(e.pointerId); sheet.classList.add("dragging"); });
-    head.addEventListener("pointermove", e => { if (!drag) return; const dy = e.clientY - drag.y; if (Math.abs(dy) > 4) drag.moved = true; const max = innerHeight - 64; sheet.style.height = Math.max(90, Math.min(max, drag.h - dy)) + "px"; });
+    head.addEventListener("pointermove", e => { if (!drag) return; const dy = e.clientY - drag.y; if (Math.abs(dy) > 4) drag.moved = true; const max = vpH() - 64; sheet.style.height = Math.max(90, Math.min(max, drag.h - dy)) + "px"; });
     const end = e => {
       if (!drag) return; sheet.classList.remove("dragging"); const dy = e.clientY - drag.y, v = dy / Math.max(1, performance.now() - drag.t), h = sheet.getBoundingClientRect().height; const was = drag; drag = null;
       if (!was.moved) { setSheet(st.sheet === "peek" ? "half" : st.sheet === "half" ? "full" : "half"); return; }
       if (v < -0.6) return setSheet(st.sheet === "peek" ? "half" : "full");
       if (v > 0.6) return setSheet(st.sheet === "full" ? "half" : "peek");
-      const H = innerHeight; const opts = [["peek", 124], ["half", Math.min(H * 0.46, 460)], ["full", H - 64]];
+      const H = vpH(); const opts = [["peek", 124], ["half", Math.min(H * 0.46, 460)], ["full", H - 64]];
       setSheet(opts.reduce((a, b) => Math.abs(b[1] - h) < Math.abs(a[1] - h) ? b : a)[0]);
     };
     head.addEventListener("pointerup", end); head.addEventListener("pointercancel", end);
@@ -2308,7 +2397,7 @@
   const gmap = (lat, lon) => `https://maps.google.com/?q=${lat.toFixed(5)},${lon.toFixed(5)}`;
   st.sos = Object.assign({ name: "", phone: "", cName: "", cPhone: "", circle: "", key: "", crash: true, guards: [] }, LS.get("sos", {}) || {});
   const saveSos = () => LS.set("sos", st.sos);
-  const post = async (url, b) => { const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.error || "אין חיבור"), { status: r.status }); return j; };
+  const post = async (url, b) => { const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(L.heText(j.error, j.error ? "השליחה נכשלה. נסו שוב" : "אין חיבור")), { status: r.status }); return j; };
 
   /* ---------- one position feed for everything (ride mode has its own watch and forwards to this) ---------- */
   const geoSubs = new Set(); let geoW = null;
@@ -2360,11 +2449,11 @@
     if (kind !== "test") { try { await liveStart(true); await liveFlush("sos"); } catch (e) { } if (st.group) gTick(); }
     let res = null, err = "";
     if (st.sos.circle) try { res = await post("/api/sos/alert", { circle: st.sos.circle, key: st.sos.key, kind, lat, lon, live: st.live ? st.live.id : "", phone: IL(st.sos.phone), name: st.sos.name }); } catch (e) { err = e.message; }
-    if (kind === "test") { toast(res ? (res.sent ? `התראת בדיקה נשלחה ל־${res.sent} אנשי קשר` : "אין עדיין אנשי קשר מחוברים לקבלת התראות") : err || "לא נשלח"); return; }
+    if (kind === "test") { toast(res ? L.sosReach(res, true) : err || "לא נשלח", res && res.failed ? 6000 : undefined); return; }
     try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) { }
     const txt = sosText(kind, lat, lon), c = st.sos;
     openModal(`<div class="sos-sheet"><h2>${kind === "crash" ? "שלחנו התראת נפילה" : "קריאת חירום"}</h2>
-      <p style="margin:0">${res ? (res.sent ? `התראה עם המיקום שלך נשלחה ל־${res.sent} ${res.sent === 1 ? "איש קשר" : "אנשי קשר"}.` : "אין עדיין איש קשר שמחובר לקבלת התראות. התקשרו או שלחו הודעה מכאן:") : `לא הצלחנו לשלוח התראה דרך האפליקציה${err ? " (" + esc(err) + ")" : ""}. התקשרו או שלחו הודעה מכאן:`}</p>
+      <p style="margin:0">${res ? esc(L.sosReach(res, false)) : `לא הצלחנו לשלוח התראה דרך האפליקציה${err ? " (" + esc(err) + ")" : ""}. התקשרו או שלחו הודעה מכאן:`}</p>
       ${lat != null ? `<p class="small muted mono" style="margin:0" dir="ltr">${lat.toFixed(5)}, ${lon.toFixed(5)}</p>` : ""}
       <a class="btn sosbig" href="tel:101">${PWI.phone}מד״א 101</a>
       ${c.cPhone ? `<a class="btn sosbig alt" href="${telOf(c.cPhone)}">${PWI.phone}התקשרות ל${esc(c.cName || "איש הקשר")}</a><div class="row"><a class="btn" target="_blank" rel="noopener" href="${waOf(c.cPhone, txt)}">וואטסאפ עם המיקום</a><a class="btn" href="${smsOf(c.cPhone, txt)}">SMS עם המיקום</a></div>` : `<button type="button" class="btn" id="sosSetup">הגדרת איש קשר לחירום</button>`}
@@ -2461,11 +2550,15 @@
   async function memLimit() { if (isPro()) return true; const n = (await memAll()).length; if (n < FREE_MEM) return true; openPaywall("memories"); return false; }
   async function memAddPhotos(files, fromCamera) {
     if (!files || !files.length) return; if (!(await memLimit())) return; let pos = null; if (fromCamera) try { pos = await getPosFresh(5000); } catch (e) { }
-    const list = [...files].slice(0, 20); if (list.length > 1) toast(`שומר ${list.length} תמונות…`, 8000);
-    let n = 0; for (const f of list) { try { const im = await decodeImg(f); let full, th; try { full = await toJpeg(im, 1800, 0.84); th = await toJpeg(im, 420, 0.72); } finally { try { im.close && im.close(); } catch (e) { } } const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
-      await idb.put(Object.assign({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t, kind: "photo", blob: full, thumb: th, lat: pos ? pos[1] : null, lon: pos ? pos[0] : null, note: "" }, memCtx())); n++; } catch (e) { toast(e.message); } }
+    /* several photos from the gallery at once: up to MEM_PICK_MAX per pick, a running count, and one message
+       for the ones the phone could not read (the rest are saved) */
+    const MEM_PICK_MAX = 20, room = isPro() ? MEM_PICK_MAX : Math.max(1, Math.min(MEM_PICK_MAX, FREE_MEM - (await memAll()).length)), list = [...files].slice(0, room); let bad = 0;
+    let n = 0; for (const f of list) { if (list.length > 1) toast(`שומר תמונה ${n + bad + 1} מתוך ${list.length}…`, 8000); try { const im = await decodeImg(f); let full, th; try { full = await toJpeg(im, 1800, 0.84); th = await toJpeg(im, 420, 0.72); } finally { try { im.close && im.close(); } catch (e) { } } const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
+      await idb.put(Object.assign({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t, kind: "photo", blob: full, thumb: th, lat: pos ? pos[1] : null, lon: pos ? pos[0] : null, note: "" }, memCtx())); n++; } catch (e) { bad++; } }
     memCache = null; try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
-    if (n) toast(n === 1 ? "התמונה נשמרה בזיכרונות" : `${n} תמונות נשמרו בזיכרונות`); renderMeIf();
+    const more = files.length > room ? (room < MEM_PICK_MAX ? ` · בגרסה החינמית נשמרות עד ${FREE_MEM} תמונות` : ` · נבחרו ${files.length}, נשמרות עד ${MEM_PICK_MAX} בכל פעם`) : "";
+    if (n) toast((n === 1 ? "התמונה נשמרה בזיכרונות" : `${n} תמונות נשמרו בזיכרונות`) + (bad ? ` · ${bad} לא נתמכו` : "") + more, bad || more ? 6000 : undefined);
+    else if (bad) toast(bad === 1 ? "התמונה לא נתמכת" : "התמונות לא נתמכות"); renderMeIf();
   }
   function pickPhotos(camera) { pickFile({ capture: camera, multiple: !camera }).then(fs => { if (fs.length) memAddPhotos(fs, camera); }); }
   /* voice recorder sheet, shared by memories and team reports */
@@ -2535,12 +2628,12 @@
     h += `<div class="card"><h3>גיבוי והעברה</h3><p class="small muted" style="margin:0">טלפון חדש, או מעבר מהכתובת הקודמת: הכול עובר בקוד מוצפן. גיבוי לקובץ כולל גם את הזיכרונות.</p>
       <div class="row"><button type="button" class="btn primary" id="xSend">שליחה למכשיר אחר</button><button type="button" class="btn" id="xRecv">קבלת נתונים בקוד</button></div>
       <div class="row"><button type="button" class="btn sm" id="xBackup">שמירת גיבוי לקובץ</button><button type="button" class="btn sm" id="xRestore">שחזור מקובץ</button></div></div>`;
-    h += `<div class="card"><h3>אני איש קשר של רוכב</h3><p class="small muted" style="margin:0">קיבלתם קוד הזמנה? הזינו אותו כאן כדי לקבל התראות חירום בטלפון הזה.</p><div class="row"><input id="gCode" class="btn mono" dir="ltr" maxlength="9" placeholder="XXXX-XXXX" style="flex:1;min-width:0"><button type="button" class="btn" id="gGo">הצטרפות</button></div></div>`;
+    h += `<div class="card"><h3>אני איש קשר של רוכב</h3><p class="small muted" style="margin:0">קיבלתם קוד הזמנה? הזינו אותו כאן כדי לקבל התראות חירום בטלפון הזה.</p><div class="row"><input id="gCode" class="btn mono" dir="ltr" maxlength="9" placeholder="XXXX-XXXX" aria-label="קוד הזמנה של איש קשר" style="flex:1;min-width:0"><button type="button" class="btn" id="gGo">הצטרפות</button></div></div>`;
     p.innerHTML = h; bindMe();
   }
   function bindMe() {
     const c = st.sos, val = id => $(id).value.trim();
-    $("sSave").onclick = () => { const ph = val("sCPhone"); if (ph && !IL(ph)) return toast("מספר הטלפון של איש הקשר לא תקין"); if (val("sPhone") && !IL(val("sPhone"))) return toast("מספר הטלפון שלך לא תקין"); Object.assign(c, { name: val("sName"), phone: val("sPhone"), cName: val("sCName"), cPhone: ph }); saveSos(); toast("נשמר"); renderMe(); };
+    $("sSave").onclick = () => { const ph = val("sCPhone"); if (ph && !IL(ph)) return fieldErr("sCPhone", "מספר הטלפון של איש הקשר לא תקין. לדוגמה: 050-1234567"); if (val("sPhone") && !IL(val("sPhone"))) return fieldErr("sPhone", "מספר הטלפון שלך לא תקין. לדוגמה: 050-1234567"); Object.assign(c, { name: val("sName"), phone: val("sPhone"), cName: val("sCName"), cPhone: ph }); saveSos(); toast("נשמר"); renderMe(); };
     $("sInvite").onclick = async () => { if (!val("sName")) return toast("קודם כתבו את השם שלכם"); c.name = val("sName"); saveSos(); const inv = await sosInvite(); if (!inv) return; const code = inv.slice(0, 4) + "-" + inv.slice(4), link = `${location.origin}/#guard=${inv}`;
       const text = `${c.name} רוכב אופנוע ומבקש שתהיו איש הקשר שלו לחירום ב־Blue Ronin. אם יקרה משהו בדרך, תקבלו התראה עם המיקום שלו.\nלאישור: ${link}\n(או קוד: ${code})`;
       try { if (navigator.share) { await navigator.share({ text }); toast("כשהוא יאשר, השם שלו יופיע כאן"); return; } } catch (e) { if (e.name === "AbortError") return; }
@@ -2627,21 +2720,34 @@
     const set = () => document.documentElement.style.setProperty("--hudH", Math.round(h.getBoundingClientRect().height) + "px");
     /* short screens: when the map buttons would run into the top bar, lay them out in a row instead */
     b.classList.remove("fabs-row"); set();
-    if (innerWidth < 900) { const f = [...document.querySelectorAll("#fabs .fab")].filter(x => x.offsetParent); const colH = f.reduce((a, x) => a + x.offsetHeight + 8, 0); const top = innerHeight - h.getBoundingClientRect().height - 14 - colH; if (top < 72) { b.classList.add("fabs-row"); set(); } }
+    if (innerWidth < 900) { const f = [...document.querySelectorAll("#fabs .fab")].filter(x => x.offsetParent); const colH = f.reduce((a, x) => a + x.offsetHeight + 8, 0); const top = vpH() - h.getBoundingClientRect().height - 14 - colH; if (top < 72) { b.classList.add("fabs-row"); set(); } }
   }
   document.querySelectorAll("[data-hs]").forEach(b => b.onclick = () => hudSize(b.dataset.hs));
   if ("ResizeObserver" in window) new ResizeObserver(hudMeasure).observe($("hud"));
   const onTurn = () => setTimeout(() => { try { map.resize(); } catch (e) { } hudMeasure(); foldAttrib(); if (st.ride && st.me && !st.ride.free) map.easeTo({ center: [st.me.lon, st.me.lat], duration: 400, padding: ridePad() }); }, 350);
+  addEventListener("br:viewport", () => { try { map.resize(); } catch (e) { } hudMeasure(); });
   addEventListener("orientationchange", onTurn); try { screen.orientation && screen.orientation.addEventListener("change", onTurn); } catch (e) { }
   hudSize(LS.get("hudSize", "compact"));
   $("hudCam").onclick = () => pickPhotos(true);
   $("hudPark").onclick = () => { if (!st.me) return toast("אין מיקום עדיין"); setPark({ lat: st.me.lat, lon: st.me.lon, acc: st.meAcc }); };
   $("hudLive").onclick = () => st.live ? liveShare() : liveShare();
   $("walkX").onclick = walkStop;
-  (() => { const b = $("hudSos"); let t = null; const go = () => { b.classList.remove("hold"); t = null; try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
-    b.addEventListener("pointerdown", e => { e.preventDefault(); b.classList.add("hold"); t = setTimeout(go, 1200); });
-    const cancel = () => { if (t) { clearTimeout(t); t = null; b.classList.remove("hold"); toast("החזיקו לחוץ שנייה כדי לשלוח"); } };
+  /* SOS: a long press (1.2 s) sends at once, as before. The accessible alternative (WCAG 2.5.1 / 2.1.1): a short tap,
+     Enter or Space opens a confirm sheet; only its own "send" button alerts the contacts. Focus starts on "cancel",
+     so a second accidental Enter does not send. */
+  function sosConfirm() {
+    if (st.sosOn) return sosAlert("sos");
+    openModal(`<div class="sos-sheet"><h2>לשלוח קריאת חירום?</h2><p style="margin:0">אנשי הקשר שלך יקבלו התראה עם המיקום, ושיתוף המיקום החי יופעל. במקרה חירום מתקשרים ל־101.</p>
+      <button type="button" class="btn sosbig" id="sosSend">${PWI.phone}שליחת קריאת חירום</button><button type="button" class="btn" id="sosNo" autofocus>ביטול</button></div>`, "sosm");
+    $("sosSend").onclick = () => { closeModal(); try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
+    $("sosNo").onclick = closeModal;
+  }
+  (() => { const b = $("hudSos"); let t = null, fired = false; const go = () => { b.classList.remove("hold"); t = null; fired = true; try { navigator.vibrate && navigator.vibrate(200); } catch (e) { } sosAlert("sos"); };
+    b.addEventListener("pointerdown", e => { e.preventDefault(); fired = false; b.classList.add("hold"); t = setTimeout(go, 1200); });
+    const cancel = () => { if (t) { clearTimeout(t); t = null; b.classList.remove("hold"); } };
     b.addEventListener("pointerup", cancel); b.addEventListener("pointerleave", cancel); b.addEventListener("pointercancel", cancel);
+    /* click comes after pointerup (tap) or from the keyboard; after a completed long press it is swallowed */
+    b.addEventListener("click", e => { e.preventDefault(); if (fired) { fired = false; return; } sosConfirm(); });
     b.addEventListener("contextmenu", e => e.preventDefault()); })();
   setInterval(() => { const on = !!st.live; $("hudLive").classList.toggle("on", on); }, 2000);
 
@@ -2749,7 +2855,9 @@
       i.addEventListener("change", () => fin([...(i.files || [])]));
       i.addEventListener("cancel", () => fin([]));
       /* no 'cancel' event on older iOS: when the page regains focus and nothing came back within a while, give up */
-      const onFocus = () => setTimeout(() => { if (!done && !(i.files && i.files.length)) fin([]); }, 4000);
+      /* browsers with the 'cancel' event tell us themselves; give a big multi-photo pick time (iOS converts every photo) */
+      const wait = "oncancel" in i ? 60000 : multiple ? 15000 : 4000;
+      const onFocus = () => setTimeout(() => { if (!done && !(i.files && i.files.length)) fin([]); }, wait);
       setTimeout(() => window.addEventListener("focus", onFocus, { once: true }), 300);
       i.click();
     });
@@ -2799,17 +2907,24 @@
     const ride = { id: "demo", demo: true, chap: cid, title: "הדגמה · " + (c ? c.title : "רכיבה"), start: trk[0][2], end: trk[trk.length - 1][2], km: +km.toFixed(1), moving: Math.round(moving), vmax: Math.round(vmax), fuel: +(km * bikeEff().cons / 100).toFixed(1), bike: bikeEff().name, trk };
     return ride;
   }
+  /* One lifecycle for every replay: stop whatever flies (another ride, the demo, the chapter fly-through),
+     show this ride alone on the map (its line in orange, the bike on it), then fly. A newer tap wins over an
+     older one still loading its photos, so any ride opens after any other, from any state. */
+  let replaySeq = 0;
   async function replayRide(ride) {
     if (!ride || !ride.trk) return; const rc = rideCoords(ride); if (!rc) return toast("הרכיבה קצרה מדי לשחזור");
     closeModal(); if (st.ride) return toast("אפשר לצפות בשחזור בסוף הרכיבה");
-    const cum = L.cumulative(rc.coords), mems = (await memAll()).filter(m => m.lat != null && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4);
+    const seq = ++replaySeq; stopFly();
+    const cum = L.cumulative(rc.coords), mems = (await memAll().catch(() => [])).filter(m => m.lat != null && m.t >= ride.start - 6e4 && m.t <= ride.end + 6e4);
+    if (seq !== replaySeq || st.ride) return;
+    st.rideShown = ride; pushSources(); rideFocus(true, ride);
     const pops = mems.map(m => { let bi = 0, bd = 1e9; for (let i = 0; i < rc.coords.length; i += 1) { const d = L.hav(rc.coords[i], [m.lon, m.lat]); if (d < bd) { bd = d; bi = i; } } return bd < 0.4 ? { km: cum[bi], m } : null; }).filter(Boolean).sort((a, b) => a.km - b.km);
     startFly({ coords: rc.coords, title: ride.title, replay: { ride, cum, times: rc.times, pops, next: 0 } });
   }
   function replayClock(F) { const R = F.replay, km = F.km * R.scale; let lo = 0, hi = R.cum.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (R.cum[mid] < km) lo = mid; else hi = mid; } const f = R.cum[hi] > R.cum[lo] ? (km - R.cum[lo]) / (R.cum[hi] - R.cum[lo]) : 0; return R.times[lo] + (R.times[hi] - R.times[lo]) * Math.max(0, Math.min(1, f)); }
   function replayPop(F) {
     const R = F.replay; if (!R || R.next >= R.pops.length) return; const p = R.pops[R.next]; if (F.km * R.scale < p.km) return; R.next++;
-    const el = $("rpPop"); el.innerHTML = `<img src="${blobUrl(p.m.id + "t", p.m.thumb)}" alt=""><span>${esc(p.m.note || fmtT(new Date(p.m.t)))}</span>`; el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+    const el = $("rpPop"); el.innerHTML = `<img src="${blobUrl(p.m.id + "t", p.m.thumb)}" alt=""><span>${esc(p.m.note || fmtT(new Date(p.m.t)))}</span>`; el.setAttribute("aria-label", "זיכרון מהרכיבה: " + (p.m.note || fmtT(new Date(p.m.t)))); el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
     el.onclick = () => memViewer(p.m.id);
     if (F.playing) { F.playing = false; flyUI(); clearTimeout(R.resume); R.resume = setTimeout(() => { if (st.fly === F && !F.hold) { F.playing = true; flyUI(); } }, 2600); }
     clearTimeout(R.hide); R.hide = setTimeout(() => { el.classList.remove("in"); setTimeout(() => el.hidden = true, 300); }, 3200);
@@ -2938,14 +3053,41 @@
   if (st.group) setTimeout(gStart, 2000);
 
   function setTab(t) {
-    st.tab = t; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.t === t)));
+    st.tab = t; document.querySelectorAll(".tab").forEach(b => { const on = b.dataset.t === t; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
     ["go", "brief", "route", "stops", "me", "tools"].forEach(k => $("p-" + k).hidden = k !== t); $("panes").scrollTop = 0;
     if (innerWidth < 900 && st.sheet === "peek") setSheet("half");
     renderTab();
   }
   const renderTab = () => ({ go: renderGo, brief: renderBrief, route: renderRoute, stops: renderStops, me: renderMe, tools: renderTools })[st.tab]();
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.t));
-  function setChap(id) { stopFly(); st.chap = id; st.rideShown = null; rideFocus(false); if (id !== DRAFT && id !== NAV) LS.set("chap", id); pushSources(); renderMarkers(); renderTab(); fitChapter(); if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); }
+  /* keyboard: the tab pattern. In RTL the next tab is to the left. Moving selects (automatic activation). */
+  document.querySelector(".tabs").addEventListener("keydown", e => {
+    const tabs = [...document.querySelectorAll(".tab")], i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const next = { ArrowLeft: rtl ? 1 : -1, ArrowRight: rtl ? -1 : 1 }[e.key];
+    const j = next ? (i + next + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+    if (j < 0) return; e.preventDefault(); setTab(tabs[j].dataset.t); tabs[j].focus();
+  });
+  function setChap(id) { stopFly(); st.rideShown = null; rideFocus(false); setCurrentRoute(id); pushSources(); renderMarkers(); renderTab(); fitChapter(); }
+  /* every consumer of the current route that is not redrawn with the tab follows it here */
+  /* The weekend push brief follows the current route: a built-in chapter sends its id; a custom route, a draft or
+     a nav trip sends "" = the best chapter this weekend (decision B). Only the id goes to the server, never the
+     route. Debounced, and only when it changed. */
+  function pushChap() { const id = st.chap; const i = CHAPTERS.findIndex(c => c.id === id); return i >= 0 && i < BUILT_IN && !CHAPTERS[i].custom ? id : ""; }
+  addEventListener("br:route", () => {
+    clearTimeout(pushChap.t); pushChap.t = setTimeout(async () => {
+      try {
+        const id = pushChap(); if (id === LS.get("pushChap", "") || !("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+        const reg = await navigator.serviceWorker.ready, sub = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (!sub) return;
+        const r = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ setChap: true, endpoint: sub.endpoint, chap: id }) });
+        if (r.ok) LS.set("pushChap", id);
+      } catch (e) { }
+    }, 4000);
+  });
+  addEventListener("br:route", () => {
+    try { if (wxSig() !== (st.wx && st.wx.sig)) loadWeather(); } catch (e) { }
+    try { if (st.tab === "brief") renderBrief(); } catch (e) { }
+  });
   const renderAll = () => { renderTab(); renderMarkers(); };
 
   /* ---------- layers popover ---------- */
@@ -2953,6 +3095,8 @@
   function closeLayers() { const p = $("layersPop"); if (p && !p.hidden) { p.hidden = true; $("fLayers").setAttribute("aria-pressed", "false"); } }
   $("fLayers").onclick = () => { const p = $("layersPop"); const open = p.hidden; if (open && innerWidth < 900 && st.sheet !== "peek") setSheet("peek"); p.hidden = !open; $("fLayers").setAttribute("aria-pressed", String(open)); };
   $("layersClose").onclick = closeLayers;
+  /* Escape closes the panel and gives focus back to its button (an open dialog takes Escape first) */
+  addEventListener("keydown", e => { if (e.key !== "Escape" || !$("modal").hidden) return; const p = $("layersPop"); if (p && !p.hidden) { closeLayers(); $("fLayers").focus(); } });
   map.on("click", () => { if (innerWidth < 900) closeLayers(); });
   document.querySelectorAll("#layersPop input").forEach(i => i.onchange = () => {
     st.layers[i.dataset.l] = i.checked; LS.set("layers", Object.assign({}, st.layers, { radar: false }));

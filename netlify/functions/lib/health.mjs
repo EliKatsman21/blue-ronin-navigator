@@ -6,9 +6,13 @@
 import { getStore } from "@netlify/blobs";
 import { opsStore, opsLog, usage } from "./ops.mjs";
 import { sendOne } from "./push.mjs";
+import { subsCap } from "./push-core.mjs";
+import { briefWatch } from "./brief-job.mjs";
+import { sweepFeedback, mediaUse } from "./feedback-core.mjs";
 
 const errStore = () => getStore({ name: "brn-err", consistency: "strong" });
 const subsStore = () => getStore({ name: "brn-subs", consistency: "strong" });
+const fbStores = () => ({ fb: getStore({ name: "brn-feedback", consistency: "strong" }), media: getStore({ name: "brn-fb-media", consistency: "strong" }) });
 const BASE = () => Netlify.env.get("URL") || "https://blueronin.app";
 const MIN = 6e4, HOUR = 36e5;
 
@@ -21,14 +25,16 @@ export const PLAYBOOK = {
   wx: ["מזג אוויר", "high", "שרת התחזית שלנו לא מחזיר נתונים. המטמון בטלפונים מגן כמה שעות. אם נמשך: לבדוק מכסת Open-Meteo."],
   osm: ["שכבות OSM", "normal", "השכבות (דלק, מצפורים, קפה) ישנות. הסורק כבר הפעיל רענון. אם נמשך יומיים: Overpass עמוס."],
   tiles: ["מפות OpenFreeMap", "critical", "שרת המפות לא עונה: המפה ריקה למי שאין לו מטמון. אם נמשך מעל שעה, לשקול סגנון גיבוי."],
-  libs: ["ספריות CDN", "critical", "MapLibre או SunCalc לא נטענים מה־CDN. האפליקציה לא תעלה למי שאין לו מטמון."],
+  libs: ["ספריות המפה", "critical", "MapLibre או SunCalc לא נטענים מהאתר (site/vendor). כנראה פריסה שבורה: Rollback ב־Netlify."],
   osrm: ["ניתוב OSRM", "normal", "שרת הניתוב לא עונה: בניית מסלול וניווט מחדש בזמן רכיבה נפגעים. המסלולים המובנים שמורים."],
   geo: ["חיפוש כתובות (HERE)", "normal", "מכסת החיפושים החודשית מתקרבת לסוף. מעבר לה האפליקציה עוברת לחיפוש החלופי (פחות מדויק במספרי בתים). אפשר להעלות HERE_GEO_CAP אם יש יתרה."],
   traffic: ["תנועה (HERE)", "normal", "מכסת HERE החודשית מתקרבת לסוף. אפשר להעלות את HERE_MONTHLY_CAP אם יש יתרה בחשבון."],
   field: ["תקלות מהשטח", "high", "קפיצה בתקלות מהטלפונים. לפתוח את ״בעיות מובילות״ ולבדוק איזו גרסה ואיזה מכשיר."],
   boot: ["פתיחת האפליקציה", "critical", "טלפונים לא מצליחים לפתוח את האפליקציה. לבדוק את התקלות האחרונות ולשקול Rollback."],
   ops: ["יומן השרת", "high", "שגיאות בפונקציות השרת. הפירוט ביומן למטה."],
-  push: ["התראות", "normal", "אין מפתחות VAPID או שאין אף מנוי. התראות לא יגיעו."]
+  fbmedia: ["תמונות משוב", "normal", "תמונות והקלטות המשוב של היום הגיעו ל־80% מהמכסה היומית. מעבר למכסה דיווחים מתקבלים בלי תמונות. אם זה רוכבים אמיתיים, אפשר להעלות את FB_MEDIA_DAILY_MB; אם זו הצפה, לבדוק את התיבה ולשקול חסימה ב־Cloudflare."],
+  brief: ["תדריך סופ״ש", "high", "התדריך הועבר לשליחה אבל לא נרשמה שליחה תוך 20 דקות: פונקציית הרקע (brief-send-background) כנראה לא רצה. לבדוק את הלוגים שלה ב־Netlify. רוכבים לא קיבלו את התדריך השבוע."],
+  push: ["התראות", "normal", "מספר המנויים להתראות הגיע ל־90% מהתקרה (PUSH_SUBS_CAP, ברירת מחדל 20000). מעבר לתקרה הרשמות חדשות נדחות. אם אלה רוכבים אמיתיים, אפשר להעלות את PUSH_SUBS_CAP; אם זו הצפה, לבדוק ולשקול חסימה ב־Cloudflare."]
 };
 
 async function probe(url, opts = {}) {
@@ -50,7 +56,7 @@ export async function runScan({ manual = false } = {}) {
     probe(base + "/", { text: true }), probe(base + "/app.js", { text: true }), probe(base + "/api/content", { json: true }),
     probe(base + "/api/wx?p=32.65,35.10", { json: true, timeout: 14000 }), probe(base + "/api/osm?v=4", { json: true, timeout: 14000 }),
     probe("https://tiles.openfreemap.org/styles/liberty", { text: true }),
-    probe("https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js", { method: "HEAD" }), probe("https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js", { method: "HEAD" }),
+    probe(base + "/vendor/maplibre-gl/4.7.1/maplibre-gl.js", { method: "HEAD" }), probe(base + "/vendor/suncalc/1.9.0/suncalc.js", { method: "HEAD" }),
     probe("https://router.project-osrm.org/route/v1/driving/35.105,32.651;35.12,32.66?overview=false", { json: true })
   ]);
   add("site", site.ok && /app\.js/.test(site.body), site.ok ? `${site.status} · ${site.ms} מ״ש` : site.err || "HTTP " + site.status, site.ms);
@@ -87,14 +93,21 @@ export async function runScan({ manual = false } = {}) {
   const own = logs.filter(l => l.service !== "monitor"); /* the monitor's own alerts must not feed back into this check */
   const bad = own.filter(l => l.level === "error" || l.level === "critical"), crit = own.filter(l => l.level === "critical");
   add("ops", !bad.length, bad.length ? `${bad.length} שגיאות: ${[...new Set(bad.map(l => l.service))].join(", ")} · ${bad[bad.length - 1].msg}` : "אין שגיאות", null, crit.length ? "critical" : null);
+  /* feedback media: today's use against the daily budget (one list). The sweep runs after the record is saved. */
+  try { const sw = await mediaUse({ media: fbStores().media, now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB") });
+    const mb = n => (n / 1048576).toFixed(1); add("fbmedia", sw.pct < 0.8, `${mb(sw.used)} מתוך ${mb(sw.cap)} MB היום (${Math.round(sw.pct * 100)}%)`, null, sw.pct >= 1 ? "high" : "normal"); } catch (e) { }
   let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
-  add("push", true, `${subs} מנויים להתראות`);
+  { const cap = subsCap(Netlify.env.get("PUSH_SUBS_CAP")), pct = subs / cap; /* N2: alert at 90% of the cap on subscriptions */
+    add("push", pct < 0.9, `${subs} מנויים להתראות מתוך תקרה של ${cap} (${Math.round(pct * 100)}%)`, null, pct >= 1 ? "high" : "normal"); }
 
-  /* incidents: open after two failing scans in a row (one, for critical), close on recovery */
+  /* R1: a weekend brief that was queued but never recorded as sent within 20 minutes */
+  try { const bw = briefWatch(await ops.get("brief", { type: "json" }), now); add("brief", bw.ok, bw.detail); } catch (e) { }
+
+  /* incidents: open after two failing scans in a row (one, for critical or a missed brief: it will not fix itself), close on recovery */
   const alerts = [];
   for (const c of checks) {
     const f = c.ok ? 0 : (state.fails[c.id] || 0) + 1; state.fails[c.id] = f; const open = state.open[c.id];
-    if (!c.ok && !open && (f >= 2 || c.level === "critical")) { state.open[c.id] = { id: c.id, title: c.name, level: c.level, since: now, last: now, detail: c.detail, hint: PLAYBOOK[c.id][2], n: 1 }; alerts.push({ kind: "open", c }); }
+    if (!c.ok && !open && (f >= 2 || c.level === "critical" || c.id === "brief")) { state.open[c.id] = { id: c.id, title: c.name, level: c.level, since: now, last: now, detail: c.detail, hint: PLAYBOOK[c.id][2], n: 1 }; alerts.push({ kind: "open", c }); }
     else if (!c.ok && open) { open.last = now; open.n++; open.detail = c.detail; if (c.level === "critical" && open.level !== "critical") { open.level = "critical"; alerts.push({ kind: "open", c }); } }
     else if (c.ok && open) { const dur = Math.round((now - open.since) / MIN); delete state.open[c.id]; alerts.push({ kind: "close", c, dur }); const hist = (await ops.get("incidents", { type: "json" }).catch(() => null)) || []; hist.unshift(Object.assign({}, open, { closed: now })); await ops.setJSON("incidents", hist.slice(0, 60)); }
   }
@@ -114,6 +127,10 @@ export async function runScan({ manual = false } = {}) {
     for (const k of keys.filter(k => k.startsWith("u:") && !k.includes(":" + m0 + ":") && !k.includes(":" + m1 + ":")).slice(0, 500)) await ops.delete(k);
     if (all.length > 320) for (const k of all.slice(0, all.length - 300)) await errStore().delete(k);
   } catch (e) { }
+  /* N1: the feedback sweep runs last, after the record and the state are saved, in batches with a time budget
+     (a flood of rate markers can never cost the scan its result; what is left waits for the next scan) */
+  try { const sw = await sweepFeedback({ ...fbStores(), now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB"), budgetMs: manual ? 3000 : 8000 });
+    if (sw.orphans || sw.more) await opsLog("monitor", "info", `ניקוי משוב: ${sw.orphans} קובצי מדיה בלי דיווח, ${sw.markers} סימונים${sw.more ? " · נשאר עוד, ימשיך בסריקה הבאה" : ""}`, sw); } catch (e) { }
   return rec;
 }
 
@@ -126,8 +143,11 @@ export async function notifyAdmins(alerts) {
   const body = opens.length ? opens.map(a => `${a.c.detail}. ${PLAYBOOK[a.c.id][2]}`).join("\n").slice(0, 300) : closes.map(a => `${a.c.name} תקין שוב אחרי ${a.dur} דק׳`).join("\n");
   let sent = 0;
   for (const b of list) { const rec = await ops.get(b.key, { type: "json" }).catch(() => null); if (!rec) continue;
-    const ok = await sendOne({ sub: rec.sub }, { title, body, tag: "ops-" + (opens[0] ? opens[0].c.id : "ok"), url: "/admin#monitor", sos: crit }, { urgency: crit ? "high" : "normal", ttl: 6 * 3600 }).catch(() => false);
-    if (ok) { sent++; if (rec.fails) { rec.fails = 0; await ops.setJSON(b.key, rec); } } else { rec.fails = (rec.fails || 0) + 1; if (rec.fails >= 5) await ops.delete(b.key).catch(() => { }); else await ops.setJSON(b.key, rec); } }
+    const r = await sendOne({ sub: rec.sub }, { title, body, tag: "ops-" + (opens[0] ? opens[0].c.id : "ok"), url: "/admin#monitor", sos: crit }, { urgency: crit ? "high" : "normal", ttl: 6 * 3600 }).catch(() => "fail");
+    /* H1: an admin device is removed only when the push service says it is gone (404/410), never on a failure */
+    if (r === "ok") { sent++; if (rec.fails) { rec.fails = 0; await ops.setJSON(b.key, rec); } }
+    else if (r === "gone") await ops.delete(b.key).catch(() => { });
+    else { rec.fails = (rec.fails || 0) + 1; await ops.setJSON(b.key, rec).catch(() => { }); } }
   await opsLog("monitor", opens.length ? (crit ? "critical" : "warn") : "info", `${opens.length ? "נפתחה תקלה" : "תקלה נסגרה"}: ${(opens.length ? opens : closes).map(a => a.c.name).join(", ")} · נשלח ל־${sent} מכשירי מנהל`);
   return sent;
 }

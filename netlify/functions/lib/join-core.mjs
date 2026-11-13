@@ -1,7 +1,7 @@
 /* Waitlist rules with no dependencies, so the unit tests can import them directly. */
 import { randomInt } from "node:crypto";
 export const NEED = 3; // friends for a month of Pro
-export const SRCS = ["ig", "yt", "wa", "tt", "fb", "app", "qr", "press", "friend", "site"];
+export const SRCS = ["ig", "yt", "wa", "wa-brief", "tt", "fb", "app", "qr", "press", "friend", "site"];
 export const cleanSrc = s => SRCS.includes(s) ? s : "site";
 /* lower-cased, trimmed, plain address or null */
 export function cleanEmail(x) {

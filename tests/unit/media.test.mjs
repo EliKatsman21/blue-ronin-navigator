@@ -56,3 +56,20 @@ test("L3: stored media is served with fixed, safe headers", () => {
   const { readFileSync } = require("node:fs");
   assert.match(readFileSync(join(ROOT, "netlify", "functions", "admin.mjs"), "utf8"), /new Response\(r\.data, \{ headers: mediaHeaders\(r\.metadata && r\.metadata\.ct\) \}\)/);
 });
+test("L6: the server drops EXIF/XMP (APP1) and IPTC (APP13) from JPEG photos", () => {
+  const seg = (mk, payload) => { const p = Buffer.from(payload, "latin1"); return Buffer.concat([Buffer.from([0xff, mk, (p.length + 2) >> 8, (p.length + 2) & 255]), p]); };
+  const exifJpeg = Buffer.concat([Buffer.from([0xff, 0xd8]), seg(0xe0, "JFIF\0\x01\x01"), seg(0xe1, "Exif\0\0GPS 32.1N 34.8E serial 1234"), seg(0xed, "Photoshop 3.0\0IPTC"), seg(0xdb, "quant"), Buffer.from([0xff, 0xda, 0, 4, 1, 2]), Buffer.from("scan-data"), Buffer.from([0xff, 0xd9])]);
+  const clean = M.stripJpegMeta(exifJpeg);
+  const txt = clean.toString("latin1");
+  assert.ok(!txt.includes("Exif") && !txt.includes("GPS") && !txt.includes("Photoshop"), "metadata gone");
+  assert.ok(txt.includes("JFIF") && txt.includes("quant") && txt.includes("scan-data"), "the image itself is kept");
+  assert.equal(clean[0], 0xff); assert.equal(clean[1], 0xd8);
+  // through the request path: what is stored has no EXIF
+  const r = M.collectMedia({ photos: ["data:image/jpeg;base64," + exifJpeg.toString("base64")] });
+  assert.equal(r.error, undefined); assert.ok(!r.items[0].buf.toString("latin1").includes("Exif"));
+  // a broken JPEG that still carries EXIF is refused; a clean phone JPEG passes unchanged
+  const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0x00, 0x11]), Buffer.from("Exif\0\0GPS")]);
+  assert.ok(M.collectMedia({ photos: [broken.toString("base64")] }).error);
+  const phone = Buffer.concat([Buffer.from([0xff, 0xd8]), seg(0xe0, "JFIF\0"), Buffer.from([0xff, 0xda, 0, 2]), Buffer.from("px"), Buffer.from([0xff, 0xd9])]);
+  assert.deepEqual(M.stripJpegMeta(phone), phone);
+});

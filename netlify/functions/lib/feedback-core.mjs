@@ -13,6 +13,9 @@ const HOUR = 36e5;
 const clean = (x, n) => String(x ?? "").replace(/[\u0000-\u0008\u000B-\u001F\u007F‪-‮⁦-⁩]/g, "").trim().slice(0, n);
 const json = (o, status = 200) => Response.json(o, { status });
 
+/* L2: only a JSON object is a report (null, a number, a string or an array is a 400, not a crash) */
+export const validBody = b => !!b && typeof b === "object" && !Array.isArray(b);
+
 export async function listKeys(store, prefix) { const { blobs } = await store.list({ prefix }); return blobs.map(b => b.key); }
 
 /* deps: { fb, media, ipHash(req) -> string, now() -> ms } */
@@ -26,6 +29,7 @@ export function makeFeedback(deps) {
     if (inbox.filter(x => x.ip === ip && now - x.t < HOUR).length >= RATE_MAX) return json({ error: "יותר מדי דיווחים בשעה האחרונה" }, 429);
     /* 2. body */
     let b; try { const t = await req.text(); if (t.length > BODY_MAX) return new Response("too large", { status: 413 }); b = JSON.parse(t); } catch (e) { return new Response("bad json", { status: 400 }); }
+    if (!validBody(b)) return new Response("bad body", { status: 400 });
     const m = collectMedia(b); if (m.error) return json({ error: m.error }, 400);
     const kind = KINDS.includes(b.kind) ? b.kind : "other", text = clean(b.text, 1000);
     if (text.length < 3) return json({ error: "קצר מדי" }, 400);

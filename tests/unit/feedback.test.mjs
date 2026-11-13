@@ -1,7 +1,7 @@
 // /api/feedback hardening (security review 2026-11-13): the handler runs against an in-memory Blobs store.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeFeedback, RATE_MAX } from "../../netlify/functions/lib/feedback-core.mjs";
+import { makeFeedback, RATE_MAX, validBody } from "../../netlify/functions/lib/feedback-core.mjs";
 
 /* the parts of a Netlify Blobs store the feedback code uses; reads and writes yield to the event loop like I/O */
 export function fakeStore() {
@@ -42,4 +42,9 @@ test("feedback still works: text, kind, location in Israel, photos stored under 
   assert.equal(inbox[0].kind, "a11y"); assert.deepEqual(inbox[0].media, ["p", "p1"]); assert.equal(inbox[0].lat, 32.1);
   assert.ok(media.m.has(inbox[0].id + "-p") && media.m.has(inbox[0].id + "-p1"));
   assert.equal((await h(req({ kind: "bug", text: "x" }))).status, 400, "too short");
+});
+
+test("L2: a body that is not a JSON object is a 400, never a crash", async () => {
+  for (const body of ["null", "1", "\"text\"", "[]", "true"]) { const { h } = setup(); const r = await h(req(body)); assert.equal(r.status, 400, body); }
+  assert.ok(validBody({}) && !validBody(null) && !validBody([]) && !validBody("x"));
 });

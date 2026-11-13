@@ -21,7 +21,7 @@ export const PLAYBOOK = {
   wx: ["מזג אוויר", "high", "שרת התחזית שלנו לא מחזיר נתונים. המטמון בטלפונים מגן כמה שעות. אם נמשך: לבדוק מכסת Open-Meteo."],
   osm: ["שכבות OSM", "normal", "השכבות (דלק, מצפורים, קפה) ישנות. הסורק כבר הפעיל רענון. אם נמשך יומיים: Overpass עמוס."],
   tiles: ["מפות OpenFreeMap", "critical", "שרת המפות לא עונה: המפה ריקה למי שאין לו מטמון. אם נמשך מעל שעה, לשקול סגנון גיבוי."],
-  libs: ["ספריות CDN", "critical", "MapLibre או SunCalc לא נטענים מה־CDN. האפליקציה לא תעלה למי שאין לו מטמון."],
+  libs: ["ספריות המפה", "critical", "MapLibre או SunCalc לא נטענים מהאתר (site/vendor). כנראה פריסה שבורה: Rollback ב־Netlify."],
   osrm: ["ניתוב OSRM", "normal", "שרת הניתוב לא עונה: בניית מסלול וניווט מחדש בזמן רכיבה נפגעים. המסלולים המובנים שמורים."],
   geo: ["חיפוש כתובות (HERE)", "normal", "מכסת החיפושים החודשית מתקרבת לסוף. מעבר לה האפליקציה עוברת לחיפוש החלופי (פחות מדויק במספרי בתים). אפשר להעלות HERE_GEO_CAP אם יש יתרה."],
   traffic: ["תנועה (HERE)", "normal", "מכסת HERE החודשית מתקרבת לסוף. אפשר להעלות את HERE_MONTHLY_CAP אם יש יתרה בחשבון."],
@@ -50,7 +50,7 @@ export async function runScan({ manual = false } = {}) {
     probe(base + "/", { text: true }), probe(base + "/app.js", { text: true }), probe(base + "/api/content", { json: true }),
     probe(base + "/api/wx?p=32.65,35.10", { json: true, timeout: 14000 }), probe(base + "/api/osm?v=4", { json: true, timeout: 14000 }),
     probe("https://tiles.openfreemap.org/styles/liberty", { text: true }),
-    probe("https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js", { method: "HEAD" }), probe("https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js", { method: "HEAD" }),
+    probe(base + "/vendor/maplibre-gl/4.7.1/maplibre-gl.js", { method: "HEAD" }), probe(base + "/vendor/suncalc/1.9.0/suncalc.js", { method: "HEAD" }),
     probe("https://router.project-osrm.org/route/v1/driving/35.105,32.651;35.12,32.66?overview=false", { json: true })
   ]);
   add("site", site.ok && /app\.js/.test(site.body), site.ok ? `${site.status} · ${site.ms} מ״ש` : site.err || "HTTP " + site.status, site.ms);

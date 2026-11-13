@@ -93,6 +93,8 @@
   function renderNav() {
     const n = S.stats ? S.stats.feedbackNew : 0;
     $("nav").innerHTML = VIEWS.map(([k, t, ic]) => `<button type="button" data-v="${k}" ${k === S.view ? 'aria-current="page"' : ""}>${ic}<span class="t">${t}</span>${k === "inbox" && n ? `<span class="badge">${n}</span>` : ""}</button>`).join("");
+    /* on a phone the nav scrolls sideways: keep the current section in view */
+    { const cur = $("nav").querySelector('[aria-current="page"]'); if (cur && innerWidth <= 860) requestAnimationFrame(() => { try { const nav = $("nav"), r = cur.getBoundingClientRect(), nr = nav.getBoundingClientRect(); nav.scrollLeft += (r.left + r.width / 2) - (nr.left + nr.width / 2); } catch (e) { } }); }
     $("nav").querySelectorAll("[data-v]").forEach(b => b.onclick = () => show(b.dataset.v));
     $("whoTxt").textContent = S.stats && S.stats.lastLogin ? "מנהל · " + fmt(S.stats.lastLogin) : "מנהל";
   }

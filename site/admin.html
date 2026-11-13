@@ -141,6 +141,35 @@ input.code{font-family:var(--mono);font-size:24px;letter-spacing:.35em;text-alig
 .grp pre{white-space:pre-wrap;margin:6px 0 0;max-height:220px;overflow:auto}
 tr.lv-error td,tr.lv-critical td{color:var(--no)}tr.lv-warn td .tag{color:var(--caution)}
 @media (max-width:700px){.chk summary{grid-template-columns:12px minmax(0,1fr) 46px}.chk .cdet,.chk .ubar{display:none}}
+
+/* Phone (Eli runs the console from his phone). Desktop is unchanged. Touch-size controls; the bottom nav
+   scrolls sideways instead of squeezing ten labels into 360px; wide tables scroll inside their own box;
+   the monitor keeps its uptime bars on a second line; nothing makes the page scroll sideways. */
+@media (max-width:860px){
+  .btn,.btn.sm{min-height:44px}
+  .btn.sm{padding:6px 12px}
+  nav.side{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none}
+  nav.side::-webkit-scrollbar{display:none}
+  nav.side button{flex:0 0 auto;min-width:62px;min-height:52px;padding:6px 8px;scroll-snap-align:center}
+  .wrap{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+  .save .in{flex-wrap:wrap}
+}
+@media (max-width:700px){
+  .wrap{padding-top:12px}
+  .card{padding:12px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kpi .v{font-size:32px}
+  .tbl{display:block;overflow-x:auto;max-width:100%}
+  .tbl td .btn{white-space:nowrap}
+  .chk summary{grid-template-columns:12px minmax(0,1fr) 46px;row-gap:4px}
+  .chk .ubar{display:flex;grid-column:2/-1;grid-row:2;width:100%}
+  .item .meta{row-gap:4px}
+  .item,.chk,.grp,.inc{overflow-wrap:anywhere}
+  .grp summary,.item summary{overflow-wrap:anywhere}
+  #hzMap{height:240px}
+  .gate .card{padding:16px}
+  .top .btn.sm{min-height:44px}
+}
 </style>
 </head>
 <body>

@@ -107,3 +107,12 @@ test("landing pages: no inline scripts (CSP) and their files exist", () => {
     for (const m of html.matchAll(/(?:src|href)="((?!https?:|\.\/|#)[^"?]+\.(?:js|png|jpg|html))"/g)) assert.ok(existsSync(join(SITE, m[1])), `${f} links missing ${m[1]}`);
   }
 });
+
+test("accessibility statement: no personal name and no draft note in the published page (Eli, 2026-11-13)", () => {
+  const html = readFileSync(join(SITE, "accessibility.html"), "utf8");
+  assert.doesNotMatch(html, /כצמן|Katsman/);
+  assert.doesNotMatch(html, /Draft for legal review|טיוטה/);
+  assert.match(html, /<li>פניות בנושא נגישות<\/li>/);
+  assert.match(html, /mailto:hello@blueronin\.app/);
+  assert.match(html, /מפעיל השירות: Blue Ronin\./);
+});

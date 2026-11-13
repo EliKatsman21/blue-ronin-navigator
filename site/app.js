@@ -1859,7 +1859,7 @@
     <div class="card"><h3>תזכורת תדריך שבתית</h3><p class="small muted" style="margin:0">אירוע חוזר ביומן בכל שישי ב־20:00 עם קישור לתדריך. עובד ביומן גוגל, אאוטלוק ואייפון.</p><div class="row"><button type="button" class="btn" id="icsGo">הוספה ליומן</button></div></div>
     <div class="card"><h3>שיתוף ודיווח לחבר׳ה</h3><div class="row"><button type="button" class="btn" id="shareGo">שיתוף האפליקציה</button><a class="btn" target="_blank" rel="noopener" href="${LIVE_BOARD}">לוח הדיווחים החי</a></div>
       <label for="repType" class="small muted">דיווח מהיר מהמיקום שלך לוואטסאפ</label><div class="row"><select id="repType" class="btn"><option>ניידת / ממל״ז</option><option>מצלמה ניידת / לייזר</option><option>חצץ או שמן על הכביש</option><option>עבודות / חסימה</option><option>כביש סגור</option><option>נקודת עצירה מומלצת</option></select><button type="button" class="btn primary" id="repGo">שליחה</button><button type="button" class="btn" id="repPhoto">${PWI.cam}עם תמונה</button></div></div>
-    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונה</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
+    ${st.flags.feedback ? `<div class="card"><h3>משוב לצוות</h3><p class="small muted" style="margin:0">תקלה, רעיון, מידע שגוי או מפגע בדרך. מגיע ישירות לצוות ולא מוצג לאחרים עד שנבדק.</p><div class="row"><select id="fbKind" class="btn"><option value="bug">תקלה</option><option value="idea">רעיון</option><option value="data">מידע שגוי</option><option value="hazard">מפגע בדרך (עם מיקום)</option></select></div><textarea id="fbText" class="fbtext" maxlength="1000" rows="3" placeholder="מה קרה, איפה, ומה ציפיתם שיקרה"></textarea><div class="fbmedia"><button type="button" class="btn sm" id="fbPhoto">${PWI.cam}תמונות</button><button type="button" class="btn sm" id="fbVoice">${PWI.mic}הקלטה</button><span id="fbAtt" class="fbmedia"></span></div><div class="row"><button type="button" class="btn primary" id="fbGo">שליחה</button></div><div id="fbRes" aria-live="polite"></div></div>` : ""}
     <div class="card" id="pushCard"><h3>התראות לטלפון</h3><p class="small muted" style="margin:0">טוען…</p></div>
     <div class="card"><h3>תצוגה ונתונים</h3><div class="row"><label for="themeSel" class="small muted">ערכת צבע</label><select id="themeSel" class="btn"><option value="system">לפי המכשיר</option><option value="dark">לילה</option><option value="light">יום</option></select></div><label class="toggle small"><input type="checkbox" id="introSnd" ${LS.get("introSound", true) ? "checked" : ""}> צליל הנעה בפתיחת האפליקציה</label><div class="row"><button type="button" class="btn" id="refAll">רענון כל הנתונים</button></div><p class="small muted" style="margin:0">מזג אוויר: ${st.wx ? ago(st.wx.ts) : "—"} · OSM: ${st.osm ? ago(st.osm.ts) : "—"} · מסלולים: OSRM, נשמרים במכשיר</p></div>
     <div class="card"><h3>נשארים בקשר</h3><p class="small muted" style="margin:0">תדריך סופ״ש כל חמישי בוואטסאפ, סרטוני מסלולים, ורשימת ההמתנה להשקה בחנויות.</p><div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://whatsapp.com/channel/0029VbDmkfmBVJl8sVPC2f0m">ערוץ התדריך בוואטסאפ</a><a class="btn" href="join?src=app">רשימת ההמתנה</a><a class="btn" target="_blank" rel="noopener" href="https://www.instagram.com/blueroninapp/">אינסטגרם</a><a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@blueroninapp">יוטיוב</a><a class="btn" target="_blank" rel="noopener" href="https://www.tiktok.com/@blueroninapp">טיקטוק</a><a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/blueroninapp/">פייסבוק</a></div></div>
@@ -1871,7 +1871,7 @@
       /* the draft survives leaving the tab (or the app): a rider often goes to check where the problem was */
       { const d = LS.get("fbDraft", null); if (d) { if (d.text) $("fbText").value = d.text; if (d.kind) $("fbKind").value = d.kind; }
         const save = () => LS.set("fbDraft", { text: $("fbText").value, kind: $("fbKind").value, t: Date.now() }); $("fbText").addEventListener("input", save); $("fbKind").addEventListener("change", save); }
-      $("fbPhoto").onclick = async () => { const [f] = await pickFile({}); if (!f) return; try { const im = await decodeImg(f); let q = 0.8, b = await toJpeg(im, 1400, q); while (b.size > 560 * 1024 && q > 0.4) { q -= 0.15; b = await toJpeg(im, 1100, q); } try { im.close && im.close(); } catch (e) { } st.fbAtt.photo = b; paintFbAtt(); } catch (e) { toast(e.message); } };
+      $("fbPhoto").onclick = fbAddPhotos;
       $("fbVoice").onclick = async () => { const b = await recordVoice(60); if (b) { if (b.size > 680 * 1024) return toast("ההקלטה ארוכה מדי"); st.fbAtt.voice = b; paintFbAtt(); } }; }
     $("repPhoto").onclick = reportPhoto;
     $("creditsGo").onclick = () => openModal(`<h2>מקורות המידע</h2><p class="small" style="margin:0">מפה: OpenFreeMap ו־© OpenStreetMap contributors (ODbL). מזג אוויר וגבהים: Open-Meteo (CC BY 4.0). מכ״ם: RainViewer. ניתוב: OSRM. תבליט: Mapzen/AWS Terrain Tiles. שקיעה וזריחה: SunCalc. תמונות: Mapillary ו־Wikimedia Commons, עם קרדיט לכל צילום. בתי קפה מומלצים: טיולי, mako, מעריב. אכיפה: וואלה (2012), ynetnews (2026).</p>`);
@@ -1880,12 +1880,32 @@
     $("introSnd").onchange = e => { LS.set("introSound", e.target.checked); toast(e.target.checked ? "הצליל יתנגן בפתיחה הבאה" : "הפתיחה תהיה שקטה"); };
     $("refAll").onclick = () => { loadWeather(true); loadOSM(true); loadCrowd(true); };
   }
-  function paintFbAtt() { const a = st.fbAtt || {}, box = $("fbAtt"); if (!box) return; box.innerHTML = (a.photo ? `<img src="${URL.createObjectURL(a.photo)}" alt="תמונה מצורפת"><button type="button" class="linkbtn small" data-fx="photo">הסרה</button>` : "") + (a.voice ? `<span class="chip">הקלטה ${Math.round(a.voice.size / 1024)}KB</span><button type="button" class="linkbtn small" data-fx="voice">הסרה</button>` : ""); box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
+  /* feedback photos: up to L.FB_PHOTOS_MAX, picked several at a time from the gallery, compressed on the phone */
+  const fbPhotos = () => { const a = st.fbAtt || (st.fbAtt = {}); if (a.photo) { a.photos = [a.photo]; delete a.photo; } return a.photos || (a.photos = []); };
+  async function fitJpeg(src, cap) { const im = await decodeImg(src); try { let max = 1400, q = 0.8, b = await toJpeg(im, max, q); while (b.size > cap && (q > 0.42 || max > 900)) { if (q > 0.42) q -= 0.12; else max -= 250; b = await toJpeg(im, max, q); } return b; } finally { try { im.close && im.close(); } catch (e) { } } }
+  async function fbAddPhotos() {
+    const have = fbPhotos(), room = L.FB_PHOTOS_MAX - have.length; if (room <= 0) return toast(`עד ${L.FB_PHOTOS_MAX} תמונות בדיווח`);
+    const files = await pickFile({ multiple: true }); if (!files.length) return;
+    const list = files.slice(0, room), cap = L.photoBudget(have.length + list.length), res = $("fbRes"); let bad = 0;
+    if (files.length > room) toast(`אפשר עד ${L.FB_PHOTOS_MAX} תמונות בדיווח. צורפו ${list.length}.`);
+    $("fbPhoto").disabled = true;
+    for (let i = 0; i < list.length; i++) { if (res && list.length > 1) res.textContent = `מכין תמונה ${i + 1} מתוך ${list.length}…`; try { have.push(await fitJpeg(list[i], cap)); } catch (e) { bad++; } paintFbAtt(); }
+    $("fbPhoto").disabled = false; if (res && list.length > 1) res.textContent = "";
+    if (bad) toast(bad === list.length ? "התמונה לא נתמכת" : `${bad} מהתמונות לא נתמכות ולא צורפו`);
+  }
+  function paintFbAtt() { const a = st.fbAtt || {}, box = $("fbAtt"); if (!box) return; const ph = fbPhotos();
+    box.innerHTML = ph.map((p, i) => `<span class="fbth"><img src="${URL.createObjectURL(p)}" alt="תמונה מצורפת ${i + 1}"><button type="button" class="fbx" data-fp="${i}" aria-label="הסרת תמונה ${i + 1}">✕</button></span>`).join("") + (ph.length ? `<span class="small muted">${ph.length}/${L.FB_PHOTOS_MAX}</span>` : "") + (a.voice ? `<span class="chip">הקלטה ${Math.round(a.voice.size / 1024)}KB</span><button type="button" class="linkbtn small" data-fx="voice">הסרה</button>` : "");
+    box.querySelectorAll("img").forEach(im => im.onload = () => URL.revokeObjectURL(im.src));
+    box.querySelectorAll("[data-fp]").forEach(b => b.onclick = () => { ph.splice(+b.dataset.fp, 1); paintFbAtt(); });
+    box.querySelectorAll("[data-fx]").forEach(b => b.onclick = () => { delete st.fbAtt[b.dataset.fx]; paintFbAtt(); }); }
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   async function sendFeedback() {
     const kind = $("fbKind").value, text = $("fbText").value.trim(); if (text.length < 3) return toast("כתבו כמה מילים");
-    const a = st.fbAtt || {}, photo = a.photo ? await b64of(a.photo) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
-    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photo || voice ? "שולח…" : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photo, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
+    const a = st.fbAtt || {}, ph = fbPhotos(), cap = L.photoBudget(ph.length);
+    /* photos added in two goes were sized for a smaller set: shrink any that are over their share now */
+    for (let i = 0; i < ph.length; i++) if (ph[i].size > cap) try { ph[i] = await fitJpeg(ph[i], cap); } catch (e) { }
+    const photos = ph.length ? await Promise.all(ph.map(b64of)) : undefined, voice = a.voice ? await b64of(a.voice) : undefined;
+    const post = async (lat, lon) => { $("fbGo").disabled = true; $("fbRes").textContent = photos || voice ? (photos && photos.length > 1 ? `שולח ${photos.length} תמונות…` : "שולח…") : ""; try { const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, lat, lon, chap: st.chap, ver: APP_VER, photos, voice }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "השליחה נכשלה"); $("fbText").value = ""; try { localStorage.removeItem("brn:fbDraft"); } catch (e) { } st.fbAtt = {}; paintFbAtt();
         $("fbRes").innerHTML = `<div class="fbok" role="status"><span class="ck">✓</span><div><b>הדיווח התקבל. תודה!</b><span class="small">${j.ref ? `מספר פנייה <b class="mono" dir="ltr">${esc(j.ref)}</b> · ` : ""}הצוות קורא כל דיווח${kind === "bug" ? " ומטפל בתקלות לפי דחיפות" : ""}.</span></div></div>`;
         try { navigator.vibrate && navigator.vibrate(60); } catch (e) { } $("fbRes").scrollIntoView({ block: "nearest", behavior: "smooth" }); toast("הדיווח נשלח ✓");
       } catch (e) { $("fbRes").innerHTML = `<div class="fberr" role="alert">${esc(e.message || "אין חיבור")}. הטקסט נשמר, אפשר לנסות שוב.</div>`; } $("fbGo").disabled = false; };
@@ -2463,11 +2483,15 @@
   async function memLimit() { if (isPro()) return true; const n = (await memAll()).length; if (n < FREE_MEM) return true; openPaywall("memories"); return false; }
   async function memAddPhotos(files, fromCamera) {
     if (!files || !files.length) return; if (!(await memLimit())) return; let pos = null; if (fromCamera) try { pos = await getPosFresh(5000); } catch (e) { }
-    const list = [...files].slice(0, 20); if (list.length > 1) toast(`שומר ${list.length} תמונות…`, 8000);
-    let n = 0; for (const f of list) { try { const im = await decodeImg(f); let full, th; try { full = await toJpeg(im, 1800, 0.84); th = await toJpeg(im, 420, 0.72); } finally { try { im.close && im.close(); } catch (e) { } } const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
-      await idb.put(Object.assign({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t, kind: "photo", blob: full, thumb: th, lat: pos ? pos[1] : null, lon: pos ? pos[0] : null, note: "" }, memCtx())); n++; } catch (e) { toast(e.message); } }
+    /* several photos from the gallery at once: up to MEM_PICK_MAX per pick, a running count, and one message
+       for the ones the phone could not read (the rest are saved) */
+    const MEM_PICK_MAX = 20, room = isPro() ? MEM_PICK_MAX : Math.max(1, Math.min(MEM_PICK_MAX, FREE_MEM - (await memAll()).length)), list = [...files].slice(0, room); let bad = 0;
+    let n = 0; for (const f of list) { if (list.length > 1) toast(`שומר תמונה ${n + bad + 1} מתוך ${list.length}…`, 8000); try { const im = await decodeImg(f); let full, th; try { full = await toJpeg(im, 1800, 0.84); th = await toJpeg(im, 420, 0.72); } finally { try { im.close && im.close(); } catch (e) { } } const t = fromCamera ? Date.now() : (f.lastModified || Date.now());
+      await idb.put(Object.assign({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t, kind: "photo", blob: full, thumb: th, lat: pos ? pos[1] : null, lon: pos ? pos[0] : null, note: "" }, memCtx())); n++; } catch (e) { bad++; } }
     memCache = null; try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
-    if (n) toast(n === 1 ? "התמונה נשמרה בזיכרונות" : `${n} תמונות נשמרו בזיכרונות`); renderMeIf();
+    const more = files.length > room ? (room < MEM_PICK_MAX ? ` · בגרסה החינמית נשמרות עד ${FREE_MEM} תמונות` : ` · נבחרו ${files.length}, נשמרות עד ${MEM_PICK_MAX} בכל פעם`) : "";
+    if (n) toast((n === 1 ? "התמונה נשמרה בזיכרונות" : `${n} תמונות נשמרו בזיכרונות`) + (bad ? ` · ${bad} לא נתמכו` : "") + more, bad || more ? 6000 : undefined);
+    else if (bad) toast(bad === 1 ? "התמונה לא נתמכת" : "התמונות לא נתמכות"); renderMeIf();
   }
   function pickPhotos(camera) { pickFile({ capture: camera, multiple: !camera }).then(fs => { if (fs.length) memAddPhotos(fs, camera); }); }
   /* voice recorder sheet, shared by memories and team reports */
@@ -2752,7 +2776,9 @@
       i.addEventListener("change", () => fin([...(i.files || [])]));
       i.addEventListener("cancel", () => fin([]));
       /* no 'cancel' event on older iOS: when the page regains focus and nothing came back within a while, give up */
-      const onFocus = () => setTimeout(() => { if (!done && !(i.files && i.files.length)) fin([]); }, 4000);
+      /* browsers with the 'cancel' event tell us themselves; give a big multi-photo pick time (iOS converts every photo) */
+      const wait = "oncancel" in i ? 60000 : multiple ? 15000 : 4000;
+      const onFocus = () => setTimeout(() => { if (!done && !(i.files && i.files.length)) fin([]); }, wait);
       setTimeout(() => window.addEventListener("focus", onFocus, { once: true }), 300);
       i.click();
     });

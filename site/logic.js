@@ -391,5 +391,10 @@
     return { pts: sm, head, step: st, km: L, n };
   }
 
-  g.BRL = { normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
+  /* Feedback photos: each one is compressed to fit its share of one request budget (the server takes up to
+     4 photos, 600KB each, 1.4MB together: lib/fbmedia.mjs). One photo keeps the old 560KB quality. */
+  const FB_PHOTOS_MAX = 4;
+  function photoBudget(n, total = 1200 * 1024, each = 560 * 1024) { return n > 0 ? Math.min(each, Math.floor(total / n)) : each; }
+
+  g.BRL = { FB_PHOTOS_MAX, photoBudget, normQuery, looksLikeAddress, nearestOnLine, offRoute, offThreshold, burnProfile, fuelSim, fuelLeftAt, fuelHue, inRing, ringSpans, instruction, speakable, arrowAngle, roadOf, flyPath, difficulty, DIFF_LEVELS, saturdayHours, fuelPlan, hav, bearing, angDiff, cumulative, pointAt, sample, curveSegments, curveStats, curveClass, CURVE_LABEL, windChill, gear, wmo, rideIndex, verdict, windowStats, glareSegments, nextSaturday, tilesForBbox, tilesAlong, simplifyByDist };
 })(typeof module !== "undefined" ? module.exports : window);

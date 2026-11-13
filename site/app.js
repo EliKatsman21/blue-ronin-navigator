@@ -7,6 +7,8 @@
   const APP_VER = "2.7.1";
   const L = window.BRL;
   const $ = id => document.getElementById(id);
+  /* the real window height: the body is sized to it in guard.js ("Viewport fit"); innerHeight can be short on iOS */
+  const vpH = () => (document.body && document.body.clientHeight) || innerHeight;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   /* Device storage. When the phone's quota is full, cached map data (routes, elevation, weather, places)
      is dropped first so the rider's own data (routes, rides, bike, safety, Pro) is never the thing lost. */
@@ -107,7 +109,7 @@
   const sheetPad = () => {
     if (innerWidth >= 900) return { top: 80, bottom: 40, left: 80, right: 460 };
     const sh = $("sheet").getBoundingClientRect().height || 300;
-    return { top: 90, bottom: Math.min(sh + 20, innerHeight * 0.6), left: 70, right: 30 };
+    return { top: 90, bottom: Math.min(sh + 20, vpH() * 0.6), left: 70, right: 30 };
   };
   /* One info window at a time: opening a popup for another place closes the previous one (like every maps app).
      Popups keep all their content and buttons; only the stacking is gone. */
@@ -725,7 +727,7 @@
      the zoom: the map is framed for the space above a half sheet at most) */
   const ISRAEL = [[34.27, 29.5], [35.9, 33.33]];
   function homeIsrael(dur = 1200) {
-    const ph = innerWidth < 900, H = innerHeight, pad = ph ? { top: 70, bottom: Math.min(H * 0.42, sheetPad().bottom || 0) + 10, left: 70, right: 16 } : { top: 70, bottom: 30, left: 90, right: Math.min(innerWidth * 0.42, 460) + 20 };
+    const ph = innerWidth < 900, H = vpH(), pad = ph ? { top: 70, bottom: Math.min(H * 0.42, sheetPad().bottom || 0) + 10, left: 70, right: 16 } : { top: 70, bottom: 30, left: 90, right: Math.min(innerWidth * 0.42, 460) + 20 };
     let cam = null; try { cam = map.cameraForBounds(ISRAEL, { padding: pad, bearing: 0 }); } catch (e) { }
     if (!cam) try { cam = map.cameraForBounds(ISRAEL, { padding: 10, bearing: 0 }); } catch (e) { }
     if (cam) map.easeTo(Object.assign({}, cam, { pitch: 0, bearing: 0, duration: dur })); else map.fitBounds(ISRAEL, { padding: 10, duration: dur });
@@ -2285,13 +2287,13 @@
   (() => {
     const head = $("sheetHead"), sheet = $("sheet"); if (!head) return; let drag = null;
     head.addEventListener("pointerdown", e => { if (e.target.closest("button") || innerWidth >= 900) return; drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, t: performance.now(), moved: false }; head.setPointerCapture(e.pointerId); sheet.classList.add("dragging"); });
-    head.addEventListener("pointermove", e => { if (!drag) return; const dy = e.clientY - drag.y; if (Math.abs(dy) > 4) drag.moved = true; const max = innerHeight - 64; sheet.style.height = Math.max(90, Math.min(max, drag.h - dy)) + "px"; });
+    head.addEventListener("pointermove", e => { if (!drag) return; const dy = e.clientY - drag.y; if (Math.abs(dy) > 4) drag.moved = true; const max = vpH() - 64; sheet.style.height = Math.max(90, Math.min(max, drag.h - dy)) + "px"; });
     const end = e => {
       if (!drag) return; sheet.classList.remove("dragging"); const dy = e.clientY - drag.y, v = dy / Math.max(1, performance.now() - drag.t), h = sheet.getBoundingClientRect().height; const was = drag; drag = null;
       if (!was.moved) { setSheet(st.sheet === "peek" ? "half" : st.sheet === "half" ? "full" : "half"); return; }
       if (v < -0.6) return setSheet(st.sheet === "peek" ? "half" : "full");
       if (v > 0.6) return setSheet(st.sheet === "full" ? "half" : "peek");
-      const H = innerHeight; const opts = [["peek", 124], ["half", Math.min(H * 0.46, 460)], ["full", H - 64]];
+      const H = vpH(); const opts = [["peek", 124], ["half", Math.min(H * 0.46, 460)], ["full", H - 64]];
       setSheet(opts.reduce((a, b) => Math.abs(b[1] - h) < Math.abs(a[1] - h) ? b : a)[0]);
     };
     head.addEventListener("pointerup", end); head.addEventListener("pointercancel", end);
@@ -2627,11 +2629,12 @@
     const set = () => document.documentElement.style.setProperty("--hudH", Math.round(h.getBoundingClientRect().height) + "px");
     /* short screens: when the map buttons would run into the top bar, lay them out in a row instead */
     b.classList.remove("fabs-row"); set();
-    if (innerWidth < 900) { const f = [...document.querySelectorAll("#fabs .fab")].filter(x => x.offsetParent); const colH = f.reduce((a, x) => a + x.offsetHeight + 8, 0); const top = innerHeight - h.getBoundingClientRect().height - 14 - colH; if (top < 72) { b.classList.add("fabs-row"); set(); } }
+    if (innerWidth < 900) { const f = [...document.querySelectorAll("#fabs .fab")].filter(x => x.offsetParent); const colH = f.reduce((a, x) => a + x.offsetHeight + 8, 0); const top = vpH() - h.getBoundingClientRect().height - 14 - colH; if (top < 72) { b.classList.add("fabs-row"); set(); } }
   }
   document.querySelectorAll("[data-hs]").forEach(b => b.onclick = () => hudSize(b.dataset.hs));
   if ("ResizeObserver" in window) new ResizeObserver(hudMeasure).observe($("hud"));
   const onTurn = () => setTimeout(() => { try { map.resize(); } catch (e) { } hudMeasure(); foldAttrib(); if (st.ride && st.me && !st.ride.free) map.easeTo({ center: [st.me.lon, st.me.lat], duration: 400, padding: ridePad() }); }, 350);
+  addEventListener("br:viewport", () => { try { map.resize(); } catch (e) { } hudMeasure(); });
   addEventListener("orientationchange", onTurn); try { screen.orientation && screen.orientation.addEventListener("change", onTurn); } catch (e) { }
   hudSize(LS.get("hudSize", "compact"));
   $("hudCam").onclick = () => pickPhotos(true);

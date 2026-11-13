@@ -55,7 +55,7 @@ test("M1: parallel requests from one IP cannot get past the hourly limit", async
   const ok = res.filter(r => r.status === 200).length;
   assert.ok(ok <= RATE_MAX, `${ok} accepted`);
   // the counter lives in its own blobs, one per request in this hour, not in the inbox
-  assert.ok([...fb.m.keys()].filter(k => k.startsWith("rl:")).length === 20);
+  assert.ok([...fb.m.keys()].filter(k => k.startsWith("rl:")).length <= 20);
 });
 
 test("M1: parallel reports from different riders all reach the inbox, and media is written only for them", async () => {
@@ -120,4 +120,37 @@ test("M2: a global daily media budget; above it reports are kept as text and the
   const { readFileSync } = await import("node:fs");
   const health = readFileSync(new URL("../../netlify/functions/lib/health.mjs", import.meta.url), "utf8");
   assert.match(health, /add\("fbmedia", sw\.pct < 0\.8/);
+});
+
+test("N1: an IP at the hourly limit gets 429 without a new marker; 200 requests leave at most the limit + a burst", async () => {
+  const { h, fb } = setup();
+  const marks = () => [...fb.m.keys()].filter(k => k.startsWith("rl:")).length;
+  const codes = [];
+  for (let i = 0; i < 200; i++) codes.push((await h(req({ kind: "bug", text: "הצפה " + i }))).status);
+  assert.equal(codes.filter(c => c === 200).length, RATE_MAX); assert.equal(codes.filter(c => c === 429).length, 200 - RATE_MAX);
+  assert.ok(marks() <= RATE_MAX + 1, `${marks()} markers`);
+  // a parallel flood from a new IP: still fails closed, and markers stay bounded by the burst size, not the total
+  const { h: h2, fb: fb2 } = setup(); const BURST = 10;
+  for (let i = 0; i < 200; i += BURST) await Promise.all(Array.from({ length: BURST }, (_, j) => h2(req({ kind: "bug", text: "מקביל " + (i + j) }, "ip7"))));
+  const m2 = [...fb2.m.keys()].filter(k => k.startsWith("rl:")).length;
+  assert.ok(m2 <= RATE_MAX + BURST, `${m2} markers after 200 parallel requests`);
+});
+
+test("N1: the sweep deletes in batches within its time budget, and the next run continues", async () => {
+  const { fb, media } = setup();
+  const now = Date.UTC(2026, 10, 13, 12, 0, 0), H = 36e5, old = Math.floor(now / H) - 3;
+  for (let i = 0; i < 2000; i++) fb.m.set(`rl:${old}:ip:${i}`, { data: "{}", metadata: {} });
+  // a virtual clock: every delete costs 10 ms
+  let clock = 0; const del = fb.delete.bind(fb); fb.delete = async k => { clock += 10; return del(k); };
+  const { sweepFeedback } = await import("../../netlify/functions/lib/feedback-core.mjs");
+  const r = await sweepFeedback({ fb, media, now, budgetMs: 1000, clock: () => clock });
+  assert.equal(r.more, true); assert.ok(r.markers > 0 && r.markers <= 125, `${r.markers} deleted in one run`);
+  assert.ok(clock <= 1000 + 25 * 10, `stopped near the budget (${clock} ms)`);
+  let runs = 1; while ((await sweepFeedback({ fb, media, now, budgetMs: 1000, clock: () => clock })).more) runs++;
+  assert.equal([...fb.m.keys()].filter(k => k.startsWith("rl:")).length, 0); assert.ok(runs > 1);
+  // the monitor runs the sweep only after the scan record and the state are saved
+  const { readFileSync } = await import("node:fs");
+  const health = readFileSync(new URL("../../netlify/functions/lib/health.mjs", import.meta.url), "utf8");
+  assert.ok(health.indexOf("await sweepFeedback(") > health.indexOf('await ops.setJSON("state", state)'), "sweep after the record");
+  assert.match(health, /budgetMs: manual \? 3000 : 8000/);
 });

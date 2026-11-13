@@ -6,7 +6,7 @@
 import { getStore } from "@netlify/blobs";
 import { opsStore, opsLog, usage } from "./ops.mjs";
 import { sendOne } from "./push.mjs";
-import { sweepFeedback } from "./feedback-core.mjs";
+import { sweepFeedback, mediaUse } from "./feedback-core.mjs";
 
 const errStore = () => getStore({ name: "brn-err", consistency: "strong" });
 const subsStore = () => getStore({ name: "brn-subs", consistency: "strong" });
@@ -90,8 +90,8 @@ export async function runScan({ manual = false } = {}) {
   const own = logs.filter(l => l.service !== "monitor"); /* the monitor's own alerts must not feed back into this check */
   const bad = own.filter(l => l.level === "error" || l.level === "critical"), crit = own.filter(l => l.level === "critical");
   add("ops", !bad.length, bad.length ? `${bad.length} שגיאות: ${[...new Set(bad.map(l => l.service))].join(", ")} · ${bad[bad.length - 1].msg}` : "אין שגיאות", null, crit.length ? "critical" : null);
-  /* feedback storage: orphan media (no inbox entry, older than an hour) and old rate markers are deleted */
-  try { const sw = await sweepFeedback({ ...fbStores(), now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB") }); if (sw.orphans) await opsLog("monitor", "info", `נמחקו ${sw.orphans} קובצי מדיה של משוב בלי דיווח`, sw);
+  /* feedback media: today's use against the daily budget (one list). The sweep runs after the record is saved. */
+  try { const sw = await mediaUse({ media: fbStores().media, now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB") });
     const mb = n => (n / 1048576).toFixed(1); add("fbmedia", sw.pct < 0.8, `${mb(sw.used)} מתוך ${mb(sw.cap)} MB היום (${Math.round(sw.pct * 100)}%)`, null, sw.pct >= 1 ? "high" : "normal"); } catch (e) { }
   let subs = 0; try { subs = (await subsStore().list()).blobs.length; } catch (e) { }
   add("push", true, `${subs} מנויים להתראות`);
@@ -120,6 +120,10 @@ export async function runScan({ manual = false } = {}) {
     for (const k of keys.filter(k => k.startsWith("u:") && !k.includes(":" + m0 + ":") && !k.includes(":" + m1 + ":")).slice(0, 500)) await ops.delete(k);
     if (all.length > 320) for (const k of all.slice(0, all.length - 300)) await errStore().delete(k);
   } catch (e) { }
+  /* N1: the feedback sweep runs last, after the record and the state are saved, in batches with a time budget
+     (a flood of rate markers can never cost the scan its result; what is left waits for the next scan) */
+  try { const sw = await sweepFeedback({ ...fbStores(), now, budgetMb: Netlify.env.get("FB_MEDIA_DAILY_MB"), budgetMs: manual ? 3000 : 8000 });
+    if (sw.orphans || sw.more) await opsLog("monitor", "info", `ניקוי משוב: ${sw.orphans} קובצי מדיה בלי דיווח, ${sw.markers} סימונים${sw.more ? " · נשאר עוד, ימשיך בסריקה הבאה" : ""}`, sw); } catch (e) { }
   return rec;
 }
 

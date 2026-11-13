@@ -37,9 +37,12 @@ test("each subscriber gets their chapter's brief, the best one when none or unkn
 test("the scheduled briefs send per chapter, and the subscription stores the chapter id only", () => {
   for (const f of ["brief-friday.mjs", "brief-saturday.mjs"]) {
     const src = read(`../../netlify/functions/${f}`);
-    assert.match(src, /sendAll\(rec => \{ const m = pickMessage\(b\.messages, cleanChap\(rec\.chap\)\)/, f);
+    /* the sending moved to brief-send-background through a one-time job (perf round 2.8); the payload per chapter is briefPayload */
+    assert.match(src, /dispatchBrief\(\{/, f); assert.match(src, /sendAll\(briefPayload\(job\), "(friday|saturday)"\)/, f);
     assert.equal((src.match(/computeBrief\(/g) || []).length, 1, `${f} computes the brief once`);
   }
+  assert.match(read("../../netlify/functions/lib/brief-job.mjs"), /const m = pickMessage\(job\.messages, cleanChap\(rec\.chap\)\)/);
+  assert.match(read("../../netlify/functions/brief-send-background.mjs"), /takeJob\(getStore\(\{ name: "brn"/);
   const push = read("../../netlify/functions/lib/push-core.mjs"); /* the logic moved here (N2) */
   assert.match(push, /prefs: clean, chap: c, ts: Date\.now\(\)/);
   assert.match(push, /rec\.chap = cleanChap\(body\.chap\)/);

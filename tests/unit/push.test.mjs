@@ -101,3 +101,42 @@ test("N2: a cap on stored subscriptions (PUSH_SUBS_CAP, default 20000) and the m
   assert.match(health, /subsCap\(Netlify\.env\.get\("PUSH_SUBS_CAP"\)\)/);
   assert.match(health, /add\("push", pct < 0\.9/);
 });
+
+test("perf: 1,000 subscribers fan out with 20 in flight, in bounded time", async () => {
+  const store = fakeStore();
+  for (let i = 0; i < 1000; i++) store.m.set(keyOf(sub(i).endpoint), JSON.stringify({ sub: sub(i), prefs: { friday: true, saturday: true }, chap: "" }));
+  let live = 0, peak = 0; const LAT = 20;
+  const send = async () => { live++; peak = Math.max(peak, live); await new Promise(r => setTimeout(r, LAT)); live--; return true; };
+  const t0 = Date.now(); const r = await sendAllWith({ store, send, payload: { title: "t", body: "b" }, pref: "friday" });
+  const ms = Date.now() - t0;
+  assert.equal(r.sent, 1000); assert.equal(peak, 20);
+  // one at a time this would be 1000 x 20 ms = 20 s; 20 in flight is about 1 s (allow for a slow machine)
+  assert.ok(ms < 5000, `${ms} ms`);
+  // worst case, every push service slow: 1000 / 20 x 5 s = 250 s, beyond the 30 s scheduled limit, hence the background hand-off
+  assert.ok(1000 / 20 * PUSH_TIMEOUT_MS / 1000 > 30);
+});
+
+test("perf: the brief is handed to a background function as a one-time job, sent at most once", async () => {
+  const { queueJob, takeJob, dispatchBrief, briefPayload, JOB_TTL } = await import("../../netlify/functions/lib/brief-job.mjs");
+  const b = { title: "T", sat: "2026-11-14", messages: { best: { title: "best", body: "B" }, byChap: { c2: { title: "c2", body: "C" } } } };
+  const store = fakeStore(), now = Date.UTC(2026, 10, 13, 14, 30);
+  // the background function took it (202): nothing sent inline, the job waits for it, once
+  let inline = 0, ids = [];
+  let r = await dispatchBrief({ store, b, mode: "friday", now, trigger: async id => { ids.push(id); return { status: 202 }; }, send: async () => { inline++; return { sent: 1 }; } });
+  assert.deepEqual(r, { queued: true }); assert.equal(inline, 0);
+  const job = await takeJob(store, ids[0], now + 1000); assert.equal(job.mode, "friday");
+  assert.equal(await takeJob(store, ids[0], now + 1000), null, "a job runs once");
+  const p = briefPayload(job);
+  assert.deepEqual(p({ chap: "c2" }), { title: "c2", body: "C", tag: "brief-2026-11-14", url: "./#brief" });
+  assert.equal(p({ chap: "nope" }).title, "best");
+  // the hand-off failed: the scheduled function sends inline, and the job is gone
+  r = await dispatchBrief({ store, b, mode: "saturday", now, trigger: async () => { throw new Error("down"); }, send: async j => { inline++; assert.equal(j.mode, "saturday"); return { sent: 7, total: 7 }; } });
+  assert.equal(r.queued, false); assert.equal(r.sent, 7); assert.equal(inline, 1); assert.equal(store.m.size, 0);
+  // nobody outside can start a send: bad ids, unknown ids, expired jobs
+  for (const id of [undefined, "", "x", "../job", "a".repeat(31), "A".repeat(32)]) assert.equal(await takeJob(store, id, now), null, String(id));
+  assert.equal(await takeJob(store, "f".repeat(32), now), null);
+  const old = await queueJob(store, b, "friday", now); assert.equal(await takeJob(store, old, now + JOB_TTL + 1), null); assert.equal(store.m.size, 0, "an expired job is deleted too");
+  // the scheduled functions only queue; the background function is the only sender of the brief
+  const bg = readFileSync(new URL("../../netlify/functions/brief-send-background.mjs", import.meta.url), "utf8");
+  assert.match(bg, /takeJob\(/); assert.match(bg, /sendAll\(briefPayload\(job\), MODES\[job\.mode\]\.pref\)/);
+});

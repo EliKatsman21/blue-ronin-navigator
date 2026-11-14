@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.blueronin.navigator",
+      "sha256_cert_fingerprints": [
+        "E2:A1:E4:3D:2D:9C:13:73:C5:65:F7:8C:1A:17:33:0A:B5:DF:1B:CB:08:58:6F:97:F2:81:7E:2D:9E:38:E9:C5",
+        "61:B2:E6:60:65:33:21:8E:18:6F:7B:61:92:31:FC:3B:78:D1:AE:89:78:6A:13:C4:E4:0B:95:CA:DE:BC:BB:E6"
+      ]
+    }
+  }
+]

@@ -1,0 +1,42 @@
+name: android
+# Builds the unsigned release bundle of the Play Store app (Trusted Web Activity in android/).
+# Signing happens off CI with the upload key, which is never in the repo or in Actions secrets.
+# The unsigned bundle is pushed to the orphan branch `android-builds` (Netlify ignores non-production builds).
+on:
+  push:
+    branches: [dev]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+concurrency:
+  group: android
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - name: Build release bundle (unsigned)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+          ls -la app/build/outputs/bundle/release/
+      - name: Publish to android-builds branch
+        run: |
+          set -e
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          VC=$(grep -oP 'versionCode \K[0-9]+' android/app/build.gradle)
+          mkdir /tmp/out && cp "$AAB" /tmp/out/app-release-unsigned.aab
+          cd /tmp/out
+          sha256sum app-release-unsigned.aab > SHA256SUMS
+          printf 'source: %s\nversionCode: %s\nbuilt: %s\n' "$GITHUB_SHA" "$VC" "$(date -u +%FT%TZ)" > BUILD.txt
+          git init -q -b android-builds
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -qm "Unsigned bundle v$VC from $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-builds

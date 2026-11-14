@@ -1,0 +1,60 @@
+{
+  "packageId": "app.blueronin.navigator",
+  "host": "blueronin.app",
+  "name": "Blue Ronin · ניווט לרוכבים",
+  "launcherName": "Blue Ronin",
+  "display": "standalone",
+  "themeColor": "#0A111E",
+  "themeColorDark": "#0A111E",
+  "navigationColor": "#0A111E",
+  "navigationColorDark": "#0A111E",
+  "navigationDividerColor": "#0A111E",
+  "navigationDividerColorDark": "#0A111E",
+  "backgroundColor": "#0A111E",
+  "enableNotifications": true,
+  "startUrl": "/?source=twa",
+  "iconUrl": "https://blueronin.app/icons/icon-512.png",
+  "maskableIconUrl": "https://blueronin.app/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./upload-key.jks",
+    "alias": "upload"
+  },
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "סוף שבוע",
+      "shortName": "סופ״ש",
+      "url": "/#brief",
+      "chosenIconUrl": "https://blueronin.app/icons/icon-192.png"
+    },
+    {
+      "name": "המסלולים",
+      "shortName": "מסלולים",
+      "url": "/#route",
+      "chosenIconUrl": "https://blueronin.app/icons/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-core",
+  "webManifestUrl": "https://blueronin.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "minSdkVersion": 21,
+  "orientation": "any",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "displayOverride": [],
+  "appVersionName": "2.8.0",
+  "appVersion": "2.8.0"
+}

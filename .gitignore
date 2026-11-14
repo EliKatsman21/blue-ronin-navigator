@@ -6,3 +6,12 @@ media/renders/
 *.mp4
 *.mov
 __pycache__/
+# Android (TWA): build output and signing keys never go in git
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore
+*.aab
+*.apk

@@ -55,7 +55,7 @@ android {
     namespace "app.blueronin.navigator"
     defaultConfig {
         applicationId "app.blueronin.navigator"
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 36
         versionCode 1
         versionName "2.8.0"

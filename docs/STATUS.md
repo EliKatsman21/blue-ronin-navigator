@@ -136,6 +136,7 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 - 2026-11-13 ~19:42 UTC Netlify (ticket #1191302) tried the internal move of the domain into Eli's Name.com account. It failed on the destination account's contacts, and the registry record was left at Name.com with status "client transfer prohibited, inactive" and **no nameservers**: blueronin.app answers NXDOMAIN everywhere. The old host also 301s to blueronin.app, so every way into the app is down (installed PWAs open from cache, but `/api` fails).
 - Eli verified all four Name.com contacts and asked Netlify to retry (2026-11-14 04:58 UTC), and opened Name.com ticket #3112318 asking to either finish the move or set the Cloudflare nameservers directly, no DS record (latest update 11:01 UTC).
 - Possible stopgap (needs Eli's OK, one deploy): make the old-host redirect in `netlify.toml` temporary-off so `blueronin-north-map.netlify.app` serves the app directly while the domain is down.
+- 2026-11-14 19:08 UTC: Netlify completed the move; blueronin.app is now in Eli's own Name.com account (Name.com "Account Transfer Notification", Netlify #1191302 confirmed). Next, at Name.com: nameservers → `damiete.ns.cloudflare.com` / `melany.ns.cloudflare.com`, auto-renew on, no DS yet. Then the Cloudflare checklist in Open items.
 - Lesson: never let a registrar move run without a rollback path; ask the reseller to set the nameservers before or during the move, and keep the old host serving.
 
 ## Cloudflare edge (set up 2026-11-12, waiting for the nameserver switch)

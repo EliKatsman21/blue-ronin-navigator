@@ -17,26 +17,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
+      # The ubuntu runner ships the Android SDK in $ANDROID_HOME; Gradle fetches missing platforms itself.
       - name: Build release bundle (unsigned)
         working-directory: android
         run: |
+          set -o pipefail
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           chmod +x gradlew
-          ./gradlew --no-daemon bundleRelease
-          ls -la app/build/outputs/bundle/release/
+          ./gradlew --no-daemon --stacktrace bundleRelease 2>&1 | tee /tmp/build.log
+      # Logs of public runs need a GitHub sign-in, so the build log is published with the bundle (also on failure).
       - name: Publish to android-builds branch
+        if: always()
         run: |
           set -e
           AAB=android/app/build/outputs/bundle/release/app-release.aab
           VC=$(grep -oP 'versionCode \K[0-9]+' android/app/build.gradle)
-          mkdir /tmp/out && cp "$AAB" /tmp/out/app-release-unsigned.aab
+          mkdir /tmp/out
+          tail -c 200000 /tmp/build.log > /tmp/out/build.log 2>/dev/null || echo "no build log" > /tmp/out/build.log
+          if [ -f "$AAB" ]; then cp "$AAB" /tmp/out/app-release-unsigned.aab; STATUS=ok; else STATUS=failed; fi
           cd /tmp/out
-          sha256sum app-release-unsigned.aab > SHA256SUMS
+          [ "$STATUS" = ok ] && sha256sum app-release-unsigned.aab > SHA256SUMS
+          echo "status: $STATUS" > STATUS
           printf 'source: %s\nversionCode: %s\nbuilt: %s\n' "$GITHUB_SHA" "$VC" "$(date -u +%FT%TZ)" > BUILD.txt
           git init -q -b android-builds
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
-          git add -A && git commit -qm "Unsigned bundle v$VC from $GITHUB_SHA"
+          git add -A && git commit -qm "Bundle v$VC ($STATUS) from $GITHUB_SHA"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-builds

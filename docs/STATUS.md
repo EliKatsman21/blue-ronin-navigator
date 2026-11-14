@@ -104,7 +104,12 @@ Voice unlocked inside the tap; arrival call-outs, ETA, curve warnings, sunset re
 
 ## Business and launch
 - Plan doc: https://claude.ai/artifact/VRcrkLdMD3SnckamEmpbMd · HQ board: https://claude.ai/artifact/8fSTGLQZPBrYZ4o2b7tNp7
-- Google Play: personal account opened 2026-11-06; identity verification done, device verification pending: needs a physical Android phone (Android 10+) with the Play Console app (no emulator, iPhone can't do it). Eli to borrow or buy a cheap used one, which is also needed to test the Android app. Next: create app, package `app.blueronin.navigator`, AAB via PWABuilder, `/.well-known/assetlinks.json`, closed test 12 testers × 14 days.
+- Google Play (issue #14): personal account, identity and device verified (device check done 2026-11-14 on a friend's Android phone). App created 2026-11-14: Play app id 4973717920188794510, package `app.blueronin.navigator`, store name "Blue Ronin · ניווט לרוכבים" (no "נביגטור"), Hebrew default, free, Play App Signing on.
+  - `android/`: Trusted Web Activity generated with Bubblewrap core (PWABuilder's scanner timed out on the site), minSdk 24, target 36, location + notification delegation. `android/README.md` has the flow.
+  - CI `android.yml` builds the unsigned bundle on pushes to `dev` touching `android/`, and pushes it with the build log to branch `android-builds` (public run logs need a sign-in). Signing is done off CI with the upload key (alias `upload`, SHA-256 `61:B2:E6:…:BB:E6`), which Eli keeps; it is not in git or Actions secrets. The signed v1 is on branch `android-release`.
+  - Play app-signing certificate SHA-256 `E2:A1:E4:…:E9:C5`. Both are in `site/.well-known/assetlinks.json` (on `dev`; live only after the next production release, until then the Android app shows a browser bar).
+  - versionCode 1 (2.8.0) uploaded to internal testing as a draft. Web releases reach the Android app with no new upload; a new upload (higher versionCode) only when `android/` changes.
+  - Next: the 11 "App content" declarations, store listing (texts, 512 icon, 1024×500 feature graphic, phone screenshots), then closed test 12 testers × 14 days.
 
 ## Marketing and launch (plan written 2026-11-11)
 - Plan doc (Hebrew, editable): https://claude.ai/artifact/6V7PFQk33MePZ75pyptWf1 . HQ items g00–g33 (area "שיווק"). Pre-registration on Play stays locked until the closed test passes, so the waitlist lives on blueronin.app.
